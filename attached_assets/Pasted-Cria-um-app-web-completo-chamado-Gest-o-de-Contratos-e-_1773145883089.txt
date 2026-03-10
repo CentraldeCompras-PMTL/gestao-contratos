@@ -1,0 +1,102 @@
+Cria um app web completo chamado "Gestão de Contratos e AFs" usando Next.js 15 (App Router) com TypeScript, Tailwind CSS, shadcn/ui, React Hook Form e backend completo. Use Prisma ORM + PostgreSQL (banco integrado do Replit ou Supabase pronto para configurar). Tudo persistente e multiusuário.
+
+Autenticação:
+- Login com email + senha
+- Cadastro de usuários
+- Todas as rotas protegidas
+
+Banco de dados Prisma Schema (exatamente assim):
+
+1. Fornecedor
+   - id (uuid)
+   - nome (string obrigatório)
+   - cnpj (string único)
+   - email (string)
+   - telefone (string)
+   - criado_em (timestamp)
+   - atualizado_em (timestamp)
+
+2. ProcessoDigital
+   - id (uuid)
+   - numero_processo_digital (string único obrigatório)
+   - objeto_completo (text longo)
+   - objeto_resumido (string, ex: "Medicamentos", "Materiais de Enfermagem", "Serviços de Limpeza")
+   - descricao (text opcional)
+   - criado_em (timestamp)
+   - atualizado_em (timestamp)
+
+3. FaseContratacao
+   - id (uuid)
+   - processo_digital_id (relation to ProcessoDigital - um processo tem várias fases)
+   - nome_fase (string)
+   - fornecedor_id (relation to Fornecedor)
+   - data_inicio (date)
+   - data_fim (date opcional)
+   - criado_em (timestamp)
+
+4. Contrato
+   - id (uuid)
+   - processo_digital_id (relation to ProcessoDigital)
+   - fase_contratacao_id (relation to FaseContratacao)
+   - numero_contrato (string único)
+   - fornecedor_id (relation to Fornecedor)
+   - valor_contrato (decimal 2 casas)
+   - vigencia_inicial (date)
+   - vigencia_final (date)
+   - criado_em (timestamp)
+   - atualizado_em (timestamp)
+   // objeto_completo e objeto_resumido serão puxados automaticamente do ProcessoDigital
+
+5. Empenho
+   - id (uuid)
+   - contrato_id (relation to Contrato)
+   - data_empenho (date)
+   - valor_empenho (decimal 2 casas)
+   - criado_em (timestamp)
+
+6. AF
+   - id (uuid)
+   - empenho_id (relation to Empenho)
+   - data_pedido_af (date)
+   - valor_af (decimal 2 casas)
+   - data_estimada_entrega (date) → calculado automaticamente = data_pedido_af + 30 dias
+   - data_entrega_real (date opcional)
+   - flag_entrega_notificada (boolean default false)
+   - criado_em (timestamp)
+
+Regras importantes:
+- Sempre que exibir Contrato, Fase ou AF, mostre objeto_completo e objeto_resumido vindos do ProcessoDigital (nunca cadastre novamente)
+- No formulário de Novo Contrato: escolhe Processo Digital → automaticamente preenche objeto_completo e objeto_resumido (não editável)
+- Saldo Contrato = valor_contrato - soma de todos empenhos
+- Saldo Empenho = valor_empenho - soma de todas AFs do empenho
+- Atualizar saldos em tempo real
+
+Interface (shadcn/ui moderno):
+
+Menu lateral: Dashboard | Fornecedores | Processos Digitais | Contratos | Notificações
+
+- Cadastro de Fornecedores (lista completa + novo + editar + busca)
+- Cadastro de Processos Digitais (lista + novo) → campos: número do processo, objeto completo, objeto resumido, descrição
+- Dentro de cada Processo Digital: lista de Fases de Contratação (com fornecedor e datas)
+- Cadastro de Contrato:
+  - Dropdown de Processo Digital
+  - Dropdown de Fase de Contratação (filtra pelas do processo escolhido)
+  - Dropdown de Fornecedor
+  - Campos: número do contrato, valor, vigência inicial e final
+  - Objeto Completo e Resumido aparecem automaticamente (somente leitura)
+- Tabela de Contratos com filtros (processo, fase, fornecedor, objeto resumido, vigência, saldo)
+- Detalhes do Contrato: tabs Informações | Empenhos | AFs
+- Notificações in-app:
+  - 10 dias antes da entrega → alerta amarelo
+  - Atrasadas → alerta vermelho + botão "Notificar Empresa" (marca flag)
+- Exportar qualquer lista para Excel/CSV
+
+Crie dados de exemplo:
+- 5 fornecedores
+- 2 Processos Digitais (cada um com objeto completo e resumido preenchido)
+- 3 Fases por processo
+- 3 Contratos completos
+
+Depois que terminar, rode o projeto, deixe variáveis de ambiente do banco prontas e mostre o link de preview.
+
+Faça tudo sozinho: schema, migrations, seed, frontend, backend, cálculos e relacionamentos.
