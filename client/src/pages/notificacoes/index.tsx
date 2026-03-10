@@ -54,10 +54,10 @@ export default function Notificacoes() {
           </div>
         ) : (
           notificacoes.map((item: any) => {
-            const isAtrasado = item.status === 'atrasado';
+            const isAtrasado = item.isLate === true;
             
             return (
-              <Card key={item.af.id} className={`border-l-4 shadow-sm transition-all hover:shadow-md ${
+              <Card key={item.id} className={`border-l-4 shadow-sm transition-all hover:shadow-md ${
                 isAtrasado ? 'border-l-red-500 bg-red-50/10' : 'border-l-amber-500 bg-amber-50/10'
               }`}>
                 <CardContent className="p-6 flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
@@ -65,7 +65,7 @@ export default function Notificacoes() {
                     <div className="flex items-center gap-2">
                       {isAtrasado ? <AlertCircle className="text-red-500" /> : <BellRing className="text-amber-500" />}
                       <h3 className="text-lg font-bold text-foreground">
-                        Contrato: {item.contrato.numeroContrato}
+                        Contrato: {item.contrato}
                       </h3>
                       <Badge variant="outline" className={isAtrasado ? "bg-red-100 text-red-800 border-red-200" : "bg-amber-100 text-amber-800 border-amber-200"}>
                         {isAtrasado ? 'Atrasado' : 'Prazo Próximo'}
@@ -73,7 +73,7 @@ export default function Notificacoes() {
                     </div>
                     
                     <p className="text-sm text-muted-foreground max-w-2xl">
-                      A Autorização de Fornecimento (AF) no valor de R$ {item.af.valorAf} vinculada ao fornecedor <strong>{item.contrato.fornecedor.nome}</strong> tem entrega estimada para <strong>{formatDate(item.af.dataEstimadaEntrega)}</strong>.
+                      A Autorização de Fornecimento (AF) no valor de R$ {item.af.valorAf} vinculada ao fornecedor <strong>{item.fornecedor}</strong> tem entrega estimada para <strong>{formatDate(item.af.dataEstimadaEntrega)}</strong>.
                     </p>
                   </div>
 
