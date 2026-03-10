@@ -78,11 +78,27 @@ export const api = {
     }
   },
   fases: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/fases' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/fases/:id' as const,
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
     create: {
       method: 'POST' as const,
-      path: '/api/processos/:processoId/fases' as const,
-      input: insertFaseContratacaoSchema.omit({ processoDigitalId: true }),
+      path: '/api/fases' as const,
+      input: insertFaseContratacaoSchema,
       responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/fases/:id' as const,
+      input: insertFaseContratacaoSchema.partial(),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
     }
   },
   contratos: {

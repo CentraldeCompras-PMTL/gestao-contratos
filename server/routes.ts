@@ -69,14 +69,32 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/processos/:processoId/fases", requireAuth, async (req, res) => {
+  app.get(api.fases.list.path, requireAuth, async (req, res) => {
+    const f = await storage.getFases();
+    res.json(f);
+  });
+
+  app.get(api.fases.get.path, requireAuth, async (req, res) => {
+    const f = await storage.getFase(req.params.id);
+    if (!f) return res.status(404).json({ message: "Not found" });
+    res.json(f);
+  });
+
+  app.post(api.fases.create.path, requireAuth, async (req, res) => {
     try {
       const data = api.fases.create.input.parse(req.body);
-      const f = await storage.createFaseContratacao({
-        ...data,
-        processoDigitalId: req.params.processoId
-      });
+      const f = await storage.createFaseContratacao(data);
       res.status(201).json(f);
+    } catch (e) {
+      res.status(400).json({ message: "Validation error" });
+    }
+  });
+
+  app.put(api.fases.update.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.fases.update.input.parse(req.body);
+      const f = await storage.updateFaseContratacao(req.params.id, data);
+      res.json(f);
     } catch (e) {
       res.status(400).json({ message: "Validation error" });
     }

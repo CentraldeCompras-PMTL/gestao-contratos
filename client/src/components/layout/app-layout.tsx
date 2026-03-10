@@ -25,6 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Fornecedores", href: "/fornecedores", icon: Users },
     { name: "Processos Digitais", href: "/processos", icon: FolderOpen },
+    { name: "Fases de Contratação", href: "/fases", icon: FileText },
     { name: "Contratos", href: "/contratos", icon: FileText },
     { name: "Notificações", href: "/notificacoes", icon: Bell },
   ];

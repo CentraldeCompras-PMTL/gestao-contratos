@@ -36,7 +36,9 @@ export const fasesContratacao = pgTable("fases_contratacao", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   processoDigitalId: varchar("processo_digital_id").references(() => processosDigitais.id).notNull(),
   nomeFase: text("nome_fase").notNull(),
-  fornecedorId: varchar("fornecedor_id").references(() => fornecedores.id),
+  fornecedorId: varchar("fornecedor_id").references(() => fornecedores.id).notNull(),
+  modalidade: text("modalidade").notNull(),
+  numeroModalidade: text("numero_modalidade").notNull(),
   dataInicio: text("data_inicio").notNull(),
   dataFim: text("data_fim"),
   criadoEm: timestamp("criado_em").defaultNow(),
@@ -110,6 +112,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
 export const insertFornecedorSchema = createInsertSchema(fornecedores).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertProcessoDigitalSchema = createInsertSchema(processosDigitais).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertFaseContratacaoSchema = createInsertSchema(fasesContratacao).omit({ id: true, criadoEm: true });
+export const updateFaseContratacaoSchema = insertFaseContratacaoSchema.partial();
 export const insertContratoSchema = createInsertSchema(contratos).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertEmpenhoSchema = createInsertSchema(empenhos).omit({ id: true, criadoEm: true });
 export const insertAfSchema = createInsertSchema(afs).omit({ id: true, dataEstimadaEntrega: true, criadoEm: true, flagEntregaNotificada: true });
@@ -126,11 +129,12 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertFornecedor = z.infer<typeof insertFornecedorSchema>;
 export type InsertProcessoDigital = z.infer<typeof insertProcessoDigitalSchema>;
 export type InsertFaseContratacao = z.infer<typeof insertFaseContratacaoSchema>;
+export type UpdateFaseContratacao = z.infer<typeof updateFaseContratacaoSchema>;
 export type InsertContrato = z.infer<typeof insertContratoSchema>;
 export type InsertEmpenho = z.infer<typeof insertEmpenhoSchema>;
 export type InsertAf = z.infer<typeof insertAfSchema>;
 
-export type FaseContratacaoWithRelations = FaseContratacao & { fornecedor: Fornecedor | null };
+export type FaseContratacaoWithRelations = FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital };
 export type ProcessoDigitalWithRelations = ProcessoDigital & { fases: FaseContratacaoWithRelations[] };
 export type AfWithRelations = Af & {
   empenho: Empenho & {

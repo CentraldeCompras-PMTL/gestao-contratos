@@ -14,6 +14,7 @@ import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
 import Fornecedores from "./pages/fornecedores";
 import Processos from "./pages/processos";
+import Fases from "./pages/fases";
 import Contratos from "./pages/contratos";
 import ContratoDetail from "./pages/contratos/[id]";
 import Notificacoes from "./pages/notificacoes";
@@ -43,6 +44,7 @@ function Router() {
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/fornecedores" component={() => <ProtectedRoute component={Fornecedores} />} />
       <Route path="/processos" component={() => <ProtectedRoute component={Processos} />} />
+      <Route path="/fases" component={() => <ProtectedRoute component={Fases} />} />
       <Route path="/contratos" component={() => <ProtectedRoute component={Contratos} />} />
       <Route path="/contratos/:id" component={() => <ProtectedRoute component={ContratoDetail} />} />
       <Route path="/notificacoes" component={() => <ProtectedRoute component={Notificacoes} />} />

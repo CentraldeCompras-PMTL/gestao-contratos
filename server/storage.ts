@@ -22,7 +22,10 @@ export interface IStorage {
   getProcessoDigital(id: string): Promise<ProcessoDigitalWithRelations | undefined>;
   createProcessoDigital(processo: InsertProcessoDigital): Promise<ProcessoDigital>;
   
+  getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital })[]>;
+  getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital }) | undefined>;
   createFaseContratacao(fase: InsertFaseContratacao): Promise<FaseContratacao>;
+  updateFaseContratacao(id: string, fase: Partial<InsertFaseContratacao>): Promise<FaseContratacao>;
 
   getContratos(): Promise<ContratoWithRelations[]>;
   getContrato(id: string): Promise<ContratoWithRelations | undefined>;
@@ -99,9 +102,33 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital })[]> {
+    return await db.query.fasesContratacao.findMany({
+      with: {
+        fornecedor: true,
+        processoDigital: true
+      }
+    });
+  }
+
+  async getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital }) | undefined> {
+    return await db.query.fasesContratacao.findFirst({
+      where: eq(fasesContratacao.id, id),
+      with: {
+        fornecedor: true,
+        processoDigital: true
+      }
+    });
+  }
+
   async createFaseContratacao(fase: InsertFaseContratacao): Promise<FaseContratacao> {
     const [created] = await db.insert(fasesContratacao).values(fase).returning();
     return created;
+  }
+
+  async updateFaseContratacao(id: string, fase: Partial<InsertFaseContratacao>): Promise<FaseContratacao> {
+    const [updated] = await db.update(fasesContratacao).set(fase).where(eq(fasesContratacao.id, id)).returning();
+    return updated;
   }
 
   async getContratos(): Promise<ContratoWithRelations[]> {
