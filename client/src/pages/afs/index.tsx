@@ -133,11 +133,13 @@ export default function AfsPanel() {
                     <TableCell className="text-sm">{formatDate(af.dataExtensao || af.dataEstimadaEntrega)}</TableCell>
                     <TableCell>
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        af.flagEntregaNotificada 
+                        af.dataEntregaReal
+                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100'
+                          : af.flagEntregaNotificada
                           ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100'
                           : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-gray-100'
                       }`}>
-                        {af.flagEntregaNotificada ? 'Notificada' : 'Pendente'}
+                        {af.dataEntregaReal ? 'Entregue' : af.flagEntregaNotificada ? 'Notificada' : 'Pendente'}
                       </span>
                     </TableCell>
                     <TableCell>
