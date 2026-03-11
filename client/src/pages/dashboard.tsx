@@ -140,12 +140,12 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Fornecedor</label>
-            <Select value={filterFornecedor} onValueChange={setFilterFornecedor}>
+            <Select value={filterFornecedor || "all"} onValueChange={(v) => setFilterFornecedor(v === "all" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todos os fornecedores" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os fornecedores</SelectItem>
+                <SelectItem value="all">Todos os fornecedores</SelectItem>
                 {fornecedoresUnicos.map(f => (
                   <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
                 ))}
@@ -154,12 +154,12 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Processo Digital</label>
-            <Select value={filterProcesso} onValueChange={setFilterProcesso}>
+            <Select value={filterProcesso || "all"} onValueChange={(v) => setFilterProcesso(v === "all" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todos os processos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os processos</SelectItem>
+                <SelectItem value="all">Todos os processos</SelectItem>
                 {processosUnicos.map(p => (
                   <SelectItem key={p.id} value={p.id}>{p.numero}</SelectItem>
                 ))}
@@ -168,12 +168,12 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Departamento</label>
-            <Select value={filterDepartamento} onValueChange={setFilterDepartamento}>
+            <Select value={filterDepartamento || "all"} onValueChange={(v) => setFilterDepartamento(v === "all" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todos os departamentos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os departamentos</SelectItem>
+                <SelectItem value="all">Todos os departamentos</SelectItem>
                 {departamentosUnicos.map(d => (
                   <SelectItem key={d.id} value={d.id}>Depto. {d.id.slice(0, 8)}</SelectItem>
                 ))}
