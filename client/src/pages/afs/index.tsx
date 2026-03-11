@@ -117,19 +117,17 @@ export default function AfsPanel() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        {!af.dataEntregaReal && (
-                          <Button 
-                            size="sm" 
-                            variant="default"
-                            onClick={() => {
-                              setSelectedAf(af);
-                              setDialogMode("entrega");
-                            }}
-                            data-testid={`button-entrega-${af.id}`}
-                          >
-                            <CheckCircle size={16} />
-                          </Button>
-                        )}
+                        <Button 
+                          size="sm" 
+                          variant={af.dataEntregaReal ? "outline" : "default"}
+                          onClick={() => {
+                            setSelectedAf(af);
+                            setDialogMode("entrega");
+                          }}
+                          data-testid={`button-entrega-${af.id}`}
+                        >
+                          <CheckCircle size={16} />
+                        </Button>
                         {af.flagEntregaNotificada && !af.dataEntregaReal && (
                           <Button 
                             size="sm" 
