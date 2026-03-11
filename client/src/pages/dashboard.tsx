@@ -28,7 +28,13 @@ export default function Dashboard() {
 
   const fornecedoresUnicos = useMemo(() => {
     const map = new Map();
-    contratos.forEach((c: any) => {
+    // Filtrar contratos baseado em processo e departamento
+    const base = contratos.filter((c: any) => {
+      if (filterProcesso && c.processoDigital.id !== filterProcesso) return false;
+      if (filterDepartamento && c.processoDigital.departamentoId !== filterDepartamento) return false;
+      return true;
+    });
+    base.forEach((c: any) => {
       if (!map.has(c.fornecedor.id)) {
         map.set(c.fornecedor.id, { id: c.fornecedor.id, nome: c.fornecedor.nome, count: 0, valor: 0 });
       }
@@ -37,11 +43,17 @@ export default function Dashboard() {
       item.valor += parseFloat(c.valorContrato || 0);
     });
     return Array.from(map.values());
-  }, [contratos]);
+  }, [contratos, filterProcesso, filterDepartamento]);
 
   const processosUnicos = useMemo(() => {
     const map = new Map();
-    contratos.forEach((c: any) => {
+    // Filtrar contratos baseado em fornecedor e departamento
+    const base = contratos.filter((c: any) => {
+      if (filterFornecedor && c.fornecedor.id !== filterFornecedor) return false;
+      if (filterDepartamento && c.processoDigital.departamentoId !== filterDepartamento) return false;
+      return true;
+    });
+    base.forEach((c: any) => {
       if (!map.has(c.processoDigital.id)) {
         map.set(c.processoDigital.id, { id: c.processoDigital.id, numero: c.processoDigital.numeroProcessoDigital, count: 0, valor: 0 });
       }
@@ -50,11 +62,17 @@ export default function Dashboard() {
       item.valor += parseFloat(c.valorContrato || 0);
     });
     return Array.from(map.values());
-  }, [contratos]);
+  }, [contratos, filterFornecedor, filterDepartamento]);
 
   const departamentosUnicos = useMemo(() => {
     const map = new Map();
-    contratos.forEach((c: any) => {
+    // Filtrar contratos baseado em fornecedor e processo
+    const base = contratos.filter((c: any) => {
+      if (filterFornecedor && c.fornecedor.id !== filterFornecedor) return false;
+      if (filterProcesso && c.processoDigital.id !== filterProcesso) return false;
+      return true;
+    });
+    base.forEach((c: any) => {
       if (c.processoDigital.departamentoId) {
         const deptId = c.processoDigital.departamentoId;
         if (!map.has(deptId)) {
@@ -66,7 +84,7 @@ export default function Dashboard() {
       }
     });
     return Array.from(map.values());
-  }, [contratos]);
+  }, [contratos, filterFornecedor, filterProcesso]);
 
   const saldoFiltrado = useMemo(() => {
     let total = 0;
