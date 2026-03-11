@@ -1,12 +1,14 @@
 import { z } from 'zod';
 import { 
   insertUserSchema, 
+  insertDepartamentoSchema,
   insertFornecedorSchema, 
   insertProcessoDigitalSchema, 
   insertFaseContratacaoSchema,
   insertContratoSchema,
   insertEmpenhoSchema,
-  insertAfSchema
+  insertAfSchema,
+  insertNotaFiscalSchema
 } from './schema';
 
 export const errorSchemas = {
@@ -16,6 +18,25 @@ export const errorSchemas = {
 };
 
 export const api = {
+  departamentos: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/departamentos' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/departamentos' as const,
+      input: insertDepartamentoSchema,
+      responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/departamentos/:id' as const,
+      input: insertDepartamentoSchema.partial(),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    }
+  },
   auth: {
     login: {
       method: 'POST' as const,
@@ -75,6 +96,12 @@ export const api = {
       method: 'GET' as const,
       path: '/api/processos/:id' as const,
       responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/processos/:id' as const,
+      input: insertProcessoDigitalSchema.partial(),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
     }
   },
   fases: {
@@ -128,6 +155,11 @@ export const api = {
     }
   },
   afs: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/afs' as const,
+      responses: { 200: z.array(z.any()) },
+    },
     create: {
       method: 'POST' as const,
       path: '/api/empenhos/:empenhoId/afs' as const,
@@ -143,6 +175,31 @@ export const api = {
       method: 'PATCH' as const,
       path: '/api/afs/:id/entrega' as const,
       input: z.object({ dataEntregaReal: z.string() }),
+      responses: { 200: z.any() },
+    },
+    extend: {
+      method: 'PATCH' as const,
+      path: '/api/afs/:id/extend' as const,
+      input: z.object({ dataExtensao: z.string() }),
+      responses: { 200: z.any() },
+    }
+  },
+  notasFiscais: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/notas-fiscais' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/notas-fiscais' as const,
+      input: insertNotaFiscalSchema,
+      responses: { 201: z.any() },
+    },
+    paymentStatus: {
+      method: 'PATCH' as const,
+      path: '/api/notas-fiscais/:id/pagamento' as const,
+      input: z.object({ statusPagamento: z.enum(['pendente', 'pago']), dataPagamento: z.string().optional() }),
       responses: { 200: z.any() },
     }
   },

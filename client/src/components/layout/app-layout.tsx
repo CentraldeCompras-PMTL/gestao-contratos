@@ -27,6 +27,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     { name: "Processos Digitais", href: "/processos", icon: FolderOpen },
     { name: "Fases de Contratação", href: "/fases", icon: FileText },
     { name: "Contratos", href: "/contratos", icon: FileText },
+    { name: "Notas Fiscais", href: "/notas-fiscais", icon: FileText },
+    { name: "AFs", href: "/afs", icon: FileText },
+    { name: "Departamentos", href: "/departamentos", icon: Users },
     { name: "Notificações", href: "/notificacoes", icon: Bell },
   ];
 

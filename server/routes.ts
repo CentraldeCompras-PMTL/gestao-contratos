@@ -19,6 +19,31 @@ export async function registerRoutes(
     next();
   };
 
+  app.get(api.departamentos.list.path, requireAuth, async (req, res) => {
+    const d = await storage.getDepartamentos();
+    res.json(d);
+  });
+
+  app.post(api.departamentos.create.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.departamentos.create.input.parse(req.body);
+      const d = await storage.createDepartamento(data);
+      res.status(201).json(d);
+    } catch (e) {
+      res.status(400).json({ message: "Validation error" });
+    }
+  });
+
+  app.put(api.departamentos.update.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.departamentos.update.input.parse(req.body);
+      const d = await storage.updateDepartamento(req.params.id, data);
+      res.json(d);
+    } catch (e) {
+      res.status(400).json({ message: "Validation error" });
+    }
+  });
+
   app.get(api.fornecedores.list.path, requireAuth, async (req, res) => {
     const fornecedores = await storage.getFornecedores();
     res.json(fornecedores);
@@ -43,6 +68,16 @@ export async function registerRoutes(
       const f = await storage.updateFornecedor(req.params.id, data);
       if (!f) return res.status(404).json({ message: "Not found" });
       res.json(f);
+    } catch (e) {
+      res.status(400).json({ message: "Validation error" });
+    }
+  });
+
+  app.put(api.processos.update.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.processos.update.input.parse(req.body);
+      const p = await storage.updateProcessoDigital(req.params.id, data);
+      res.json(p);
     } catch (e) {
       res.status(400).json({ message: "Validation error" });
     }
@@ -165,6 +200,41 @@ export async function registerRoutes(
       const data = api.afs.updateEntrega.input.parse(req.body);
       const a = await storage.updateAfEntrega(req.params.id, data.dataEntregaReal);
       res.json(a);
+    } catch (e) {
+      res.status(400).json({ message: "Validation error" });
+    }
+  });
+
+  app.patch(api.afs.extend.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.afs.extend.input.parse(req.body);
+      const a = await storage.extendAf(req.params.id, data.dataExtensao);
+      res.json(a);
+    } catch (e) {
+      res.status(400).json({ message: "Validation error" });
+    }
+  });
+
+  app.get(api.notasFiscais.list.path, requireAuth, async (req, res) => {
+    const notas = await storage.getNotasFiscais();
+    res.json(notas);
+  });
+
+  app.post(api.notasFiscais.create.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.notasFiscais.create.input.parse(req.body);
+      const n = await storage.createNotaFiscal(data);
+      res.status(201).json(n);
+    } catch (e) {
+      res.status(400).json({ message: "Validation error" });
+    }
+  });
+
+  app.patch(api.notasFiscais.paymentStatus.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.notasFiscais.paymentStatus.input.parse(req.body);
+      const n = await storage.updateNotaFiscalPagamento(req.params.id, data.statusPagamento, data.dataPagamento);
+      res.json(n);
     } catch (e) {
       res.status(400).json({ message: "Validation error" });
     }

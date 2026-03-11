@@ -1,20 +1,22 @@
 import { useState } from "react";
-import { useFornecedores, useCreateFornecedor } from "@/hooks/use-fornecedores";
+import { useFornecedores, useCreateFornecedor, useUpdateFornecedor } from "@/hooks/use-fornecedores";
 import { formatDate } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Search, Plus, Building2 } from "lucide-react";
+import { Search, Plus, Building2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Fornecedores() {
   const { data: fornecedores = [], isLoading } = useFornecedores();
   const createFornecedor = useCreateFornecedor();
+  const updateFornecedor = useUpdateFornecedor();
   const { toast } = useToast();
   
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nome: "", cnpj: "", email: "", telefone: "" });
 
   const filtered = fornecedores.filter((f: any) => 
@@ -24,14 +26,32 @@ export default function Fornecedores() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createFornecedor.mutate(formData, {
-      onSuccess: () => {
-        toast({ title: "Fornecedor cadastrado com sucesso!" });
-        setIsDialogOpen(false);
-        setFormData({ nome: "", cnpj: "", email: "", telefone: "" });
-      },
-      onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
-    });
+    if (editingId) {
+      updateFornecedor.mutate({ id: editingId, data: formData }, {
+        onSuccess: () => {
+          toast({ title: "Fornecedor atualizado!" });
+          setIsDialogOpen(false);
+          setEditingId(null);
+          setFormData({ nome: "", cnpj: "", email: "", telefone: "" });
+        },
+        onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
+      });
+    } else {
+      createFornecedor.mutate(formData, {
+        onSuccess: () => {
+          toast({ title: "Fornecedor cadastrado com sucesso!" });
+          setIsDialogOpen(false);
+          setFormData({ nome: "", cnpj: "", email: "", telefone: "" });
+        },
+        onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
+      });
+    }
+  };
+
+  const handleEdit = (f: any) => {
+    setEditingId(f.id);
+    setFormData({ nome: f.nome, cnpj: f.cnpj, email: f.email || "", telefone: f.telefone || "" });
+    setIsDialogOpen(true);
   };
 
   return (
@@ -42,7 +62,13 @@ export default function Fornecedores() {
           <p className="text-muted-foreground mt-1">Gerencie a base de fornecedores credenciados.</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            setEditingId(null);
+            setFormData({ nome: "", cnpj: "", email: "", telefone: "" });
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="shadow-lg shadow-primary/20">
               <Plus className="mr-2" size={18} /> Adicionar Fornecedor
@@ -50,7 +76,7 @@ export default function Fornecedores() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Novo Fornecedor</DialogTitle>
+              <DialogTitle>{editingId ? "Editar" : "Novo"} Fornecedor</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-2">
@@ -120,6 +146,11 @@ export default function Fornecedores() {
                       </div>
                     </TableCell>
                     <TableCell>{formatDate(f.criadoEm)}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(f)} data-testid={`button-edit-${f.id}`}>
+                        <Edit2 size={16} />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}

@@ -17,6 +17,9 @@ import Processos from "./pages/processos";
 import Fases from "./pages/fases";
 import Contratos from "./pages/contratos";
 import ContratoDetail from "./pages/contratos/[id]";
+import Departamentos from "./pages/departamentos";
+import NotasFiscais from "./pages/notas-fiscais";
+import AfsPanel from "./pages/afs";
 import Notificacoes from "./pages/notificacoes";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -47,6 +50,9 @@ function Router() {
       <Route path="/fases" component={() => <ProtectedRoute component={Fases} />} />
       <Route path="/contratos" component={() => <ProtectedRoute component={Contratos} />} />
       <Route path="/contratos/:id" component={() => <ProtectedRoute component={ContratoDetail} />} />
+      <Route path="/notas-fiscais" component={() => <ProtectedRoute component={NotasFiscais} />} />
+      <Route path="/afs" component={() => <ProtectedRoute component={AfsPanel} />} />
+      <Route path="/departamentos" component={() => <ProtectedRoute component={Departamentos} />} />
       <Route path="/notificacoes" component={() => <ProtectedRoute component={Notificacoes} />} />
       <Route component={NotFound} />
     </Switch>

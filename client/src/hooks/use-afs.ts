@@ -62,3 +62,32 @@ export function useUpdateEntregaAf() {
     }
   });
 }
+
+export function useAfs() {
+  return useQuery({
+    queryKey: [api.afs.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.afs.list.path);
+      if (!res.ok) throw new Error("Failed to fetch AFs");
+      return res.json();
+    },
+  });
+}
+
+export function useExtendAf() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, dataExtensao }: { id: string; dataExtensao: string }) => {
+      const res = await fetch(`/api/afs/${id}/extend`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataExtensao }),
+      });
+      if (!res.ok) throw new Error("Failed to extend AF");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
+    },
+  });
+}

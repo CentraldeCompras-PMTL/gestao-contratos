@@ -1,17 +1,22 @@
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { 
-  users, fornecedores, processosDigitais, fasesContratacao, contratos, empenhos, afs,
-  type User, type InsertUser, type Fornecedor, type InsertFornecedor,
+  users, departamentos, fornecedores, processosDigitais, fasesContratacao, contratos, empenhos, afs, notasFiscais,
+  type User, type InsertUser, type Departamento, type InsertDepartamento, type Fornecedor, type InsertFornecedor,
   type ProcessoDigital, type InsertProcessoDigital, type FaseContratacao, type InsertFaseContratacao,
-  type Contrato, type InsertContrato, type Empenho, type InsertEmpenho, type Af, type InsertAf,
-  type ContratoWithRelations, type ProcessoDigitalWithRelations, type AfWithRelations
+  type Contrato, type InsertContrato, type Empenho, type InsertEmpenho, type Af, type InsertAf, type NotaFiscal, type InsertNotaFiscal,
+  type ContratoWithRelations, type ProcessoDigitalWithRelations, type AfWithRelations, type NotaFiscalWithRelations
 } from "@shared/schema";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+
+  getDepartamentos(): Promise<Departamento[]>;
+  getDepartamento(id: string): Promise<Departamento | undefined>;
+  createDepartamento(departamento: InsertDepartamento): Promise<Departamento>;
+  updateDepartamento(id: string, departamento: Partial<InsertDepartamento>): Promise<Departamento>;
 
   getFornecedores(): Promise<Fornecedor[]>;
   getFornecedor(id: string): Promise<Fornecedor | undefined>;
@@ -37,6 +42,11 @@ export interface IStorage {
   createAf(af: InsertAf): Promise<Af>;
   updateAfEntrega(id: string, dataEntregaReal: string): Promise<Af>;
   notifyAf(id: string): Promise<Af>;
+  extendAf(id: string, dataExtensao: string): Promise<Af>;
+
+  getNotasFiscais(): Promise<NotaFiscalWithRelations[]>;
+  createNotaFiscal(nota: InsertNotaFiscal): Promise<NotaFiscal>;
+  updateNotaFiscalPagamento(id: string, statusPagamento: string, dataPagamento?: string): Promise<NotaFiscal>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -100,6 +110,11 @@ export class DatabaseStorage implements IStorage {
   async createProcessoDigital(proc: InsertProcessoDigital): Promise<ProcessoDigital> {
     const [created] = await db.insert(processosDigitais).values(proc).returning();
     return created;
+  }
+
+  async updateProcessoDigital(id: string, proc: Partial<InsertProcessoDigital>): Promise<ProcessoDigital> {
+    const [updated] = await db.update(processosDigitais).set(proc).where(eq(processosDigitais.id, id)).returning();
+    return updated;
   }
 
   async getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital })[]> {
@@ -208,6 +223,53 @@ export class DatabaseStorage implements IStorage {
 
   async notifyAf(id: string): Promise<Af> {
     const [updated] = await db.update(afs).set({ flagEntregaNotificada: true }).where(eq(afs.id, id)).returning();
+    return updated;
+  }
+
+  async extendAf(id: string, dataExtensao: string): Promise<Af> {
+    const [updated] = await db.update(afs).set({ dataExtensao }).where(eq(afs.id, id)).returning();
+    return updated;
+  }
+
+  async getDepartamentos(): Promise<Departamento[]> {
+    return await db.select().from(departamentos);
+  }
+
+  async getDepartamento(id: string): Promise<Departamento | undefined> {
+    const [d] = await db.select().from(departamentos).where(eq(departamentos.id, id));
+    return d;
+  }
+
+  async createDepartamento(d: InsertDepartamento): Promise<Departamento> {
+    const [created] = await db.insert(departamentos).values(d).returning();
+    return created;
+  }
+
+  async updateDepartamento(id: string, d: Partial<InsertDepartamento>): Promise<Departamento> {
+    const [updated] = await db.update(departamentos).set(d).where(eq(departamentos.id, id)).returning();
+    return updated;
+  }
+
+  async getNotasFiscais(): Promise<NotaFiscalWithRelations[]> {
+    return await db.query.notasFiscais.findMany({
+      with: {
+        contrato: {
+          with: {
+            processoDigital: true,
+            fornecedor: true
+          }
+        }
+      }
+    });
+  }
+
+  async createNotaFiscal(nota: InsertNotaFiscal): Promise<NotaFiscal> {
+    const [created] = await db.insert(notasFiscais).values(nota).returning();
+    return created;
+  }
+
+  async updateNotaFiscalPagamento(id: string, statusPagamento: string, dataPagamento?: string): Promise<NotaFiscal> {
+    const [updated] = await db.update(notasFiscais).set({ statusPagamento, dataPagamento }).where(eq(notasFiscais.id, id)).returning();
     return updated;
   }
 }
