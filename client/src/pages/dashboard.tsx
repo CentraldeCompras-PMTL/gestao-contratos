@@ -1,15 +1,88 @@
+import { useState, useMemo } from "react";
 import { useDashboardStats } from "@/hooks/use-dashboard";
+import { useContratos } from "@/hooks/use-contratos";
 import { formatCurrency } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, AlertTriangle, CheckCircle2, TrendingUp, AlertCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, AlertTriangle, CheckCircle2, TrendingUp, AlertCircle, Building2, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotificacoes } from "@/hooks/use-notificacoes";
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: contratos = [], isLoading: contratosLoading } = useContratos();
   const { data: notificacoes, isLoading: notifLoading } = useNotificacoes();
+  
+  const [filterFornecedor, setFilterFornecedor] = useState("");
+  const [filterProcesso, setFilterProcesso] = useState("");
+  const [filterDepartamento, setFilterDepartamento] = useState("");
 
-  if (statsLoading || notifLoading) {
+  const filteredContratos = useMemo(() => {
+    return contratos.filter((c: any) => {
+      if (filterFornecedor && c.fornecedor.id !== filterFornecedor) return false;
+      if (filterProcesso && c.processoDigital.id !== filterProcesso) return false;
+      if (filterDepartamento && c.processoDigital.departamentoId !== filterDepartamento) return false;
+      return true;
+    });
+  }, [contratos, filterFornecedor, filterProcesso, filterDepartamento]);
+
+  const fornecedoresUnicos = useMemo(() => {
+    const map = new Map();
+    contratos.forEach((c: any) => {
+      if (!map.has(c.fornecedor.id)) {
+        map.set(c.fornecedor.id, { id: c.fornecedor.id, nome: c.fornecedor.nome, count: 0, valor: 0 });
+      }
+      const item = map.get(c.fornecedor.id);
+      item.count++;
+      item.valor += parseFloat(c.valorContrato || 0);
+    });
+    return Array.from(map.values());
+  }, [contratos]);
+
+  const processosUnicos = useMemo(() => {
+    const map = new Map();
+    contratos.forEach((c: any) => {
+      if (!map.has(c.processoDigital.id)) {
+        map.set(c.processoDigital.id, { id: c.processoDigital.id, numero: c.processoDigital.numeroProcessoDigital, count: 0, valor: 0 });
+      }
+      const item = map.get(c.processoDigital.id);
+      item.count++;
+      item.valor += parseFloat(c.valorContrato || 0);
+    });
+    return Array.from(map.values());
+  }, [contratos]);
+
+  const departamentosUnicos = useMemo(() => {
+    const map = new Map();
+    contratos.forEach((c: any) => {
+      if (c.processoDigital.departamentoId) {
+        const deptId = c.processoDigital.departamentoId;
+        if (!map.has(deptId)) {
+          map.set(deptId, { id: deptId, count: 0, valor: 0 });
+        }
+        const item = map.get(deptId);
+        item.count++;
+        item.valor += parseFloat(c.valorContrato || 0);
+      }
+    });
+    return Array.from(map.values());
+  }, [contratos]);
+
+  const saldoFiltrado = useMemo(() => {
+    let total = 0;
+    let utilizado = 0;
+    filteredContratos.forEach((c: any) => {
+      total += parseFloat(c.valorContrato || 0);
+      c.notasFiscais?.forEach((nf: any) => {
+        if (nf.statusPagamento === 'pago') {
+          utilizado += parseFloat(nf.valorNota || 0);
+        }
+      });
+    });
+    return { total, utilizado, saldo: total - utilizado };
+  }, [filteredContratos]);
+
+  if (statsLoading || notifLoading || contratosLoading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -61,6 +134,56 @@ export default function Dashboard() {
         <p className="text-muted-foreground mt-2">Acompanhe os indicadores principais dos contratos e AFs.</p>
       </div>
 
+      {/* Filtros */}
+      <div className="bg-white dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800 p-6">
+        <h3 className="font-semibold mb-4">Filtros</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Fornecedor</label>
+            <Select value={filterFornecedor} onValueChange={setFilterFornecedor}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os fornecedores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os fornecedores</SelectItem>
+                {fornecedoresUnicos.map(f => (
+                  <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Processo Digital</label>
+            <Select value={filterProcesso} onValueChange={setFilterProcesso}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os processos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os processos</SelectItem>
+                {processosUnicos.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.numero}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Departamento</label>
+            <Select value={filterDepartamento} onValueChange={setFilterDepartamento}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os departamentos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os departamentos</SelectItem>
+                {departamentosUnicos.map(d => (
+                  <SelectItem key={d.id} value={d.id}>Depto. {d.id.slice(0, 8)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* KPIs Filtrados */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((kpi, i) => (
           <Card key={i} className="border-border/50 shadow-md hover:shadow-lg transition-shadow">
@@ -75,6 +198,127 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Saldo Filtrado */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="border-border/50 shadow-md">
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-4 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600">
+              <DollarSign size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Valor Total Filtrado</p>
+              <h3 className="text-2xl font-bold mt-1">{formatCurrency(saldoFiltrado.total)}</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 shadow-md">
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-4 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Valor Utilizado</p>
+              <h3 className="text-2xl font-bold mt-1">{formatCurrency(saldoFiltrado.utilizado)}</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 shadow-md">
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-4 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600">
+              <TrendingUp size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Saldo Disponível</p>
+              <h3 className="text-2xl font-bold mt-1">{formatCurrency(saldoFiltrado.saldo)}</h3>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Agregações */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Por Fornecedor */}
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Building2 size={20} />
+              Contratos por Fornecedor
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50 max-h-[400px] overflow-auto">
+              {fornecedoresUnicos.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">Nenhum fornecedor</div>
+              ) : (
+                fornecedoresUnicos.map(f => (
+                  <div key={f.id} className="p-4 flex justify-between items-start hover:bg-muted/30 transition-colors">
+                    <div>
+                      <p className="font-medium text-sm">{f.nome}</p>
+                      <p className="text-xs text-muted-foreground">{f.count} contrato{f.count !== 1 ? 's' : ''}</p>
+                    </div>
+                    <p className="font-semibold text-sm">{formatCurrency(f.valor)}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Por Processo Digital */}
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText size={20} />
+              Contratos por Processo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50 max-h-[400px] overflow-auto">
+              {processosUnicos.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">Nenhum processo</div>
+              ) : (
+                processosUnicos.map(p => (
+                  <div key={p.id} className="p-4 flex justify-between items-start hover:bg-muted/30 transition-colors">
+                    <div>
+                      <p className="font-medium text-sm">{p.numero}</p>
+                      <p className="text-xs text-muted-foreground">{p.count} contrato{p.count !== 1 ? 's' : ''}</p>
+                    </div>
+                    <p className="font-semibold text-sm">{formatCurrency(p.valor)}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Por Departamento */}
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Building2 size={20} />
+              Valor por Departamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50 max-h-[400px] overflow-auto">
+              {departamentosUnicos.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">Nenhum departamento</div>
+              ) : (
+                departamentosUnicos.map(d => (
+                  <div key={d.id} className="p-4 flex justify-between items-start hover:bg-muted/30 transition-colors">
+                    <div>
+                      <p className="font-medium text-sm">Departamento</p>
+                      <p className="text-xs text-muted-foreground">{d.count} contrato{d.count !== 1 ? 's' : ''}</p>
+                    </div>
+                    <p className="font-semibold text-sm">{formatCurrency(d.valor)}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
