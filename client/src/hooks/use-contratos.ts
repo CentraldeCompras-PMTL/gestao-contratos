@@ -45,6 +45,25 @@ export function useCreateContrato() {
   });
 }
 
+export function useUpdateContrato() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertContrato> }) => {
+      const res = await fetch(`${api.contratos.list.path}/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar contrato");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
+    }
+  });
+}
+
 export function useCreateEmpenho() {
   const queryClient = useQueryClient();
   return useMutation({

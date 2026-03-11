@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useContratos, useCreateContrato } from "@/hooks/use-contratos";
+import { useContratos, useCreateContrato, useUpdateContrato } from "@/hooks/use-contratos";
 import { useProcessos } from "@/hooks/use-processos";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
@@ -8,17 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Search, Eye } from "lucide-react";
+import { FileText, Plus, Search, Eye, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Contratos() {
   const { data: contratos = [], isLoading } = useContratos();
   const { data: processos = [] } = useProcessos();
   const createContrato = useCreateContrato();
+  const updateContrato = useUpdateContrato();
   const { toast } = useToast();
   
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   
   // Cascading form state
   const [procId, setProcId] = useState("");
@@ -45,6 +47,18 @@ export default function Contratos() {
     c.numeroContrato.includes(search) || 
     c.fornecedor?.nome.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleEdit = (c: any) => {
+    setEditingId(c.id);
+    setProcId(c.processoDigitalId);
+    setFaseId(c.faseContratacaoId);
+    setFornecedorId(c.fornecedorId);
+    setNumeroContrato(c.numeroContrato);
+    setValorContrato(c.valorContrato);
+    setVigenciaInicial(c.vigenciaInicial);
+    setVigenciaFinal(c.vigenciaFinal);
+    setDialogOpen(true);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,14 +93,21 @@ export default function Contratos() {
           <p className="text-muted-foreground mt-1">Gestão de contratos e acompanhamento de saldos.</p>
         </div>
         
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setEditingId(null);
+            setProcId(""); setFaseId(""); setFornecedorId("");
+            setNumeroContrato(""); setValorContrato(""); setVigenciaInicial(""); setVigenciaFinal("");
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="shadow-lg shadow-primary/20">
               <Plus className="mr-2" size={18} /> Novo Contrato
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Criar Novo Contrato</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar" : "Criar Novo"} Contrato</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-5 pt-4">
               
               <div className="p-4 bg-muted/50 rounded-xl space-y-4 border border-border">
@@ -156,8 +177,8 @@ export default function Contratos() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={createContrato.isPending || !fornecedorId}>
-                Gerar Contrato
+              <Button type="submit" className="w-full" disabled={createContrato.isPending || updateContrato.isPending || !fornecedorId}>
+                {editingId ? "Atualizar" : "Gerar"} Contrato
               </Button>
             </form>
           </DialogContent>
@@ -207,7 +228,10 @@ export default function Contratos() {
                     <TableCell className="text-sm">
                       {formatDate(c.vigenciaInicial)} até {formatDate(c.vigenciaFinal)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right gap-1 flex justify-end">
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(c)} data-testid={`button-edit-${c.id}`}>
+                        <Edit2 size={16} />
+                      </Button>
                       <Link href={`/contratos/${c.id}`} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-9 px-3">
                         <Eye size={16} className="mr-2" /> Detalhes
                       </Link>

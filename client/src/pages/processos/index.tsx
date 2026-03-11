@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useProcessos, useCreateProcesso, useCreateFase } from "@/hooks/use-processos";
+import { useProcessos, useCreateProcesso, useCreateFase, useUpdateProcesso } from "@/hooks/use-processos";
 import { useFornecedores } from "@/hooks/use-fornecedores";
+import { useDepartamentos } from "@/hooks/use-departamentos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,21 +9,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FolderOpen, Plus, Search, ChevronRight } from "lucide-react";
+import { FolderOpen, Plus, Search, ChevronRight, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Processos() {
   const { data: processos = [], isLoading } = useProcessos();
   const { data: fornecedores = [] } = useFornecedores();
+  const { data: departamentos = [] } = useDepartamentos();
   const createProcesso = useCreateProcesso();
+  const updateProcesso = useUpdateProcesso();
   const createFase = useCreateFase();
   const { toast } = useToast();
   
   const [search, setSearch] = useState("");
   const [processoDialog, setProcessoDialog] = useState(false);
   const [faseDialog, setFaseDialog] = useState<string | null>(null);
+  const [editingProcId, setEditingProcId] = useState<string | null>(null);
   
-  const [procForm, setProcForm] = useState({ numeroProcessoDigital: "", objetoResumido: "", objetoCompleto: "", descricao: "" });
+  const [procForm, setProcForm] = useState({ numeroProcessoDigital: "", objetoResumido: "", objetoCompleto: "", descricao: "", departamentoId: "" });
   const [faseForm, setFaseForm] = useState({ nomeFase: "", fornecedorId: "", dataInicio: "", dataFim: "" });
 
   const filtered = processos.filter((p: any) => 
@@ -30,15 +34,40 @@ export default function Processos() {
     p.objetoResumido.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleEditProcesso = (p: any) => {
+    setEditingProcId(p.id);
+    setProcForm({ 
+      numeroProcessoDigital: p.numeroProcessoDigital, 
+      objetoResumido: p.objetoResumido, 
+      objetoCompleto: p.objetoCompleto, 
+      descricao: p.descricao || "",
+      departamentoId: p.departamentoId || ""
+    });
+    setProcessoDialog(true);
+  };
+
   const handleCreateProcesso = (e: React.FormEvent) => {
     e.preventDefault();
-    createProcesso.mutate(procForm, {
-      onSuccess: () => {
-        toast({ title: "Processo criado!" });
-        setProcessoDialog(false);
-        setProcForm({ numeroProcessoDigital: "", objetoResumido: "", objetoCompleto: "", descricao: "" });
-      }
-    });
+    if (editingProcId) {
+      updateProcesso.mutate({ id: editingProcId, data: procForm }, {
+        onSuccess: () => {
+          toast({ title: "Processo atualizado!" });
+          setProcessoDialog(false);
+          setEditingProcId(null);
+          setProcForm({ numeroProcessoDigital: "", objetoResumido: "", objetoCompleto: "", descricao: "", departamentoId: "" });
+        },
+        onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
+      });
+    } else {
+      createProcesso.mutate(procForm, {
+        onSuccess: () => {
+          toast({ title: "Processo criado!" });
+          setProcessoDialog(false);
+          setProcForm({ numeroProcessoDigital: "", objetoResumido: "", objetoCompleto: "", descricao: "", departamentoId: "" });
+        },
+        onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
+      });
+    }
   };
 
   const handleCreateFase = (e: React.FormEvent) => {
@@ -64,14 +93,20 @@ export default function Processos() {
           <p className="text-muted-foreground mt-1">Acompanhe processos e suas respectivas fases.</p>
         </div>
         
-        <Dialog open={processoDialog} onOpenChange={setProcessoDialog}>
+        <Dialog open={processoDialog} onOpenChange={(open) => {
+          setProcessoDialog(open);
+          if (!open) {
+            setEditingProcId(null);
+            setProcForm({ numeroProcessoDigital: "", objetoResumido: "", objetoCompleto: "", descricao: "", departamentoId: "" });
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="shadow-lg shadow-primary/20">
               <Plus className="mr-2" size={18} /> Novo Processo
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-xl">
-            <DialogHeader><DialogTitle>Cadastrar Processo Digital</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingProcId ? "Editar" : "Cadastrar"} Processo Digital</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateProcesso} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nº Processo</label>
@@ -85,9 +120,22 @@ export default function Processos() {
                 <label className="text-sm font-medium">Objeto Completo</label>
                 <Textarea required value={procForm.objetoCompleto} onChange={e => setProcForm({...procForm, objetoCompleto: e.target.value})} />
               </div>
-              <Button type="submit" className="w-full" disabled={createProcesso.isPending}>
-                {createProcesso.isPending ? "Salvando..." : "Salvar"}
-              </Button>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descrição (Opcional)</label>
+                <Textarea value={procForm.descricao} onChange={e => setProcForm({...procForm, descricao: e.target.value})} placeholder="Descrição adicional..." />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Departamento Responsável</label>
+                <Select value={procForm.departamentoId} onValueChange={v => setProcForm({...procForm, departamentoId: v})}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {departamentos.map((d: any) => (
+                      <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" className="w-full" disabled={createProcesso.isPending || updateProcesso.isPending}>{editingProcId ? "Atualizar" : "Cadastrar"} Processo</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -142,7 +190,10 @@ export default function Processos() {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right gap-1 flex justify-end">
+                      <Button variant="ghost" size="sm" onClick={() => handleEditProcesso(p)} data-testid={`button-edit-${p.id}`}>
+                        <Edit2 size={16} />
+                      </Button>
                       <Dialog open={faseDialog === p.id} onOpenChange={(open) => setFaseDialog(open ? p.id : null)}>
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="sm" className="text-xs">

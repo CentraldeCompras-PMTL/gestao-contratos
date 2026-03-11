@@ -45,6 +45,25 @@ export function useCreateProcesso() {
   });
 }
 
+export function useUpdateProcesso() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertProcessoDigital> }) => {
+      const res = await fetch(`${api.processos.list.path}/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar processo");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+    }
+  });
+}
+
 export function useCreateFase() {
   const queryClient = useQueryClient();
   return useMutation({

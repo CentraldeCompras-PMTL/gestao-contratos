@@ -18,7 +18,10 @@ export default function AfsPanel() {
   const [extensionDate, setExtensionDate] = useState("");
 
   const filtered = afs.filter((a: any) => 
-    a.empenho.contrato.numeroContrato.includes(search)
+    a.empenho.contrato.numeroContrato.includes(search) ||
+    a.empenho.contrato.fornecedor.nome.toLowerCase().includes(search.toLowerCase()) ||
+    a.empenho.contrato.processoDigital.numeroProcessoDigital.includes(search) ||
+    search === ""
   );
 
   const handleExtend = () => {
@@ -50,8 +53,8 @@ export default function AfsPanel() {
             <TableHeader>
               <TableRow>
                 <TableHead>Contrato</TableHead>
-                <TableHead>Processo</TableHead>
                 <TableHead>Fornecedor</TableHead>
+                <TableHead>Processo</TableHead>
                 <TableHead>Valor AF</TableHead>
                 <TableHead>Data Estimada</TableHead>
                 <TableHead>Status</TableHead>
@@ -67,8 +70,8 @@ export default function AfsPanel() {
                 filtered.map((af: any) => (
                   <TableRow key={af.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
                     <TableCell className="font-medium">{af.empenho.contrato.numeroContrato}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{af.empenho.contrato.processoDigital.numeroProcessoDigital}</TableCell>
                     <TableCell className="text-sm">{af.empenho.contrato.fornecedor.nome}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{af.empenho.contrato.processoDigital.numeroProcessoDigital}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(parseFloat(af.valorAf))}</TableCell>
                     <TableCell className="text-sm">{formatDate(af.dataExtensao || af.dataEstimadaEntrega)}</TableCell>
                     <TableCell>
