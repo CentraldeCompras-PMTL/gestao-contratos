@@ -172,6 +172,11 @@ export async function registerRoutes(
     }
   });
 
+  app.get(api.afs.list.path, requireAuth, async (req, res) => {
+    const afs = await storage.getAfs();
+    res.json(afs);
+  });
+
   app.post("/api/empenhos/:empenhoId/afs", requireAuth, async (req, res) => {
     try {
       const parsedBody = { ...req.body, valorAf: String(req.body.valorAf) };

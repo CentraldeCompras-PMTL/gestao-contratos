@@ -17,6 +17,7 @@ export function useCreateAf() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
       queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
     }
@@ -36,6 +37,7 @@ export function useNotifyAf() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
     }
@@ -57,6 +59,7 @@ export function useUpdateEntregaAf() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
     }
