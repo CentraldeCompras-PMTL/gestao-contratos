@@ -82,6 +82,28 @@ export default function Dashboard() {
     return { total, utilizado, saldo: total - utilizado };
   }, [filteredContratos]);
 
+  const kpisCalculados = useMemo(() => {
+    let totalContratos = filteredContratos.length;
+    let totalValor = 0;
+    let afsPendentes = 0;
+    let afsEntregues = 0;
+
+    filteredContratos.forEach((c: any) => {
+      totalValor += parseFloat(c.valorContrato || 0);
+      c.empenhos?.forEach((e: any) => {
+        e.afs?.forEach((af: any) => {
+          if (af.dataEntregaReal) {
+            afsEntregues++;
+          } else {
+            afsPendentes++;
+          }
+        });
+      });
+    });
+
+    return { totalContratos, totalValor, afsPendentes, afsEntregues };
+  }, [filteredContratos]);
+
   if (statsLoading || notifLoading || contratosLoading) {
     return (
       <div className="space-y-6">
@@ -95,29 +117,29 @@ export default function Dashboard() {
 
   const kpis = [
     {
-      title: "Contratos Ativos",
-      value: stats?.totalContratos || 0,
+      title: "Contratos Filtrados",
+      value: kpisCalculados.totalContratos,
       icon: FileText,
       color: "text-blue-600",
       bg: "bg-blue-100 dark:bg-blue-900/30"
     },
     {
-      title: "Valor Total Contratado",
-      value: formatCurrency(stats?.valorTotalContratado || 0),
+      title: "Valor Total Filtrado",
+      value: formatCurrency(kpisCalculados.totalValor),
       icon: TrendingUp,
       color: "text-emerald-600",
       bg: "bg-emerald-100 dark:bg-emerald-900/30"
     },
     {
       title: "AFs Pendentes",
-      value: stats?.afsPendentes || 0,
+      value: kpisCalculados.afsPendentes,
       icon: AlertTriangle,
       color: "text-amber-600",
       bg: "bg-amber-100 dark:bg-amber-900/30"
     },
     {
       title: "AFs Entregues",
-      value: stats?.afsEntregues || 0,
+      value: kpisCalculados.afsEntregues,
       icon: CheckCircle2,
       color: "text-indigo-600",
       bg: "bg-indigo-100 dark:bg-indigo-900/30"
