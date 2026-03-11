@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, Package, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -17,17 +18,26 @@ export default function AfsPanel() {
   const { toast } = useToast();
   
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("aberto");
   const [selectedAf, setSelectedAf] = useState<any>(null);
   const [dialogMode, setDialogMode] = useState<"extend" | "entrega">("extend");
   const [extensionDate, setExtensionDate] = useState("");
   const [notaForm, setNotaForm] = useState({ numeroNota: "", valorNota: "", dataNota: "" });
 
-  const filtered = afs.filter((a: any) => 
-    a.empenho.contrato.numeroContrato.includes(search) ||
-    a.empenho.contrato.fornecedor.nome.toLowerCase().includes(search.toLowerCase()) ||
-    a.empenho.contrato.processoDigital.numeroProcessoDigital.includes(search) ||
-    search === ""
-  );
+  const afsAberto = afs.filter((a: any) => !a.dataEntregaReal);
+  const afsEntregues = afs.filter((a: any) => a.dataEntregaReal);
+
+  const filterAfs = (list: any[]) => 
+    list.filter((a: any) => 
+      a.empenho.contrato.numeroContrato.includes(search) ||
+      a.empenho.contrato.fornecedor.nome.toLowerCase().includes(search.toLowerCase()) ||
+      a.empenho.contrato.processoDigital.numeroProcessoDigital.includes(search) ||
+      search === ""
+    );
+
+  const filtered = activeTab === "aberto" 
+    ? filterAfs(afsAberto)
+    : filterAfs(afsEntregues);
 
   const handleExtend = () => {
     if (!selectedAf || !extensionDate) return;
@@ -76,12 +86,27 @@ export default function AfsPanel() {
       </div>
 
       <div className="bg-white dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800 p-6">
-        <div className="mb-4">
-          <Input placeholder="Buscar contrato..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <TabsList>
+              <TabsTrigger value="aberto">
+                AFs em Aberto ({afsAberto.length})
+              </TabsTrigger>
+              <TabsTrigger value="entregue">
+                AFs Entregues ({afsEntregues.length})
+              </TabsTrigger>
+            </TabsList>
+            <Input 
+              placeholder="Buscar contrato..." 
+              value={search} 
+              onChange={e => setSearch(e.target.value)}
+              className="w-full sm:w-64"
+            />
+          </div>
 
-        <div className="overflow-x-auto">
-          <Table>
+          <TabsContent value="aberto" className="mt-4">
+            <div className="overflow-x-auto">
+              <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Contrato</TableHead>
@@ -147,8 +172,59 @@ export default function AfsPanel() {
                 ))
               )}
             </TableBody>
-          </Table>
-        </div>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="entregue" className="mt-4">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Contrato</TableHead>
+                    <TableHead>Fornecedor</TableHead>
+                    <TableHead>Processo</TableHead>
+                    <TableHead>Valor AF</TableHead>
+                    <TableHead>Data Estimada</TableHead>
+                    <TableHead>Data Entrega</TableHead>
+                    <TableHead className="w-20">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                  ) : filtered.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="text-center py-8"><div className="flex flex-col items-center"><Package className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhuma AF entregue</p></div></TableCell></TableRow>
+                  ) : (
+                    filtered.map((af: any) => (
+                      <TableRow key={af.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
+                        <TableCell className="font-medium">{af.empenho.contrato.numeroContrato}</TableCell>
+                        <TableCell className="text-sm">{af.empenho.contrato.fornecedor.nome}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{af.empenho.contrato.processoDigital.numeroProcessoDigital}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(parseFloat(af.valorAf))}</TableCell>
+                        <TableCell className="text-sm">{formatDate(af.dataExtensao || af.dataEstimadaEntrega)}</TableCell>
+                        <TableCell className="text-sm font-medium">{formatDate(af.dataEntregaReal)}</TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedAf(af);
+                              setDialogMode("entrega");
+                            }}
+                            data-testid={`button-entrega-${af.id}`}
+                          >
+                            <CheckCircle size={16} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={!!selectedAf} onOpenChange={(open) => {
