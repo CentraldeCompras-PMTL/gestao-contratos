@@ -1,21 +1,26 @@
 import { useState } from "react";
-import { useAfs, useExtendAf } from "@/hooks/use-afs";
+import { useAfs, useExtendAf, useUpdateEntregaAf } from "@/hooks/use-afs";
+import { useCreateNotaFiscal } from "@/hooks/use-notas-fiscais";
 import { formatDate, formatCurrency } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Clock, Package } from "lucide-react";
+import { Clock, Package, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AfsPanel() {
   const { data: afs = [], isLoading } = useAfs();
   const extendMutation = useExtendAf();
+  const updateEntregaMutation = useUpdateEntregaAf();
+  const createNotaMutation = useCreateNotaFiscal();
   const { toast } = useToast();
   
   const [search, setSearch] = useState("");
   const [selectedAf, setSelectedAf] = useState<any>(null);
+  const [dialogMode, setDialogMode] = useState<"extend" | "entrega">("extend");
   const [extensionDate, setExtensionDate] = useState("");
+  const [notaForm, setNotaForm] = useState({ numeroNota: "", valorNota: "", dataNota: "" });
 
   const filtered = afs.filter((a: any) => 
     a.empenho.contrato.numeroContrato.includes(search) ||
@@ -33,6 +38,33 @@ export default function AfsPanel() {
         setExtensionDate("");
       },
       onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
+    });
+  };
+
+  const handleEntrega = () => {
+    if (!selectedAf || !notaForm.numeroNota || !notaForm.valorNota || !notaForm.dataNota) {
+      toast({ variant: "destructive", title: "Preencha todos os campos" });
+      return;
+    }
+
+    createNotaMutation.mutate({
+      contratoId: selectedAf.empenho.contrato.id,
+      numeroNota: notaForm.numeroNota,
+      valorNota: parseFloat(notaForm.valorNota),
+      dataNota: notaForm.dataNota
+    }, {
+      onSuccess: () => {
+        updateEntregaMutation.mutate({ id: selectedAf.id, dataEntregaReal: new Date().toISOString().split('T')[0] }, {
+          onSuccess: () => {
+            toast({ title: "Entrega registrada e nota fiscal criada!" });
+            setSelectedAf(null);
+            setNotaForm({ numeroNota: "", valorNota: "", dataNota: "" });
+            setDialogMode("extend");
+          },
+          onError: (err) => toast({ variant: "destructive", title: "Erro ao registrar entrega", description: err.message })
+        });
+      },
+      onError: (err) => toast({ variant: "destructive", title: "Erro ao criar nota fiscal", description: err.message })
     });
   };
 
@@ -84,16 +116,34 @@ export default function AfsPanel() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {af.flagEntregaNotificada && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => setSelectedAf(af)}
-                          data-testid={`button-extend-${af.id}`}
-                        >
-                          <Clock size={16} />
-                        </Button>
-                      )}
+                      <div className="flex gap-1">
+                        {!af.dataEntregaReal && (
+                          <Button 
+                            size="sm" 
+                            variant="default"
+                            onClick={() => {
+                              setSelectedAf(af);
+                              setDialogMode("entrega");
+                            }}
+                            data-testid={`button-entrega-${af.id}`}
+                          >
+                            <CheckCircle size={16} />
+                          </Button>
+                        )}
+                        {af.flagEntregaNotificada && !af.dataEntregaReal && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedAf(af);
+                              setDialogMode("extend");
+                            }}
+                            data-testid={`button-extend-${af.id}`}
+                          >
+                            <Clock size={16} />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -103,10 +153,19 @@ export default function AfsPanel() {
         </div>
       </div>
 
-      <Dialog open={!!selectedAf} onOpenChange={(open) => !open && setSelectedAf(null)}>
+      <Dialog open={!!selectedAf} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedAf(null);
+          setExtensionDate("");
+          setNotaForm({ numeroNota: "", valorNota: "", dataNota: "" });
+          setDialogMode("extend");
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Prorrogar Prazo de Entrega</DialogTitle>
+            <DialogTitle>
+              {dialogMode === "extend" ? "Prorrogar Prazo de Entrega" : "Registrar Entrega"}
+            </DialogTitle>
           </DialogHeader>
           {selectedAf && (
             <div className="space-y-4 pt-4">
@@ -114,22 +173,63 @@ export default function AfsPanel() {
                 <p className="text-sm text-muted-foreground">Contrato</p>
                 <p className="font-medium">{selectedAf.empenho.contrato.numeroContrato}</p>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Nova Data de Entrega</label>
-                <Input 
-                  type="date" 
-                  value={extensionDate} 
-                  onChange={e => setExtensionDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-              <Button 
-                onClick={handleExtend} 
-                className="w-full"
-                disabled={!extensionDate || extendMutation.isPending}
-              >
-                Prorrogar Prazo
-              </Button>
+
+              {dialogMode === "extend" ? (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Nova Data de Entrega</label>
+                    <Input 
+                      type="date" 
+                      value={extensionDate} 
+                      onChange={e => setExtensionDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleExtend} 
+                    className="w-full"
+                    disabled={!extensionDate || extendMutation.isPending}
+                  >
+                    Prorrogar Prazo
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Número da Nota Fiscal</label>
+                    <Input 
+                      value={notaForm.numeroNota}
+                      onChange={e => setNotaForm({...notaForm, numeroNota: e.target.value})}
+                      placeholder="Ex: NF-001"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Valor da Nota (R$)</label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      value={notaForm.valorNota}
+                      onChange={e => setNotaForm({...notaForm, valorNota: e.target.value})}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Data da Nota</label>
+                    <Input 
+                      type="date"
+                      value={notaForm.dataNota}
+                      onChange={e => setNotaForm({...notaForm, dataNota: e.target.value})}
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleEntrega} 
+                    className="w-full"
+                    disabled={!notaForm.numeroNota || !notaForm.valorNota || !notaForm.dataNota || createNotaMutation.isPending || updateEntregaMutation.isPending}
+                  >
+                    Registrar Entrega
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
