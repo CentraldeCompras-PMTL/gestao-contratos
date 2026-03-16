@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useAfs, useExtendAf, useUpdateEntregaAf } from "@/hooks/use-afs";
+import { useAfs, useExtendAf, useNotifyAf, useUpdateEntregaAf } from "@/hooks/use-afs";
 import { useCreateNotaFiscal } from "@/hooks/use-notas-fiscais";
 import { formatDate, formatCurrency, parseNumberString } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
@@ -17,14 +17,74 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Package, CheckCircle, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { BellRing, Clock, Package, CheckCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteAf } from "@/hooks/use-afs";
 import type { AfWithRelations } from "@shared/schema";
 
+function daysUntil(date: string) {
+  const today = new Date();
+  const target = new Date(`${date}T00:00:00`);
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diffMs = target.getTime() - todayStart.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function getPrazoEntregaInfo(af: AfWithRelations) {
+  const prazoBase = af.dataExtensao || af.dataEstimadaEntrega;
+  const diasRestantes = daysUntil(prazoBase);
+
+  if (af.dataEntregaReal) {
+    return {
+      prazoBase,
+      diasRestantes,
+      label: "Entregue",
+      badgeClass: "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100",
+    };
+  }
+
+  if (diasRestantes < 0) {
+    return {
+      prazoBase,
+      diasRestantes,
+      label: "Prazo vencido",
+      badgeClass: "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100",
+    };
+  }
+
+  if (diasRestantes === 0) {
+    return {
+      prazoBase,
+      diasRestantes,
+      label: "Entrega vence hoje",
+      badgeClass: "bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-100",
+    };
+  }
+
+  if (diasRestantes <= 10) {
+    return {
+      prazoBase,
+      diasRestantes,
+      label: "Prazo proximo",
+      badgeClass: "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100",
+    };
+  }
+
+  return {
+    prazoBase,
+    diasRestantes,
+    label: af.flagEntregaNotificada ? "Empresa notificada" : "Pendente",
+    badgeClass: af.flagEntregaNotificada
+      ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+      : "bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-gray-100",
+  };
+}
+
 export default function AfsPanel() {
   const { data: afs = [], isLoading } = useAfs();
   const extendMutation = useExtendAf();
+  const notifyMutation = useNotifyAf();
   const updateEntregaMutation = useUpdateEntregaAf();
   const deleteAfMutation = useDeleteAf();
   const createNotaMutation = useCreateNotaFiscal();
@@ -131,6 +191,20 @@ export default function AfsPanel() {
     });
   };
 
+  const executeNotify = (af: AfWithRelations) => {
+    notifyMutation.mutate(af.id, {
+      onSuccess: () => {
+        toast({ title: "Empresa notificada com sucesso!" });
+      },
+      onError: (err) =>
+        toast({
+          variant: "destructive",
+          title: "Erro ao notificar fornecedor",
+          description: err instanceof Error ? err.message : "Falha ao notificar fornecedor",
+        }),
+    });
+  };
+
   const renderRows = (list: AfWithRelations[], delivered: boolean) => (
     list.map((af) => (
       <TableRow key={af.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
@@ -138,19 +212,27 @@ export default function AfsPanel() {
         <TableCell className="text-sm">{af.empenho.contrato.fornecedor.nome}</TableCell>
         <TableCell className="text-sm text-muted-foreground">{af.empenho.contrato.processoDigital.numeroProcessoDigital}</TableCell>
         <TableCell className="font-medium">{formatCurrency(parseNumberString(af.valorAf))}</TableCell>
-        <TableCell className="text-sm">{formatDate(af.dataExtensao || af.dataEstimadaEntrega)}</TableCell>
+        <TableCell className="text-sm">{formatDate(getPrazoEntregaInfo(af).prazoBase)}</TableCell>
         {delivered && <TableCell className="text-sm font-medium">{formatDate(af.dataEntregaReal)}</TableCell>}
         {!delivered && (
           <TableCell>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-              af.dataEntregaReal
-                ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
-                : af.flagEntregaNotificada
-                ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100"
-                : "bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-gray-100"
-            }`}>
-              {af.dataEntregaReal ? "Entregue" : af.flagEntregaNotificada ? "Notificada" : "Pendente"}
-            </span>
+            <div className="space-y-1">
+              <Badge className={getPrazoEntregaInfo(af).badgeClass}>
+                {getPrazoEntregaInfo(af).label}
+              </Badge>
+              {getPrazoEntregaInfo(af).diasRestantes <= 10 && getPrazoEntregaInfo(af).diasRestantes >= 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {getPrazoEntregaInfo(af).diasRestantes === 0
+                    ? "Entrega prevista para hoje"
+                    : `${getPrazoEntregaInfo(af).diasRestantes} dia(s) restantes`}
+                </p>
+              )}
+              {getPrazoEntregaInfo(af).diasRestantes < 0 && (
+                <p className="text-xs text-red-600">
+                  {Math.abs(getPrazoEntregaInfo(af).diasRestantes)} dia(s) em atraso
+                </p>
+              )}
+            </div>
           </TableCell>
         )}
         <TableCell>
@@ -177,6 +259,17 @@ export default function AfsPanel() {
                 data-testid={`button-extend-${af.id}`}
               >
                 <Clock size={16} />
+              </Button>
+            )}
+            {!delivered && !af.flagEntregaNotificada && getPrazoEntregaInfo(af).diasRestantes <= 10 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => executeNotify(af)}
+                disabled={notifyMutation.isPending}
+                data-testid={`button-notify-${af.id}`}
+              >
+                <BellRing size={16} />
               </Button>
             )}
             {!delivered && (
@@ -224,8 +317,8 @@ export default function AfsPanel() {
                     <TableHead>Fornecedor</TableHead>
                     <TableHead>Processo</TableHead>
                     <TableHead>Valor AF</TableHead>
-                    <TableHead>Data Estimada</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Prazo de Entrega</TableHead>
+                    <TableHead>Status do Prazo</TableHead>
                     <TableHead className="w-20">Acao</TableHead>
                   </TableRow>
                 </TableHeader>

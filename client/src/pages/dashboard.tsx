@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 import { useContratos } from "@/hooks/use-contratos";
 import { useNotificacoes } from "@/hooks/use-notificacoes";
+import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency, parseNumberString } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +49,7 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: contratos = [], isLoading: contratosLoading } = useContratos();
   const { data: notificacoes = [], isLoading: notifLoading } = useNotificacoes();
+  const { data: departamentos = [], isLoading: departamentosLoading } = useDepartamentos();
 
   const [filterFornecedor, setFilterFornecedor] = useState("");
   const [filterProcesso, setFilterProcesso] = useState("");
@@ -81,17 +83,36 @@ export default function Dashboard() {
   }, [contratos, filterFornecedor, filterDepartamento]);
 
   const departamentosUnicos = useMemo(() => {
-    const base = contratos.filter((contrato) => {
-      if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
-      if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
-      return true;
-    });
-    return aggregateBy(
-      base,
-      (contrato) => contrato.processoDigital.departamentoId,
-      (contrato) => contrato.processoDigital.departamento?.nome ?? "Sem departamento",
-    );
-  }, [contratos, filterFornecedor, filterProcesso]);
+    if (filterProcesso) {
+      const processoSelecionado = contratos.find((contrato) => contrato.processoDigital.id === filterProcesso)?.processoDigital;
+      if (!processoSelecionado?.departamentoId) return [];
+      return [{
+        id: processoSelecionado.departamentoId,
+        label: processoSelecionado.departamento?.nome ?? "Sem departamento",
+        count: 0,
+        value: 0,
+      }];
+    }
+
+    const departamentosBase = filterFornecedor
+      ? departamentos.filter((departamento) =>
+          contratos.some(
+            (contrato) =>
+              contrato.fornecedor.id === filterFornecedor &&
+              contrato.processoDigital.departamentoId === departamento.id,
+          ),
+        )
+      : departamentos;
+
+    return departamentosBase
+      .map((departamento) => ({
+        id: departamento.id,
+        label: departamento.nome,
+        count: 0,
+        value: 0,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [contratos, departamentos, filterFornecedor, filterProcesso]);
 
   const saldoFiltrado = useMemo(() => {
     let total = 0;
@@ -135,7 +156,7 @@ export default function Dashboard() {
     };
   }, [filteredContratos]);
 
-  if (statsLoading || notifLoading || contratosLoading) {
+  if (statsLoading || notifLoading || contratosLoading || departamentosLoading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
