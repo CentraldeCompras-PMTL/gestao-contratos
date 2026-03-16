@@ -105,7 +105,7 @@ export default function Fornecedores() {
       onError: (err) => toast({
         variant: "destructive",
         title: "Erro ao consultar CNPJ",
-        description: err instanceof Error ? err.message : "Falha na consulta publica",
+        description: err instanceof Error ? err.message : "Falha na consulta publica. Voce pode preencher os dados manualmente.",
       }),
     });
   };

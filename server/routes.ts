@@ -25,6 +25,122 @@ function normalizeCnpj(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+type CnpjLookupResult = {
+  cnpj: string;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  municipio: string | null;
+  uf: string | null;
+};
+
+async function lookupCnpjFromBrasilApi(cnpj: string): Promise<CnpjLookupResult | null> {
+  const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`BrasilAPI:${response.status}`);
+  }
+
+  const payload = await response.json() as {
+    cnpj?: string;
+    razao_social?: string;
+    email?: string | null;
+    ddd_telefone_1?: string | null;
+    cep?: string | null;
+    logradouro?: string | null;
+    numero?: string | null;
+    complemento?: string | null;
+    bairro?: string | null;
+    municipio?: string | null;
+    uf?: string | null;
+  };
+
+  return {
+    cnpj: payload.cnpj ?? cnpj,
+    nome: payload.razao_social ?? "",
+    email: payload.email ?? null,
+    telefone: payload.ddd_telefone_1 ?? null,
+    cep: payload.cep ?? null,
+    logradouro: payload.logradouro ?? null,
+    numero: payload.numero ?? null,
+    complemento: payload.complemento ?? null,
+    bairro: payload.bairro ?? null,
+    municipio: payload.municipio ?? null,
+    uf: payload.uf ?? null,
+  };
+}
+
+async function lookupCnpjFromPublicaCnpjWs(cnpj: string): Promise<CnpjLookupResult | null> {
+  const response = await fetch(`https://publica.cnpj.ws/cnpj/${cnpj}`, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`CNPJ.ws:${response.status}`);
+  }
+
+  const payload = await response.json() as {
+    estabelecimento?: {
+      cnpj?: string;
+      email?: string | null;
+      telefone1?: string | null;
+      cep?: string | null;
+      logradouro?: string | null;
+      numero?: string | null;
+      complemento?: string | null;
+      bairro?: string | null;
+      cidade?: { nome?: string | null } | null;
+      estado?: { sigla?: string | null } | null;
+    } | null;
+    razao_social?: string | null;
+  };
+
+  return {
+    cnpj: payload.estabelecimento?.cnpj ?? cnpj,
+    nome: payload.razao_social ?? "",
+    email: payload.estabelecimento?.email ?? null,
+    telefone: payload.estabelecimento?.telefone1 ?? null,
+    cep: payload.estabelecimento?.cep ?? null,
+    logradouro: payload.estabelecimento?.logradouro ?? null,
+    numero: payload.estabelecimento?.numero ?? null,
+    complemento: payload.estabelecimento?.complemento ?? null,
+    bairro: payload.estabelecimento?.bairro ?? null,
+    municipio: payload.estabelecimento?.cidade?.nome ?? null,
+    uf: payload.estabelecimento?.estado?.sigla ?? null,
+  };
+}
+
+async function lookupCnpj(cnpj: string): Promise<CnpjLookupResult> {
+  const providers = [lookupCnpjFromBrasilApi, lookupCnpjFromPublicaCnpjWs];
+  let providerError: Error | null = null;
+
+  for (const provider of providers) {
+    try {
+      const result = await provider(cnpj);
+      if (result) {
+        return result;
+      }
+    } catch (error) {
+      providerError = error instanceof Error ? error : new Error("Servico de CNPJ indisponivel");
+    }
+  }
+
+  if (providerError) {
+    throw new HttpError(502, "Os servicos publicos de consulta de CNPJ estao indisponiveis no momento. Voce pode preencher os dados manualmente e tentar novamente depois.");
+  }
+
+  throw new HttpError(404, "CNPJ nao encontrado");
+}
+
 function getEmpenhoMetrics(
   empenho: {
     valorEmpenho: string | number;
@@ -386,46 +502,8 @@ export async function registerRoutes(
       if (cnpj.length !== 14) {
         throw new HttpError(400, "CNPJ invalido");
       }
-
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
-        headers: { Accept: "application/json" },
-      });
-
-      if (response.status === 404) {
-        return res.status(404).json({ message: "CNPJ nao encontrado" });
-      }
-
-      if (!response.ok) {
-        throw new HttpError(502, "Falha ao consultar servico publico de CNPJ");
-      }
-
-      const payload = await response.json() as {
-        cnpj?: string;
-        razao_social?: string;
-        email?: string | null;
-        ddd_telefone_1?: string | null;
-        cep?: string | null;
-        logradouro?: string | null;
-        numero?: string | null;
-        complemento?: string | null;
-        bairro?: string | null;
-        municipio?: string | null;
-        uf?: string | null;
-      };
-
-      res.json({
-        cnpj: payload.cnpj ?? cnpj,
-        nome: payload.razao_social ?? "",
-        email: payload.email ?? null,
-        telefone: payload.ddd_telefone_1 ?? null,
-        cep: payload.cep ?? null,
-        logradouro: payload.logradouro ?? null,
-        numero: payload.numero ?? null,
-        complemento: payload.complemento ?? null,
-        bairro: payload.bairro ?? null,
-        municipio: payload.municipio ?? null,
-        uf: payload.uf ?? null,
-      });
+      const result = await lookupCnpj(cnpj);
+      res.json(result);
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao consultar CNPJ") });
     }
