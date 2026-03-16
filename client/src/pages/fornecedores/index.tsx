@@ -117,7 +117,7 @@ export default function Fornecedores() {
         { id: editingId, ...formData },
         {
           onSuccess: () => {
-            toast({ title: "Fornecedor atualizado!" });
+            toast({ title: "Registro atualizado com sucesso!" });
             setIsDialogOpen(false);
             resetForm();
           },
@@ -133,7 +133,7 @@ export default function Fornecedores() {
 
     createFornecedor.mutate(formData, {
       onSuccess: () => {
-        toast({ title: "Fornecedor cadastrado com sucesso!" });
+        toast({ title: "Cadastro realizado com sucesso!" });
         setIsDialogOpen(false);
         resetForm();
       },
@@ -167,7 +167,7 @@ export default function Fornecedores() {
     if (!deleteTarget) return;
     deleteFornecedor.mutate(deleteTarget.id, {
       onSuccess: () => {
-        toast({ title: "Fornecedor excluido com sucesso!" });
+        toast({ title: "Registro excluido com sucesso!" });
         setDeleteTarget(null);
       },
       onError: (err) => toast({

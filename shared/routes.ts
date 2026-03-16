@@ -296,6 +296,16 @@ export const api = {
       input: insertEmpenhoSchema.omit({ contratoId: true }),
       responses: { 201: empenhoResponseSchema },
     },
+    annul: {
+      method: 'POST' as const,
+      path: '/api/empenhos/:id/anular' as const,
+      input: z.object({
+        valorAnulado: z.string(),
+        dataAnulacao: z.string(),
+        motivoAnulacao: z.string().min(1),
+      }),
+      responses: { 200: empenhoResponseSchema, 404: errorSchemas.notFound },
+    },
     delete: {
       method: 'DELETE' as const,
       path: '/api/empenhos/:id' as const,
@@ -349,10 +359,19 @@ export const api = {
       input: insertNotaFiscalSchema,
       responses: { 201: notaFiscalResponseSchema },
     },
-    paymentStatus: {
+    sendToPayment: {
       method: 'PATCH' as const,
-      path: '/api/notas-fiscais/:id/pagamento' as const,
-      input: z.object({ statusPagamento: z.enum(['pendente', 'pago']), dataPagamento: z.string().optional() }),
+      path: '/api/notas-fiscais/:id/enviar-pagamento' as const,
+      input: z.object({
+        numeroProcessoPagamento: z.string().min(1),
+        dataEnvioPagamento: z.string(),
+      }),
+      responses: { 200: notaFiscalResponseSchema },
+    },
+    registerPayment: {
+      method: 'PATCH' as const,
+      path: '/api/notas-fiscais/:id/registrar-pagamento' as const,
+      input: z.object({ dataPagamento: z.string() }),
       responses: { 200: notaFiscalResponseSchema },
     },
     delete: {

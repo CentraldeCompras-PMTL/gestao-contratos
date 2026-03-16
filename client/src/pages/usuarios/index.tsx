@@ -59,9 +59,18 @@ export default function Usuarios() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.role === "operacional" && !form.enteId) {
+      toast({
+        variant: "destructive",
+        title: "Preencha os campos obrigatorios",
+        description: "Selecione o ente do usuario operacional antes de salvar.",
+      });
+      return;
+    }
+
     createUser.mutate({ ...form, enteId: form.role === "admin" ? undefined : form.enteId }, {
       onSuccess: () => {
-        toast({ title: "Usuario criado com sucesso!" });
+        toast({ title: "Cadastro realizado com sucesso!" });
         setDialogOpen(false);
         resetForm();
       },
@@ -126,7 +135,14 @@ export default function Usuarios() {
               </div>
               <div className="space-y-2">
                 <Label>Perfil</Label>
-                <Select value={form.role} onValueChange={(value: "admin" | "operacional") => setForm((current) => ({ ...current, role: value }))}>
+                <Select
+                  value={form.role}
+                  onValueChange={(value: "admin" | "operacional") => setForm((current) => ({
+                    ...current,
+                    role: value,
+                    enteId: value === "admin" ? "" : current.enteId,
+                  }))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -137,7 +153,7 @@ export default function Usuarios() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Ente</Label>
+                <Label>Ente {form.role === "operacional" ? "*" : ""}</Label>
                 <Select value={form.enteId} onValueChange={(value) => setForm((current) => ({ ...current, enteId: value }))} disabled={form.role === "admin"}>
                   <SelectTrigger>
                     <SelectValue placeholder={form.role === "admin" ? "Administrador acessa todos" : "Selecione o ente"} />
@@ -148,6 +164,9 @@ export default function Usuarios() {
                     ))}
                   </SelectContent>
                 </Select>
+                {form.role === "operacional" && (
+                  <p className="text-xs text-muted-foreground">Usuarios operacionais devem ser vinculados a um ente.</p>
+                )}
               </div>
               <Button type="submit" className="w-full" disabled={createUser.isPending}>
                 {createUser.isPending ? "Salvando..." : "Salvar Usuario"}

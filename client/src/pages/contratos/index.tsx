@@ -119,7 +119,7 @@ export default function Contratos() {
         { id: editingId, data: payload },
         {
           onSuccess: () => {
-            toast({ title: "Contrato atualizado!" });
+            toast({ title: "Registro atualizado com sucesso!" });
             setDialogOpen(false);
             setEditingId(null);
             resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
@@ -138,7 +138,7 @@ export default function Contratos() {
 
     createContrato.mutate(payload, {
       onSuccess: () => {
-        toast({ title: "Contrato criado!" });
+        toast({ title: "Cadastro realizado com sucesso!" });
         setDialogOpen(false);
         resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
       },

@@ -42,14 +42,14 @@ export function useCreateNotaFiscal() {
   });
 }
 
-export function useUpdateNotaFiscalPagamento() {
+export function useSendNotaFiscalToPayment() {
   return useMutation({
-    mutationFn: async ({ id, statusPagamento, dataPagamento }: { id: string; statusPagamento: "pendente" | "pago"; dataPagamento?: string }) => {
-      const url = buildUrl(api.notasFiscais.paymentStatus.path, { id });
+    mutationFn: async ({ id, numeroProcessoPagamento, dataEnvioPagamento }: { id: string; numeroProcessoPagamento: string; dataEnvioPagamento: string }) => {
+      const url = buildUrl(api.notasFiscais.sendToPayment.path, { id });
       const res = await fetch(url, {
-        method: api.notasFiscais.paymentStatus.method,
+        method: api.notasFiscais.sendToPayment.method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statusPagamento, dataPagamento }),
+        body: JSON.stringify({ numeroProcessoPagamento, dataEnvioPagamento }),
         credentials: "include",
       });
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar nota fiscal"));
@@ -58,6 +58,27 @@ export function useUpdateNotaFiscalPagamento() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.notasFiscais.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
+    },
+  });
+}
+
+export function useRegisterNotaFiscalPayment() {
+  return useMutation({
+    mutationFn: async ({ id, dataPagamento }: { id: string; dataPagamento: string }) => {
+      const url = buildUrl(api.notasFiscais.registerPayment.path, { id });
+      const res = await fetch(url, {
+        method: api.notasFiscais.registerPayment.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataPagamento }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao registrar pagamento da nota"));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.notasFiscais.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
     },
   });
 }

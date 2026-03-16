@@ -95,7 +95,7 @@ export default function Processos() {
         { id: editingProcId, data: procForm },
         {
           onSuccess: () => {
-            toast({ title: "Processo atualizado!" });
+            toast({ title: "Registro atualizado com sucesso!" });
             setProcessoDialog(false);
             setEditingProcId(null);
             resetProcForm();
@@ -112,7 +112,7 @@ export default function Processos() {
 
     createProcesso.mutate(procForm, {
       onSuccess: () => {
-        toast({ title: "Processo criado!" });
+        toast({ title: "Cadastro realizado com sucesso!" });
         setProcessoDialog(false);
         resetProcForm();
       },
@@ -331,7 +331,7 @@ export default function Processos() {
                 if (!processoToDelete) return;
                 deleteProcesso.mutate(processoToDelete.id, {
                   onSuccess: () => {
-                    toast({ title: "Processo excluido com sucesso!" });
+                    toast({ title: "Registro excluido com sucesso!" });
                     setProcessoToDelete(null);
                   },
                   onError: (err) => toast({

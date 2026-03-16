@@ -9,6 +9,8 @@ const timestampSchema = z.string();
 export const userRoleSchema = z.enum(["admin", "operacional"]);
 export const contractStatusSchema = z.enum(["vigente", "encerrado"]);
 export const aditivoTipoSchema = z.enum(["valor", "vigencia", "misto", "apostilamento", "outro"]);
+export const empenhoStatusSchema = z.enum(["ativo", "anulado_parcial", "anulado"]);
+export const notaFiscalStatusSchema = z.enum(["nota_recebida", "aguardando_pagamento", "pago"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -118,6 +120,10 @@ export const empenhos = pgTable("empenhos", {
   contratoId: varchar("contrato_id").references(() => contratos.id).notNull(),
   dataEmpenho: date("data_empenho", { mode: "string" }).notNull(),
   valorEmpenho: numeric("valor_empenho", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").notNull().default("ativo"),
+  valorAnulado: numeric("valor_anulado", { precision: 12, scale: 2 }).notNull().default("0"),
+  dataAnulacao: date("data_anulacao", { mode: "string" }),
+  motivoAnulacao: text("motivo_anulacao"),
   criadoEm: timestamp("criado_em").defaultNow(),
 });
 
@@ -139,7 +145,9 @@ export const notasFiscais = pgTable("notas_fiscais", {
   numeroNota: text("numero_nota").notNull().unique(),
   valorNota: numeric("valor_nota", { precision: 12, scale: 2 }).notNull(),
   dataNota: date("data_nota", { mode: "string" }).notNull(),
-  statusPagamento: text("status_pagamento").default("pendente"),
+  statusPagamento: text("status_pagamento").notNull().default("nota_recebida"),
+  numeroProcessoPagamento: text("numero_processo_pagamento"),
+  dataEnvioPagamento: date("data_envio_pagamento", { mode: "string" }),
   dataPagamento: date("data_pagamento", { mode: "string" }),
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
@@ -233,9 +241,24 @@ export const insertFornecedorSchema = createInsertSchema(fornecedores).omit({ id
 export const insertProcessoDigitalSchema = createInsertSchema(processosDigitais).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertFaseContratacaoSchema = createInsertSchema(fasesContratacao).omit({ id: true, criadoEm: true });
 export const insertContratoSchema = createInsertSchema(contratos).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export const insertEmpenhoSchema = createInsertSchema(empenhos).omit({ id: true, criadoEm: true });
+export const insertEmpenhoSchema = createInsertSchema(empenhos).omit({
+  id: true,
+  criadoEm: true,
+  status: true,
+  valorAnulado: true,
+  dataAnulacao: true,
+  motivoAnulacao: true,
+});
 export const insertAfSchema = createInsertSchema(afs).omit({ id: true, dataEstimadaEntrega: true, criadoEm: true, flagEntregaNotificada: true, dataExtensao: true });
-export const insertNotaFiscalSchema = createInsertSchema(notasFiscais).omit({ id: true, criadoEm: true, atualizadoEm: true, dataPagamento: true, statusPagamento: true });
+export const insertNotaFiscalSchema = createInsertSchema(notasFiscais).omit({
+  id: true,
+  criadoEm: true,
+  atualizadoEm: true,
+  dataPagamento: true,
+  statusPagamento: true,
+  numeroProcessoPagamento: true,
+  dataEnvioPagamento: true,
+});
 export const insertContratoAditivoSchema = createInsertSchema(contratoAditivos).omit({ id: true, criadoEm: true, contratoId: true }).extend({
   tipoAditivo: aditivoTipoSchema,
 });
@@ -349,6 +372,10 @@ export const empenhoResponseSchema = z.object({
   contratoId: z.string(),
   dataEmpenho: isoDateSchema,
   valorEmpenho: z.union([z.string(), z.number()]),
+  status: empenhoStatusSchema,
+  valorAnulado: z.union([z.string(), z.number()]),
+  dataAnulacao: isoDateSchema.nullable(),
+  motivoAnulacao: z.string().nullable(),
   criadoEm: timestampSchema.nullable().optional(),
 });
 
@@ -374,7 +401,9 @@ export const notaFiscalResponseSchema = z.object({
   numeroNota: z.string(),
   valorNota: z.union([z.string(), z.number()]),
   dataNota: isoDateSchema,
-  statusPagamento: z.string().nullable().optional(),
+  statusPagamento: notaFiscalStatusSchema,
+  numeroProcessoPagamento: z.string().nullable(),
+  dataEnvioPagamento: isoDateSchema.nullable(),
   dataPagamento: isoDateSchema.nullable(),
   criadoEm: timestampSchema.nullable().optional(),
   atualizadoEm: timestampSchema.nullable().optional(),

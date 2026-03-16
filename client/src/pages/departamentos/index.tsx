@@ -53,7 +53,7 @@ export default function Departamentos() {
         { id: editingId, data: formData },
         {
           onSuccess: () => {
-            toast({ title: "Departamento atualizado!" });
+            toast({ title: "Registro atualizado com sucesso!" });
             setIsDialogOpen(false);
             resetForm();
           },
@@ -69,7 +69,7 @@ export default function Departamentos() {
 
     createMutation.mutate(formData, {
       onSuccess: () => {
-        toast({ title: "Departamento criado!" });
+        toast({ title: "Cadastro realizado com sucesso!" });
         setIsDialogOpen(false);
         resetForm();
       },
@@ -191,7 +191,7 @@ export default function Departamentos() {
                 if (!departamentoToDelete) return;
                 deleteMutation.mutate(departamentoToDelete.id, {
                   onSuccess: () => {
-                    toast({ title: "Departamento excluido com sucesso!" });
+                    toast({ title: "Registro excluido com sucesso!" });
                     setDepartamentoToDelete(null);
                   },
                   onError: (err) => toast({

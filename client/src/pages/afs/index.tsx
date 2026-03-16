@@ -36,7 +36,7 @@ export default function AfsPanel() {
   const [pendingAction, setPendingAction] = useState<"extend" | "entrega" | "delete" | null>(null);
   const [dialogMode, setDialogMode] = useState<"extend" | "entrega">("extend");
   const [extensionDate, setExtensionDate] = useState("");
-  const [notaForm, setNotaForm] = useState({ numeroNota: "", valorNota: "", dataNota: "" });
+  const [entregaForm, setEntregaForm] = useState({ dataEntregaReal: "", numeroNota: "", valorNota: "", dataNota: "" });
 
   const afsAberto = useMemo(() => afs.filter((af) => !af.dataEntregaReal), [afs]);
   const afsEntregues = useMemo(() => afs.filter((af) => !!af.dataEntregaReal), [afs]);
@@ -55,7 +55,7 @@ export default function AfsPanel() {
     setSelectedAf(null);
     setPendingAction(null);
     setExtensionDate("");
-    setNotaForm({ numeroNota: "", valorNota: "", dataNota: "" });
+    setEntregaForm({ dataEntregaReal: "", numeroNota: "", valorNota: "", dataNota: "" });
     setDialogMode("extend");
   };
 
@@ -78,7 +78,7 @@ export default function AfsPanel() {
   };
 
   const executeEntrega = () => {
-    if (!selectedAf || !notaForm.numeroNota || !notaForm.valorNota || !notaForm.dataNota) {
+    if (!selectedAf || !entregaForm.dataEntregaReal || !entregaForm.numeroNota || !entregaForm.valorNota || !entregaForm.dataNota) {
       toast({ variant: "destructive", title: "Preencha todos os campos" });
       return;
     }
@@ -86,17 +86,17 @@ export default function AfsPanel() {
     createNotaMutation.mutate(
       {
         contratoId: selectedAf.empenho.contrato.id,
-        numeroNota: notaForm.numeroNota,
-        valorNota: notaForm.valorNota,
-        dataNota: notaForm.dataNota,
+        numeroNota: entregaForm.numeroNota,
+        valorNota: entregaForm.valorNota,
+        dataNota: entregaForm.dataNota,
       },
       {
         onSuccess: () => {
           updateEntregaMutation.mutate(
-            { id: selectedAf.id, dataEntregaReal: new Date().toISOString().split("T")[0] },
+            { id: selectedAf.id, dataEntregaReal: entregaForm.dataEntregaReal },
             {
               onSuccess: () => {
-                toast({ title: "Entrega registrada e nota fiscal criada!" });
+                toast({ title: "Entrega registrada e nota recebida cadastrada!" });
                 resetDialog();
               },
               onError: (err) => toast({
@@ -288,18 +288,22 @@ export default function AfsPanel() {
               ) : (
                 <>
                   <div className="space-y-2">
+                    <label className="text-sm font-medium">Data da Entrega</label>
+                    <Input type="date" value={entregaForm.dataEntregaReal} onChange={(e) => setEntregaForm({ ...entregaForm, dataEntregaReal: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-sm font-medium">Numero da Nota Fiscal</label>
-                    <Input value={notaForm.numeroNota} onChange={(e) => setNotaForm({ ...notaForm, numeroNota: e.target.value })} placeholder="Ex: NF-001" />
+                    <Input value={entregaForm.numeroNota} onChange={(e) => setEntregaForm({ ...entregaForm, numeroNota: e.target.value })} placeholder="Ex: NF-001" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Valor da Nota (R$)</label>
-                    <Input type="number" step="0.01" value={notaForm.valorNota} onChange={(e) => setNotaForm({ ...notaForm, valorNota: e.target.value })} placeholder="0.00" />
+                    <Input type="number" step="0.01" value={entregaForm.valorNota} onChange={(e) => setEntregaForm({ ...entregaForm, valorNota: e.target.value })} placeholder="0.00" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Data da Nota</label>
-                    <Input type="date" value={notaForm.dataNota} onChange={(e) => setNotaForm({ ...notaForm, dataNota: e.target.value })} />
+                    <Input type="date" value={entregaForm.dataNota} onChange={(e) => setEntregaForm({ ...entregaForm, dataNota: e.target.value })} />
                   </div>
-                  <Button onClick={() => setPendingAction("entrega")} className="w-full" disabled={!notaForm.numeroNota || !notaForm.valorNota || !notaForm.dataNota || createNotaMutation.isPending || updateEntregaMutation.isPending}>
+                  <Button onClick={() => setPendingAction("entrega")} className="w-full" disabled={!entregaForm.dataEntregaReal || !entregaForm.numeroNota || !entregaForm.valorNota || !entregaForm.dataNota || createNotaMutation.isPending || updateEntregaMutation.isPending}>
                     Registrar Entrega
                   </Button>
                 </>

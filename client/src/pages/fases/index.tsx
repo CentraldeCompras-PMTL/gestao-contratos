@@ -62,7 +62,7 @@ export default function Fases() {
     e.preventDefault();
     createFase.mutate(toPayload(), {
       onSuccess: () => {
-        toast({ title: "Fase criada com sucesso!" });
+        toast({ title: "Cadastro realizado com sucesso!" });
         resetForm();
         setIsCreateOpen(false);
       },
@@ -95,7 +95,7 @@ export default function Fases() {
       { id: editingId, data: toPayload() },
       {
         onSuccess: () => {
-          toast({ title: "Fase atualizada com sucesso!" });
+          toast({ title: "Registro atualizado com sucesso!" });
           resetForm();
         },
         onError: (err) => toast({
@@ -306,7 +306,7 @@ export default function Fases() {
                 if (!faseToDelete) return;
                 deleteFase.mutate(faseToDelete.id, {
                   onSuccess: () => {
-                    toast({ title: "Fase excluida com sucesso!" });
+                    toast({ title: "Registro excluido com sucesso!" });
                     setFaseToDelete(null);
                   },
                   onError: (err) => toast({

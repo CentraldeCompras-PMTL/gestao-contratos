@@ -100,7 +100,7 @@ export default function Dashboard() {
     filteredContratos.forEach((contrato) => {
       total += parseNumberString(contrato.valorContrato);
       contrato.notasFiscais.forEach((nota) => {
-        if (nota.statusPagamento === "pago") {
+        if (nota.statusPagamento === "aguardando_pagamento" || nota.statusPagamento === "pago") {
           utilizado += parseNumberString(nota.valorNota);
         }
       });

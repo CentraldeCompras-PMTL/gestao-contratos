@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNotasFiscais, useCreateNotaFiscal, useUpdateNotaFiscalPagamento, useDeleteNotaFiscal } from "@/hooks/use-notas-fiscais";
+import { useNotasFiscais, useCreateNotaFiscal, useSendNotaFiscalToPayment, useRegisterNotaFiscalPayment, useDeleteNotaFiscal } from "@/hooks/use-notas-fiscais";
 import { useContratos } from "@/hooks/use-contratos";
 import { useEntes } from "@/hooks/use-entes";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, FileText, Check, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { ContratoWithRelations, NotaFiscalWithRelations } from "@shared/schema";
@@ -29,27 +30,32 @@ export default function NotasFiscais() {
   const { data: contratos = [] } = useContratos();
   const { data: entes = [] } = useEntes();
   const createMutation = useCreateNotaFiscal();
-  const paymentMutation = useUpdateNotaFiscalPagamento();
+  const sendToPaymentMutation = useSendNotaFiscalToPayment();
+  const registerPaymentMutation = useRegisterNotaFiscalPayment();
   const deleteMutation = useDeleteNotaFiscal();
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusTab, setStatusTab] = useState("nota_recebida");
   const [contratoStatusFilter, setContratoStatusFilter] = useState("all");
   const [enteFilter, setEnteFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ contratoId: "", numeroNota: "", valorNota: "", dataNota: "" });
   const [deleteTarget, setDeleteTarget] = useState<NotaFiscalWithRelations | null>(null);
+  const [sendTarget, setSendTarget] = useState<NotaFiscalWithRelations | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<NotaFiscalWithRelations | null>(null);
+  const [paymentFlowForm, setPaymentFlowForm] = useState({ numeroProcessoPagamento: "", dataEnvioPagamento: "", dataPagamento: "" });
 
   const filtered = notas.filter((nota) =>
     (nota.numeroNota.toLowerCase().includes(search.toLowerCase()) ||
       nota.contrato.numeroContrato.includes(search)) &&
-    (statusFilter === "all" || nota.statusPagamento === statusFilter) &&
+    (statusTab === "all" || nota.statusPagamento === statusTab) &&
     (contratoStatusFilter === "all" || nota.contrato.status === contratoStatusFilter) &&
     (enteFilter === "all" || nota.contrato.processoDigital.departamento?.enteId === enteFilter)
   );
 
   const resetForm = () => setFormData({ contratoId: "", numeroNota: "", valorNota: "", dataNota: "" });
+  const resetPaymentFlowForm = () => setPaymentFlowForm({ numeroProcessoPagamento: "", dataEnvioPagamento: "", dataPagamento: "" });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +68,7 @@ export default function NotasFiscais() {
       },
       {
         onSuccess: () => {
-          toast({ title: "Nota fiscal criada!" });
+          toast({ title: "Cadastro realizado com sucesso!" });
           setIsDialogOpen(false);
           resetForm();
         },
@@ -75,21 +81,52 @@ export default function NotasFiscais() {
     );
   };
 
-  const handlePayment = (notaId: string, status: "pago" | "pendente") => {
-    paymentMutation.mutate(
+  const handleSendToPayment = () => {
+    if (!sendTarget || !paymentFlowForm.numeroProcessoPagamento || !paymentFlowForm.dataEnvioPagamento) {
+      toast({ variant: "destructive", title: "Preencha os campos obrigatorios" });
+      return;
+    }
+    sendToPaymentMutation.mutate(
       {
-        id: notaId,
-        statusPagamento: status,
-        dataPagamento: status === "pago" ? new Date().toISOString().split("T")[0] : undefined,
+        id: sendTarget.id,
+        numeroProcessoPagamento: paymentFlowForm.numeroProcessoPagamento,
+        dataEnvioPagamento: paymentFlowForm.dataEnvioPagamento,
       },
       {
         onSuccess: () => {
-          toast({ title: `Nota marcada como ${status === "pago" ? "paga" : "pendente"}!` });
+          toast({ title: "Registro atualizado com sucesso!" });
+          setSendTarget(null);
+          resetPaymentFlowForm();
         },
         onError: (err) => toast({
           variant: "destructive",
           title: "Erro",
-          description: err instanceof Error ? err.message : "Erro ao atualizar pagamento",
+          description: err instanceof Error ? err.message : "Erro ao enviar nota para pagamento",
+        }),
+      },
+    );
+  };
+
+  const handleRegisterPayment = () => {
+    if (!paymentTarget || !paymentFlowForm.dataPagamento) {
+      toast({ variant: "destructive", title: "Preencha os campos obrigatorios" });
+      return;
+    }
+    registerPaymentMutation.mutate(
+      {
+        id: paymentTarget.id,
+        dataPagamento: paymentFlowForm.dataPagamento,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Registro atualizado com sucesso!" });
+          setPaymentTarget(null);
+          resetPaymentFlowForm();
+        },
+        onError: (err) => toast({
+          variant: "destructive",
+          title: "Erro",
+          description: err instanceof Error ? err.message : "Erro ao registrar pagamento",
         }),
       },
     );
@@ -99,7 +136,7 @@ export default function NotasFiscais() {
     if (!deleteTarget) return;
     deleteMutation.mutate(deleteTarget.id, {
       onSuccess: () => {
-        toast({ title: "Nota fiscal excluida com sucesso!" });
+        toast({ title: "Registro excluido com sucesso!" });
         setDeleteTarget(null);
       },
       onError: (err) => toast({
@@ -162,18 +199,7 @@ export default function NotasFiscais() {
         <div className="mb-4">
           <Input placeholder="Buscar nota..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="mb-4 grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Pagamento</label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="mb-4 grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <label className="text-sm font-medium">Status do Contrato</label>
             <Select value={contratoStatusFilter} onValueChange={setContratoStatusFilter}>
@@ -201,67 +227,84 @@ export default function NotasFiscais() {
           )}
         </div>
 
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Numero</TableHead>
-                <TableHead>Contrato</TableHead>
-                <TableHead>Processo</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-28">Acao</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8"><div className="flex flex-col items-center"><FileText className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhuma nota fiscal</p></div></TableCell></TableRow>
-              ) : (
-                filtered.map((nota: NotaFiscalWithRelations) => (
-                  <TableRow key={nota.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
-                    <TableCell className="font-medium">{nota.numeroNota}</TableCell>
-                    <TableCell>{nota.contrato.numeroContrato}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{nota.contrato.processoDigital.numeroProcessoDigital}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(parseNumberString(nota.valorNota))}</TableCell>
-                    <TableCell className="text-sm">{formatDate(nota.dataNota)}</TableCell>
-                    <TableCell>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        nota.statusPagamento === "pago"
-                          ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
-                          : "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
-                      }`}>
-                        {nota.statusPagamento === "pago" ? "Pago" : "Pendente"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant={nota.statusPagamento === "pago" ? "outline" : "default"}
-                        onClick={() => handlePayment(nota.id, nota.statusPagamento === "pago" ? "pendente" : "pago")}
-                        disabled={paymentMutation.isPending || (nota.contrato.status === "encerrado" && nota.statusPagamento === "pago")}
-                        data-testid={`button-payment-${nota.id}`}
-                      >
-                        <Check size={16} />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteTarget(nota)}
-                        disabled={nota.statusPagamento === "pago" || nota.contrato.status === "encerrado"}
-                        data-testid={`button-delete-${nota.id}`}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </TableCell>
+        <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="nota_recebida">Notas Recebidas</TabsTrigger>
+            <TabsTrigger value="aguardando_pagamento">Aguardando Pagamento</TabsTrigger>
+            <TabsTrigger value="pago">Notas Pagas</TabsTrigger>
+          </TabsList>
+          <TabsContent value={statusTab} className="mt-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Numero</TableHead>
+                    <TableHead>Contrato</TableHead>
+                    <TableHead>Processo</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Data da Nota</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Processo Pagamento</TableHead>
+                    <TableHead className="w-40">Acao</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                  ) : filtered.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8"><div className="flex flex-col items-center"><FileText className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhuma nota fiscal</p></div></TableCell></TableRow>
+                  ) : (
+                    filtered.map((nota: NotaFiscalWithRelations) => (
+                      <TableRow key={nota.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
+                        <TableCell className="font-medium">{nota.numeroNota}</TableCell>
+                        <TableCell>{nota.contrato.numeroContrato}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{nota.contrato.processoDigital.numeroProcessoDigital}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(parseNumberString(nota.valorNota))}</TableCell>
+                        <TableCell className="text-sm">{formatDate(nota.dataNota)}</TableCell>
+                        <TableCell>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            nota.statusPagamento === "pago"
+                              ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
+                              : nota.statusPagamento === "aguardando_pagamento"
+                              ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100"
+                              : "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
+                          }`}>
+                            {nota.statusPagamento === "pago" ? "Pago" : nota.statusPagamento === "aguardando_pagamento" ? "Aguardando pagamento" : "Nota recebida"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm">{nota.numeroProcessoPagamento || "-"}</TableCell>
+                        <TableCell className="flex gap-1">
+                          {nota.statusPagamento === "nota_recebida" && (
+                            <Button size="sm" onClick={() => { setSendTarget(nota); setPaymentFlowForm({ numeroProcessoPagamento: "", dataEnvioPagamento: "", dataPagamento: "" }); }}>
+                              Enviar
+                            </Button>
+                          )}
+                          {nota.statusPagamento === "aguardando_pagamento" && (
+                            <Button size="sm" variant="outline" onClick={() => { setPaymentTarget(nota); setPaymentFlowForm({ numeroProcessoPagamento: "", dataEnvioPagamento: "", dataPagamento: "" }); }}>
+                              <Check size={16} className="mr-1" />
+                              Pagar
+                            </Button>
+                          )}
+                          {nota.statusPagamento === "nota_recebida" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteTarget(nota)}
+                              disabled={nota.contrato.status === "encerrado"}
+                              data-testid={`button-delete-${nota.id}`}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
@@ -280,6 +323,40 @@ export default function NotasFiscais() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!sendTarget} onOpenChange={(open) => { if (!open) { setSendTarget(null); resetPaymentFlowForm(); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Enviar nota para pagamento</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Numero do Processo de Pagamento</label>
+              <Input value={paymentFlowForm.numeroProcessoPagamento} onChange={(e) => setPaymentFlowForm({ ...paymentFlowForm, numeroProcessoPagamento: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data do Envio</label>
+              <Input type="date" value={paymentFlowForm.dataEnvioPagamento} onChange={(e) => setPaymentFlowForm({ ...paymentFlowForm, dataEnvioPagamento: e.target.value })} />
+            </div>
+            <Button className="w-full" onClick={handleSendToPayment} disabled={sendToPaymentMutation.isPending}>
+              Confirmar envio
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!paymentTarget} onOpenChange={(open) => { if (!open) { setPaymentTarget(null); resetPaymentFlowForm(); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Registrar pagamento</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data do Pagamento</label>
+              <Input type="date" value={paymentFlowForm.dataPagamento} onChange={(e) => setPaymentFlowForm({ ...paymentFlowForm, dataPagamento: e.target.value })} />
+            </div>
+            <Button className="w-full" onClick={handleRegisterPayment} disabled={registerPaymentMutation.isPending}>
+              Confirmar pagamento
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

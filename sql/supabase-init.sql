@@ -118,8 +118,14 @@ create table if not exists empenhos (
   contrato_id varchar not null references contratos(id) on delete restrict,
   data_empenho date not null,
   valor_empenho numeric(12, 2) not null,
+  status text not null default 'ativo',
+  valor_anulado numeric(12, 2) not null default 0,
+  data_anulacao date,
+  motivo_anulacao text,
   criado_em timestamp default now(),
-  constraint empenhos_valor_chk check (valor_empenho >= 0)
+  constraint empenhos_valor_chk check (valor_empenho >= 0),
+  constraint empenhos_status_chk check (status in ('ativo', 'anulado_parcial', 'anulado')),
+  constraint empenhos_valor_anulado_chk check (valor_anulado >= 0 and valor_anulado <= valor_empenho)
 );
 
 create table if not exists afs (
@@ -143,12 +149,14 @@ create table if not exists notas_fiscais (
   numero_nota text not null unique,
   valor_nota numeric(12, 2) not null,
   data_nota date not null,
-  status_pagamento text default 'pendente',
+  status_pagamento text not null default 'nota_recebida',
+  numero_processo_pagamento text,
+  data_envio_pagamento date,
   data_pagamento date,
   criado_em timestamp default now(),
   atualizado_em timestamp default now(),
   constraint notas_fiscais_valor_chk check (valor_nota >= 0),
-  constraint notas_fiscais_status_chk check (status_pagamento in ('pendente', 'pago', 'atrasado', 'cancelado')),
+  constraint notas_fiscais_status_chk check (status_pagamento in ('nota_recebida', 'aguardando_pagamento', 'pago')),
   constraint notas_fiscais_pagamento_chk check (data_pagamento is null or data_pagamento >= data_nota)
 );
 

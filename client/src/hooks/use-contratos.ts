@@ -159,6 +159,40 @@ export function useDeleteEmpenho() {
   });
 }
 
+export function useAnnulEmpenho() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      contratoId,
+      valorAnulado,
+      dataAnulacao,
+      motivoAnulacao,
+    }: {
+      id: string;
+      contratoId: string;
+      valorAnulado: string;
+      dataAnulacao: string;
+      motivoAnulacao: string;
+    }) => {
+      const url = buildUrl(api.empenhos.annul.path, { id });
+      const res = await fetch(url, {
+        method: api.empenhos.annul.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ valorAnulado, dataAnulacao, motivoAnulacao }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao anular empenho"));
+      return { ...(await res.json()), contratoId };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.contratos.get.path, variables.contratoId] });
+      queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
+    },
+  });
+}
+
 export function useCreateContratoAditivo() {
   const queryClient = useQueryClient();
   return useMutation({

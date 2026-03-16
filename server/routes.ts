@@ -25,6 +25,22 @@ function normalizeCnpj(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+function getEmpenhoMetrics(
+  empenho: {
+    valorEmpenho: string | number;
+    valorAnulado?: string | number | null;
+    afs: Array<{ valorAf: string | number }>;
+  },
+) {
+  const valorEmpenho = parseMoney(empenho.valorEmpenho, "Valor do empenho");
+  const valorAnulado = parseMoney(empenho.valorAnulado ?? "0", "Valor anulado");
+  const totalAfs = empenho.afs.reduce((acc, af) => acc + parseMoney(af.valorAf, "Valor da AF"), 0);
+  const saldoDisponivel = valorEmpenho - totalAfs - valorAnulado;
+  const valorComprometido = valorEmpenho - valorAnulado;
+
+  return { valorEmpenho, valorAnulado, totalAfs, saldoDisponivel, valorComprometido };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -843,7 +859,7 @@ export async function registerRoutes(
 
       const valorContrato = parseMoney(contrato.valorContrato, "Valor do contrato");
       const totalEmpenhado = contrato.empenhos.reduce(
-        (acc, empenho) => acc + parseMoney(empenho.valorEmpenho, "Valor do empenho"),
+        (acc, empenho) => acc + getEmpenhoMetrics(empenho).valorComprometido,
         0,
       );
       const novoEmpenho = parseMoney(data.valorEmpenho, "Valor do empenho");
@@ -863,6 +879,65 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.empenhos.annul.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.empenhos.annul.input.parse({
+        ...req.body,
+        valorAnulado: String(req.body.valorAnulado),
+      });
+      parseDateOnly(data.dataAnulacao, "Data da anulacao");
+
+      const empenho = await storage.getEmpenho(req.params.id);
+      if (!empenho) {
+        return res.status(404).json({ message: "Empenho nao encontrado" });
+      }
+
+      const contrato = await storage.getContrato(empenho.contratoId);
+      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+
+      if (empenho.contrato.status === "encerrado") {
+        throw new HttpError(400, "Contrato encerrado nao permite anulacao de empenho");
+      }
+
+      const valorSolicitado = parseMoney(data.valorAnulado, "Valor da anulacao");
+      if (valorSolicitado <= 0) {
+        throw new HttpError(400, "O valor da anulacao deve ser maior que zero");
+      }
+
+      const { valorEmpenho, valorAnulado, saldoDisponivel } = getEmpenhoMetrics(empenho);
+      if (valorSolicitado > saldoDisponivel) {
+        throw new HttpError(400, "O valor da anulacao nao pode ultrapassar o saldo disponivel do empenho");
+      }
+
+      const novoValorAnulado = valorAnulado + valorSolicitado;
+      const novoStatus = novoValorAnulado >= valorEmpenho - empenho.afs.reduce((acc, af) => acc + parseMoney(af.valorAf, "Valor da AF"), 0)
+        ? "anulado"
+        : "anulado_parcial";
+
+      const updated = await storage.updateEmpenhoAnulacao(empenho.id, {
+        status: novoStatus,
+        valorAnulado: novoValorAnulado.toFixed(2),
+        dataAnulacao: data.dataAnulacao,
+        motivoAnulacao: data.motivoAnulacao,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Empenho nao encontrado" });
+      }
+
+      await audit(
+        req,
+        "annul",
+        "empenho",
+        updated.id,
+        `Anulacao de ${valorSolicitado.toFixed(2)} em ${data.dataAnulacao}: ${data.motivoAnulacao}`,
+      );
+      res.json(updated);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao anular empenho") });
+    }
+  });
+
   app.delete(api.empenhos.delete.path, requireAuth, async (req, res) => {
     try {
       const empenho = await storage.getEmpenho(req.params.id);
@@ -877,6 +952,9 @@ export async function registerRoutes(
       }
       if (empenho.afs.length > 0) {
         throw new HttpError(400, "Nao e possivel excluir empenho com AFs vinculadas");
+      }
+      if (parseMoney(empenho.valorAnulado ?? "0", "Valor anulado") > 0) {
+        throw new HttpError(400, "Nao e possivel excluir empenho com anulacao registrada");
       }
 
       const deleted = await storage.deleteEmpenho(req.params.id);
@@ -914,11 +992,10 @@ export async function registerRoutes(
         throw new HttpError(400, "Contrato encerrado nao aceita novas AFs");
       }
 
-      const valorEmpenho = parseMoney(empenho.valorEmpenho, "Valor do empenho");
-      const totalAfs = empenho.afs.reduce((acc, af) => acc + parseMoney(af.valorAf, "Valor da AF"), 0);
+      const { saldoDisponivel } = getEmpenhoMetrics(empenho);
       const novaAf = parseMoney(data.valorAf, "Valor da AF");
 
-      if (totalAfs + novaAf > valorEmpenho) {
+      if (novaAf > saldoDisponivel) {
         throw new HttpError(400, "O valor da AF nao pode ultrapassar o saldo do empenho");
       }
 
@@ -1049,25 +1126,56 @@ export async function registerRoutes(
     }
   });
 
-  app.patch(api.notasFiscais.paymentStatus.path, requireAuth, async (req, res) => {
+  app.patch(api.notasFiscais.sendToPayment.path, requireAuth, async (req, res) => {
     try {
-      const data = api.notasFiscais.paymentStatus.input.parse(req.body);
+      const data = api.notasFiscais.sendToPayment.input.parse(req.body);
       const nota = await storage.getNotaFiscal(req.params.id);
       if (!nota) {
         return res.status(404).json({ message: "Nota fiscal nao encontrada" });
       }
       ensureEnteAccess(req, nota.contrato.processoDigital.departamento?.enteId);
-      if (nota.contrato.status === "encerrado" && data.statusPagamento !== "pago") {
-        throw new HttpError(400, "Contrato encerrado nao pode voltar a ter nota pendente");
+      if (nota.contrato.status === "encerrado") {
+        throw new HttpError(400, "Contrato encerrado nao permite alterar a nota fiscal");
       }
-      if (data.dataPagamento) {
-        parseDateOnly(data.dataPagamento, "Data de pagamento");
+      if (nota.statusPagamento !== "nota_recebida") {
+        throw new HttpError(400, "Somente notas recebidas podem ser enviadas para pagamento");
       }
-      const n = await storage.updateNotaFiscalPagamento(req.params.id, data.statusPagamento, data.dataPagamento);
-      await audit(req, "update_pagamento", "nota_fiscal", n.id, data.statusPagamento);
+      parseDateOnly(data.dataEnvioPagamento, "Data de envio para pagamento");
+      const n = await storage.updateNotaFiscalPagamento(req.params.id, {
+        statusPagamento: "aguardando_pagamento",
+        numeroProcessoPagamento: data.numeroProcessoPagamento,
+        dataEnvioPagamento: data.dataEnvioPagamento,
+        dataPagamento: null,
+      });
+      await audit(req, "send_to_payment", "nota_fiscal", n.id, data.numeroProcessoPagamento);
       res.json(n);
     } catch (e) {
-      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar pagamento") });
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao enviar nota para pagamento") });
+    }
+  });
+
+  app.patch(api.notasFiscais.registerPayment.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.notasFiscais.registerPayment.input.parse(req.body);
+      const nota = await storage.getNotaFiscal(req.params.id);
+      if (!nota) {
+        return res.status(404).json({ message: "Nota fiscal nao encontrada" });
+      }
+      ensureEnteAccess(req, nota.contrato.processoDigital.departamento?.enteId);
+      if (nota.statusPagamento !== "aguardando_pagamento") {
+        throw new HttpError(400, "Somente notas aguardando pagamento podem ser marcadas como pagas");
+      }
+      parseDateOnly(data.dataPagamento, "Data de pagamento");
+      const n = await storage.updateNotaFiscalPagamento(req.params.id, {
+        statusPagamento: "pago",
+        numeroProcessoPagamento: nota.numeroProcessoPagamento ?? null,
+        dataEnvioPagamento: nota.dataEnvioPagamento ?? null,
+        dataPagamento: data.dataPagamento,
+      });
+      await audit(req, "register_payment", "nota_fiscal", n.id, data.dataPagamento);
+      res.json(n);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao registrar pagamento") });
     }
   });
 
@@ -1081,8 +1189,8 @@ export async function registerRoutes(
       if (nota.contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de nota fiscal");
       }
-      if (nota.statusPagamento === "pago") {
-        throw new HttpError(400, "Nao e possivel excluir nota fiscal ja paga");
+      if (nota.statusPagamento !== "nota_recebida") {
+        throw new HttpError(400, "Nao e possivel excluir nota fiscal que ja entrou no fluxo de pagamento");
       }
 
       const deleted = await storage.deleteNotaFiscal(req.params.id);
@@ -1151,7 +1259,7 @@ export async function registerRoutes(
       valorTotal += vc;
 
       const empenhado = c.empenhos.reduce(
-        (acc, emp) => acc + parseMoney(emp.valorEmpenho, "Valor do empenho"),
+        (acc, emp) => acc + getEmpenhoMetrics(emp).valorComprometido,
         0,
       );
       saldoTotal += vc - empenhado;

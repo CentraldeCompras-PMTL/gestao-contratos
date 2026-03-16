@@ -27,16 +27,43 @@ export default function EntesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const action = editingId
-      ? updateEnte.mutate({ id: editingId, data: form }, {
-          onSuccess: () => { toast({ title: "Ente atualizado!" }); setDialogOpen(false); reset(); },
-          onError: (err) => toast({ variant: "destructive", title: "Erro", description: err instanceof Error ? err.message : "Erro ao atualizar ente" }),
-        })
-      : createEnte.mutate(form, {
-          onSuccess: () => { toast({ title: "Ente criado!" }); setDialogOpen(false); reset(); },
-          onError: (err) => toast({ variant: "destructive", title: "Erro", description: err instanceof Error ? err.message : "Erro ao criar ente" }),
+    if (editingId) {
+      updateEnte.mutate(
+        { id: editingId, data: form },
+        {
+          onSuccess: () => {
+            toast({
+              title: "Registro atualizado com sucesso!",
+              description: "Os dados foram salvos com sucesso.",
+            });
+            setDialogOpen(false);
+            reset();
+          },
+          onError: (err) => toast({
+            variant: "destructive",
+            title: "Erro",
+            description: err instanceof Error ? err.message : "Erro ao atualizar ente",
+          }),
+        },
+      );
+      return;
+    }
+
+    createEnte.mutate(form, {
+      onSuccess: () => {
+        toast({
+          title: "Cadastro realizado com sucesso!",
+          description: "Os dados foram cadastrados com sucesso.",
         });
-    return action;
+        setDialogOpen(false);
+        reset();
+      },
+      onError: (err) => toast({
+        variant: "destructive",
+        title: "Erro",
+        description: err instanceof Error ? err.message : "Erro ao criar ente",
+      }),
+    });
   };
 
   return (
@@ -53,7 +80,9 @@ export default function EntesPage() {
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-2"><label className="text-sm font-medium">Nome</label><Input value={form.nome} onChange={(e) => setForm((c) => ({ ...c, nome: e.target.value }))} required /></div>
               <div className="space-y-2"><label className="text-sm font-medium">Sigla</label><Input value={form.sigla} onChange={(e) => setForm((c) => ({ ...c, sigla: e.target.value.toUpperCase() }))} required /></div>
-              <Button type="submit" className="w-full">Salvar</Button>
+              <Button type="submit" className="w-full" disabled={createEnte.isPending || updateEnte.isPending}>
+                {createEnte.isPending || updateEnte.isPending ? "Salvando..." : "Salvar"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>

@@ -66,6 +66,15 @@ export interface IStorage {
 
   getEmpenho(id: string): Promise<(Empenho & { afs: Af[]; contrato: Contrato }) | undefined>;
   createEmpenho(empenho: InsertEmpenho): Promise<Empenho>;
+  updateEmpenhoAnulacao(
+    id: string,
+    data: {
+      status: string;
+      valorAnulado: string;
+      dataAnulacao: string;
+      motivoAnulacao: string;
+    },
+  ): Promise<Empenho | undefined>;
   deleteEmpenho(id: string): Promise<Empenho | undefined>;
 
   getAfs(): Promise<AfWithRelations[]>;
@@ -79,7 +88,15 @@ export interface IStorage {
   getNotasFiscais(): Promise<NotaFiscalWithRelations[]>;
   getNotaFiscal(id: string): Promise<NotaFiscalWithRelations | undefined>;
   createNotaFiscal(nota: InsertNotaFiscal): Promise<NotaFiscal>;
-  updateNotaFiscalPagamento(id: string, statusPagamento: string, dataPagamento?: string): Promise<NotaFiscal>;
+  updateNotaFiscalPagamento(
+    id: string,
+    data: {
+      statusPagamento: string;
+      numeroProcessoPagamento?: string | null;
+      dataEnvioPagamento?: string | null;
+      dataPagamento?: string | null;
+    },
+  ): Promise<NotaFiscal>;
   deleteNotaFiscal(id: string): Promise<NotaFiscal | undefined>;
 }
 
@@ -390,8 +407,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEmpenho(e: InsertEmpenho): Promise<Empenho> {
-    const [created] = await db.insert(empenhos).values(e).returning();
+    const [created] = await db.insert(empenhos).values({
+      ...e,
+      status: "ativo",
+      valorAnulado: "0",
+      dataAnulacao: null,
+      motivoAnulacao: null,
+    }).returning();
     return created;
+  }
+
+  async updateEmpenhoAnulacao(
+    id: string,
+    data: {
+      status: string;
+      valorAnulado: string;
+      dataAnulacao: string;
+      motivoAnulacao: string;
+    },
+  ): Promise<Empenho | undefined> {
+    const [updated] = await db.update(empenhos).set(data).where(eq(empenhos.id, id)).returning();
+    return updated;
   }
 
   async deleteEmpenho(id: string): Promise<Empenho | undefined> {
@@ -524,12 +560,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNotaFiscal(nota: InsertNotaFiscal): Promise<NotaFiscal> {
-    const [created] = await db.insert(notasFiscais).values(nota).returning();
+    const [created] = await db.insert(notasFiscais).values({
+      ...nota,
+      statusPagamento: "nota_recebida",
+      numeroProcessoPagamento: null,
+      dataEnvioPagamento: null,
+      dataPagamento: null,
+    }).returning();
     return created;
   }
 
-  async updateNotaFiscalPagamento(id: string, statusPagamento: string, dataPagamento?: string): Promise<NotaFiscal> {
-    const [updated] = await db.update(notasFiscais).set({ statusPagamento, dataPagamento }).where(eq(notasFiscais.id, id)).returning();
+  async updateNotaFiscalPagamento(
+    id: string,
+    data: {
+      statusPagamento: string;
+      numeroProcessoPagamento?: string | null;
+      dataEnvioPagamento?: string | null;
+      dataPagamento?: string | null;
+    },
+  ): Promise<NotaFiscal> {
+    const [updated] = await db.update(notasFiscais).set(data).where(eq(notasFiscais.id, id)).returning();
     return updated;
   }
 

@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   useContrato,
   useCreateEmpenho,
+  useAnnulEmpenho,
   useCloseContrato,
   useDeleteContrato,
   useDeleteEmpenho,
@@ -35,10 +36,21 @@ import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Af, EmpenhoWithRelations } from "@shared/schema";
 
+function getEmpenhoMetrics(empenho: EmpenhoWithRelations) {
+  const valorTotal = parseNumberString(empenho.valorEmpenho);
+  const totalAfs = empenho.afs.reduce((acc, af) => acc + parseNumberString(af.valorAf), 0);
+  const valorAnulado = parseNumberString(empenho.valorAnulado);
+  const saldoDisponivel = valorTotal - totalAfs - valorAnulado;
+  const valorComprometido = valorTotal - valorAnulado;
+
+  return { valorTotal, totalAfs, valorAnulado, saldoDisponivel, valorComprometido };
+}
+
 export default function ContratoDetail() {
   const { id } = useParams();
   const { data: contrato, isLoading } = useContrato(id!);
   const createEmpenho = useCreateEmpenho();
+  const annulEmpenho = useAnnulEmpenho();
   const closeContrato = useCloseContrato();
   const deleteContrato = useDeleteContrato();
   const deleteEmpenho = useDeleteEmpenho();
@@ -59,6 +71,7 @@ export default function ContratoDetail() {
   const [motivoEncerramento, setMotivoEncerramento] = useState("");
   const [deleteContratoOpen, setDeleteContratoOpen] = useState(false);
   const [deleteEmpenhoId, setDeleteEmpenhoId] = useState<string | null>(null);
+  const [annulEmpenhoId, setAnnulEmpenhoId] = useState<string | null>(null);
   const [aditivoDialog, setAditivoDialog] = useState(false);
   const [anexoDialog, setAnexoDialog] = useState(false);
   const [deleteAditivoId, setDeleteAditivoId] = useState<string | null>(null);
@@ -77,12 +90,17 @@ export default function ContratoDetail() {
     urlArquivo: "",
     observacao: "",
   });
+  const [annulEmpenhoForm, setAnnulEmpenhoForm] = useState({
+    valorAnulado: "",
+    dataAnulacao: "",
+    motivoAnulacao: "",
+  });
 
   if (isLoading) return <div className="p-8 text-center animate-pulse">Carregando contrato...</div>;
   if (!contrato) return <div className="p-8 text-center text-red-500">Contrato nao encontrado</div>;
 
   const valContrato = parseNumberString(contrato.valorContrato);
-  const totalEmpenhado = contrato.empenhos.reduce((acc, empenho) => acc + parseNumberString(empenho.valorEmpenho), 0);
+  const totalEmpenhado = contrato.empenhos.reduce((acc, empenho) => acc + getEmpenhoMetrics(empenho).valorComprometido, 0);
   const saldoContrato = valContrato - totalEmpenhado;
 
   const handleEmpenho = (e: React.FormEvent) => {
@@ -105,11 +123,9 @@ export default function ContratoDetail() {
 
   const handleAf = (e: React.FormEvent, empenho: EmpenhoWithRelations) => {
     e.preventDefault();
-    const valEmp = parseNumberString(empenho.valorEmpenho);
-    const totalAfs = empenho.afs.reduce((acc, af) => acc + parseNumberString(af.valorAf), 0);
-    const saldoEmpenho = valEmp - totalAfs;
+    const { saldoDisponivel } = getEmpenhoMetrics(empenho);
 
-    if (parseNumberString(afForm.valorAf) > saldoEmpenho) {
+    if (parseNumberString(afForm.valorAf) > saldoDisponivel) {
       toast({ variant: "destructive", title: "Valor superior ao saldo do empenho!" });
       return;
     }
@@ -121,6 +137,33 @@ export default function ContratoDetail() {
           toast({ title: "AF gerada com sucesso! Data estimada calculada automaticamente (+30 dias)." });
           setAfDialog(null);
           setAfForm({ dataPedidoAf: "", valorAf: "" });
+        },
+      },
+    );
+  };
+
+  const handleAnnulEmpenho = () => {
+    if (!annulEmpenhoId) return;
+    annulEmpenho.mutate(
+      {
+        id: annulEmpenhoId,
+        contratoId: contrato.id,
+        valorAnulado: annulEmpenhoForm.valorAnulado,
+        dataAnulacao: annulEmpenhoForm.dataAnulacao,
+        motivoAnulacao: annulEmpenhoForm.motivoAnulacao,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Empenho anulado com sucesso!" });
+          setAnnulEmpenhoId(null);
+          setAnnulEmpenhoForm({ valorAnulado: "", dataAnulacao: "", motivoAnulacao: "" });
+        },
+        onError: (error) => {
+          toast({
+            variant: "destructive",
+            title: "Erro",
+            description: error instanceof Error ? error.message : "Erro ao anular empenho",
+          });
         },
       },
     );
@@ -395,33 +438,43 @@ export default function ContratoDetail() {
                     <TableHead>Data</TableHead>
                     <TableHead>Valor Total</TableHead>
                     <TableHead>Executado (AFs)</TableHead>
+                    <TableHead>Valor Anulado</TableHead>
                     <TableHead>Saldo do Empenho</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Acao</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {contrato.empenhos.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum empenho registrado</TableCell></TableRow>}
+                  {contrato.empenhos.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum empenho registrado</TableCell></TableRow>}
                   {contrato.empenhos.map((empenho) => {
-                    const val = parseNumberString(empenho.valorEmpenho);
-                    const afsVal = empenho.afs.reduce((acc, af) => acc + parseNumberString(af.valorAf), 0);
-                    const saldo = val - afsVal;
+                    const { valorTotal, totalAfs, valorAnulado, saldoDisponivel } = getEmpenhoMetrics(empenho);
                     return (
                       <TableRow key={empenho.id}>
                         <TableCell>{formatDate(empenho.dataEmpenho)}</TableCell>
-                        <TableCell className="font-medium">{formatCurrency(val)}</TableCell>
-                        <TableCell className="text-blue-600">{formatCurrency(afsVal)}</TableCell>
-                        <TableCell className="text-emerald-600">{formatCurrency(saldo)}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(valorTotal)}</TableCell>
+                        <TableCell className="text-blue-600">{formatCurrency(totalAfs)}</TableCell>
+                        <TableCell className="text-amber-600">{formatCurrency(valorAnulado)}</TableCell>
+                        <TableCell className="text-emerald-600">{formatCurrency(saldoDisponivel)}</TableCell>
+                        <TableCell>
+                          <Badge variant={empenho.status === "ativo" ? "outline" : "secondary"}>
+                            {empenho.status === "ativo"
+                              ? "Ativo"
+                              : empenho.status === "anulado"
+                                ? "Anulado"
+                                : "Anulado Parcial"}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Dialog open={afDialog === empenho.id} onOpenChange={(open) => setAfDialog(open ? empenho.id : null)}>
                               <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={saldo <= 0}>Gerar AF</Button>
+                                <Button variant="outline" size="sm" disabled={saldoDisponivel <= 0 || contrato.status === "encerrado"}>Gerar AF</Button>
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader><DialogTitle>Autorizacao de Fornecimento</DialogTitle></DialogHeader>
                                 <form onSubmit={(event) => handleAf(event, empenho)} className="space-y-4 pt-4">
                                   <div className="p-3 bg-muted rounded-lg text-sm">
-                                    Saldo deste empenho: <strong>{formatCurrency(saldo)}</strong>
+                                    Saldo deste empenho: <strong>{formatCurrency(saldoDisponivel)}</strong>
                                   </div>
                                   <div className="space-y-2">
                                     <label className="text-sm font-medium">Data do Pedido</label>
@@ -437,10 +490,18 @@ export default function ContratoDetail() {
                               </DialogContent>
                             </Dialog>
                             <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAnnulEmpenhoId(empenho.id)}
+                              disabled={contrato.status === "encerrado" || saldoDisponivel <= 0 || annulEmpenho.isPending}
+                            >
+                              Anular
+                            </Button>
+                            <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setDeleteEmpenhoId(empenho.id)}
-                              disabled={contrato.status === "encerrado" || empenho.afs.length > 0 || deleteEmpenho.isPending}
+                              disabled={contrato.status === "encerrado" || empenho.afs.length > 0 || parseNumberString(empenho.valorAnulado) > 0 || deleteEmpenho.isPending}
                             >
                               <Trash2 size={16} />
                             </Button>
@@ -713,6 +774,57 @@ export default function ContratoDetail() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteEmpenho} disabled={deleteEmpenho.isPending}>
               Confirmar exclusao
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!annulEmpenhoId} onOpenChange={(open) => !open && setAnnulEmpenhoId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Anular empenho</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe o valor que deve ser anulado do saldo ainda disponivel deste empenho.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Valor da anulacao</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={annulEmpenhoForm.valorAnulado}
+                onChange={(event) => setAnnulEmpenhoForm({ ...annulEmpenhoForm, valorAnulado: event.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data da anulacao</label>
+              <Input
+                type="date"
+                value={annulEmpenhoForm.dataAnulacao}
+                onChange={(event) => setAnnulEmpenhoForm({ ...annulEmpenhoForm, dataAnulacao: event.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo</label>
+              <Input
+                value={annulEmpenhoForm.motivoAnulacao}
+                onChange={(event) => setAnnulEmpenhoForm({ ...annulEmpenhoForm, motivoAnulacao: event.target.value })}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleAnnulEmpenho}
+              disabled={
+                annulEmpenho.isPending ||
+                !annulEmpenhoForm.valorAnulado ||
+                !annulEmpenhoForm.dataAnulacao ||
+                !annulEmpenhoForm.motivoAnulacao
+              }
+            >
+              Confirmar anulacao
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
