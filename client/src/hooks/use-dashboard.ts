@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import type { DashboardStats } from "@shared/schema";
 
 export function useDashboardStats() {
-  return useQuery({
+  return useQuery<DashboardStats>({
     queryKey: [api.dashboard.stats.path],
     queryFn: async () => {
       const res = await fetch(api.dashboard.stats.path, { credentials: "include" });

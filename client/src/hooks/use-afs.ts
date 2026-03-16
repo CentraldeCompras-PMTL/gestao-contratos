@@ -1,6 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import type { InsertAf } from "@shared/schema";
+import type { AfWithRelations, InsertAf } from "@shared/schema";
+
+async function readErrorMessage(res: Response, fallback: string) {
+  try {
+    const body = await res.json();
+    return body.message ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function useCreateAf() {
   const queryClient = useQueryClient();
@@ -13,7 +22,7 @@ export function useCreateAf() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Erro ao criar AF");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao criar AF"));
       return res.json();
     },
     onSuccess: () => {
@@ -33,7 +42,7 @@ export function useNotifyAf() {
         method: api.afs.notify.method,
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Erro ao notificar empresa");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao notificar empresa"));
       return res.json();
     },
     onSuccess: () => {
@@ -55,7 +64,7 @@ export function useUpdateEntregaAf() {
         body: JSON.stringify({ dataEntregaReal }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Erro ao registrar entrega");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao registrar entrega"));
       return res.json();
     },
     onSuccess: () => {
@@ -67,11 +76,11 @@ export function useUpdateEntregaAf() {
 }
 
 export function useAfs() {
-  return useQuery({
+  return useQuery<AfWithRelations[]>({
     queryKey: [api.afs.list.path],
     queryFn: async () => {
-      const res = await fetch(api.afs.list.path);
-      if (!res.ok) throw new Error("Failed to fetch AFs");
+      const res = await fetch(api.afs.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao consultar AFs"));
       return res.json();
     },
   });
@@ -81,16 +90,41 @@ export function useExtendAf() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, dataExtensao }: { id: string; dataExtensao: string }) => {
-      const res = await fetch(`/api/afs/${id}/extend`, {
-        method: "PATCH",
+      const url = buildUrl(api.afs.extend.path, { id });
+      const res = await fetch(url, {
+        method: api.afs.extend.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataExtensao }),
+        credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to extend AF");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao prorrogar AF"));
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
+    },
+  });
+}
+
+export function useDeleteAf() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const url = buildUrl(api.afs.delete.path, { id });
+      const res = await fetch(url, {
+        method: api.afs.delete.method,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao excluir AF"));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
+      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
     },
   });
 }

@@ -1,8 +1,7 @@
+import { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
 import { db } from "./db";
 import { users, fornecedores, processosDigitais, fasesContratacao, contratos, empenhos, afs } from "@shared/schema";
-import { hash } from "crypto"; // simple replacement for hashPassword
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
@@ -21,7 +20,8 @@ async function seed() {
     await db.insert(users).values({
       email: "admin@admin.com",
       password: pw,
-      name: "Administrador"
+      name: "Administrador",
+      role: "admin",
     });
     console.log("User admin@admin.com created.");
   }
@@ -44,8 +44,18 @@ async function seed() {
   let procs = existingProcs;
   if (existingProcs.length === 0) {
     const data = [
-      { numeroProcessoDigital: "2024.0001", objetoCompleto: "Aquisição de medicamentos para o hospital municipal", objetoResumido: "Medicamentos", descricao: "Pregão Eletrônico 01/2024" },
-      { numeroProcessoDigital: "2024.0002", objetoCompleto: "Contratação de empresa para serviços de limpeza nas secretarias", objetoResumido: "Serviços de Limpeza", descricao: "Concorrência 02/2024" },
+      {
+        numeroProcessoDigital: "2024.0001",
+        objetoCompleto: "Aquisicao de medicamentos para o hospital municipal",
+        objetoResumido: "Medicamentos",
+        descricao: "Pregao Eletronico 01/2024",
+      },
+      {
+        numeroProcessoDigital: "2024.0002",
+        objetoCompleto: "Contratacao de empresa para servicos de limpeza nas secretarias",
+        objetoResumido: "Servicos de Limpeza",
+        descricao: "Concorrencia 02/2024",
+      },
     ];
     procs = await db.insert(processosDigitais).values(data).returning();
     console.log("2 Processos Digitais created.");
@@ -55,15 +65,15 @@ async function seed() {
   let fases = existingFases;
   if (existingFases.length === 0) {
     const data = [
-      { processoDigitalId: procs[0].id, nomeFase: "Fase Interna", fornecedorId: forns[0].id, dataInicio: "2024-01-10" },
-      { processoDigitalId: procs[0].id, nomeFase: "Licitação", fornecedorId: forns[1].id, dataInicio: "2024-02-01" },
-      { processoDigitalId: procs[0].id, nomeFase: "Homologação", fornecedorId: forns[1].id, dataInicio: "2024-03-01" },
-      { processoDigitalId: procs[1].id, nomeFase: "Fase Interna", fornecedorId: forns[2].id, dataInicio: "2024-01-15" },
-      { processoDigitalId: procs[1].id, nomeFase: "Licitação", fornecedorId: forns[2].id, dataInicio: "2024-02-15" },
-      { processoDigitalId: procs[1].id, nomeFase: "Empenho", fornecedorId: forns[3].id, dataInicio: "2024-03-15" },
+      { processoDigitalId: procs[0].id, nomeFase: "Fase Interna", fornecedorId: forns[0].id, modalidade: "Planejamento", numeroModalidade: "INT-001/2024", dataInicio: "2024-01-10" },
+      { processoDigitalId: procs[0].id, nomeFase: "Licitacao", fornecedorId: forns[1].id, modalidade: "Pregao Eletronico", numeroModalidade: "PE-001/2024", dataInicio: "2024-02-01" },
+      { processoDigitalId: procs[0].id, nomeFase: "Homologacao", fornecedorId: forns[1].id, modalidade: "Pregao Eletronico", numeroModalidade: "PE-001/2024", dataInicio: "2024-03-01" },
+      { processoDigitalId: procs[1].id, nomeFase: "Fase Interna", fornecedorId: forns[2].id, modalidade: "Planejamento", numeroModalidade: "INT-002/2024", dataInicio: "2024-01-15" },
+      { processoDigitalId: procs[1].id, nomeFase: "Licitacao", fornecedorId: forns[2].id, modalidade: "Concorrencia", numeroModalidade: "CC-002/2024", dataInicio: "2024-02-15" },
+      { processoDigitalId: procs[1].id, nomeFase: "Empenho", fornecedorId: forns[3].id, modalidade: "Concorrencia", numeroModalidade: "CC-002/2024", dataInicio: "2024-03-15" },
     ];
     fases = await db.insert(fasesContratacao).values(data).returning();
-    console.log("6 Fases de Contratação created.");
+    console.log("6 Fases de Contratacao created.");
   }
 
   const existingContratos = await db.select().from(contratos);
@@ -71,11 +81,10 @@ async function seed() {
   if (existingContratos.length === 0) {
     const data = [
       { processoDigitalId: procs[0].id, faseContratacaoId: fases[2].id, numeroContrato: "001/2024", fornecedorId: forns[1].id, valorContrato: "150000.00", vigenciaInicial: "2024-03-05", vigenciaFinal: "2025-03-05" },
-      { processoDigitalId: procs[0].id, faseContratacaoId: fases[2].id, numeroContrato: "002/2024", fornecedorId: forns[0].id, valorContrato: "85000.00", vigenciaInicial: "2024-03-10", vigenciaFinal: "2025-03-10" },
-      { processoDigitalId: procs[1].id, faseContratacaoId: fases[5].id, numeroContrato: "003/2024", fornecedorId: forns[2].id, valorContrato: "200000.00", vigenciaInicial: "2024-04-01", vigenciaFinal: "2025-04-01" },
+      { processoDigitalId: procs[1].id, faseContratacaoId: fases[5].id, numeroContrato: "003/2024", fornecedorId: forns[3].id, valorContrato: "200000.00", vigenciaInicial: "2024-04-01", vigenciaFinal: "2025-04-01" },
     ];
     contrs = await db.insert(contratos).values(data).returning();
-    console.log("3 Contratos created.");
+    console.log("2 Contratos created.");
   }
 
   const existingEmpenhos = await db.select().from(empenhos);
@@ -83,7 +92,7 @@ async function seed() {
   if (existingEmpenhos.length === 0) {
     const data = [
       { contratoId: contrs[0].id, dataEmpenho: "2024-03-06", valorEmpenho: "50000.00" },
-      { contratoId: contrs[1].id, dataEmpenho: "2024-03-11", valorEmpenho: "25000.00" },
+      { contratoId: contrs[1].id, dataEmpenho: "2024-04-02", valorEmpenho: "25000.00" },
     ];
     emps = await db.insert(empenhos).values(data).returning();
     console.log("2 Empenhos created.");
@@ -92,28 +101,23 @@ async function seed() {
   const existingAfs = await db.select().from(afs);
   if (existingAfs.length === 0) {
     const today = new Date();
-    // 1 AF entregue
     const dtPedido1 = new Date(today.getTime() - 40 * 24 * 60 * 60 * 1000);
     const dtEst1 = new Date(dtPedido1.getTime() + 30 * 24 * 60 * 60 * 1000);
-    
-    // 1 AF pendente mas não atrasada (pedido há 15 dias, faltam 15)
+
     const dtPedido2 = new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000);
     const dtEst2 = new Date(dtPedido2.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // 1 AF pendente faltando 5 dias (pedido há 25 dias)
     const dtPedido3 = new Date(today.getTime() - 25 * 24 * 60 * 60 * 1000);
     const dtEst3 = new Date(dtPedido3.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // 1 AF atrasada (pedido há 40 dias, não entregue)
     const dtPedido4 = new Date(today.getTime() - 40 * 24 * 60 * 60 * 1000);
     const dtEst4 = new Date(dtPedido4.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-
     const data = [
-      { empenhoId: emps[0].id, dataPedidoAf: dtPedido1.toISOString().split('T')[0], valorAf: "10000.00", dataEstimadaEntrega: dtEst1.toISOString().split('T')[0], dataEntregaReal: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-      { empenhoId: emps[0].id, dataPedidoAf: dtPedido2.toISOString().split('T')[0], valorAf: "15000.00", dataEstimadaEntrega: dtEst2.toISOString().split('T')[0], dataEntregaReal: null },
-      { empenhoId: emps[1].id, dataPedidoAf: dtPedido3.toISOString().split('T')[0], valorAf: "10000.00", dataEstimadaEntrega: dtEst3.toISOString().split('T')[0], dataEntregaReal: null },
-      { empenhoId: emps[1].id, dataPedidoAf: dtPedido4.toISOString().split('T')[0], valorAf: "5000.00", dataEstimadaEntrega: dtEst4.toISOString().split('T')[0], dataEntregaReal: null },
+      { empenhoId: emps[0].id, dataPedidoAf: dtPedido1.toISOString().split("T")[0], valorAf: "10000.00", dataEstimadaEntrega: dtEst1.toISOString().split("T")[0], dataEntregaReal: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] },
+      { empenhoId: emps[0].id, dataPedidoAf: dtPedido2.toISOString().split("T")[0], valorAf: "15000.00", dataEstimadaEntrega: dtEst2.toISOString().split("T")[0], dataEntregaReal: null },
+      { empenhoId: emps[1].id, dataPedidoAf: dtPedido3.toISOString().split("T")[0], valorAf: "10000.00", dataEstimadaEntrega: dtEst3.toISOString().split("T")[0], dataEntregaReal: null },
+      { empenhoId: emps[1].id, dataPedidoAf: dtPedido4.toISOString().split("T")[0], valorAf: "5000.00", dataEstimadaEntrega: dtEst4.toISOString().split("T")[0], dataEntregaReal: null },
     ];
     await db.insert(afs).values(data);
     console.log("4 AFs created.");

@@ -5,24 +5,36 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import type { PublicUser, User } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 
 const PostgresStore = connectPg(session);
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+export async function comparePasswords(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+
+function toPublicUser(user: User): PublicUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name ?? null,
+    role: user.role === "admin" ? "admin" : "operacional",
+    enteId: user.enteId ?? null,
+    forcePasswordChange: Boolean(user.forcePasswordChange),
+    createdAt: user.createdAt ?? null,
+  };
 }
 
 export function setupAuth(app: Express) {
@@ -37,7 +49,7 @@ export function setupAuth(app: Express) {
     cookie: {
       secure: app.get("env") === "production",
       maxAge: 30 * 24 * 60 * 60 * 1000,
-    }
+    },
   };
 
   app.set("trust proxy", 1);
@@ -59,7 +71,7 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user, done) => done(null, (user as User).id));
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
@@ -69,35 +81,17 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
-    try {
-      const existingUser = await storage.getUserByEmail(req.body.email);
-      if (existingUser) {
-        return res.status(400).json({ message: "Email já cadastrado" });
-      }
-      
-      const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({
-        ...req.body,
-        password: hashedPassword,
-      });
-
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json(user);
-      });
-    } catch (err) {
-      next(err);
-    }
+  app.post("/api/register", async (_req, res) => {
+    res.status(403).json({ message: "Cadastro publico desabilitado" });
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
+    passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: info?.message || "Erro no login" });
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(200).json(user);
+      req.login(user, (loginErr) => {
+        if (loginErr) return next(loginErr);
+        res.status(200).json(toPublicUser(user));
       });
     })(req, res, next);
   });
@@ -111,8 +105,8 @@ export function setupAuth(app: Express) {
 
   app.get("/api/me", (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Não autorizado" });
+      return res.status(401).json({ message: "Nao autorizado" });
     }
-    res.json(req.user);
+    res.json(toPublicUser(req.user as User));
   });
 }

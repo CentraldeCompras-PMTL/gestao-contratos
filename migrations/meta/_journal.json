@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1770000000000,
+      "tag": "0000_dates_to_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770000001000,
+      "tag": "0001_add_fornecedor_address_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770000002000,
+      "tag": "0002_add_user_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770000003000,
+      "tag": "0003_auth_and_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770000004000,
+      "tag": "0004_contrato_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770000005000,
+      "tag": "0005_entes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770000006000,
+      "tag": "0006_contrato_aditivos_anexos",
+      "breakpoints": true
+    }
+  ]
+}

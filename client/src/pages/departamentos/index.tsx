@@ -1,55 +1,89 @@
 import { useState } from "react";
-import { useDepartamentos, useCreateDepartamento, useUpdateDepartamento } from "@/hooks/use-departamentos";
+import { useDepartamentos, useCreateDepartamento, useUpdateDepartamento, useDeleteDepartamento } from "@/hooks/use-departamentos";
+import { useAuth } from "@/hooks/use-auth";
+import { useEntes } from "@/hooks/use-entes";
 import { formatDate } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit2, Building2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Edit2, Building2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { Departamento } from "@shared/schema";
 
 export default function Departamentos() {
+  const { user } = useAuth();
   const { data: departamentos = [], isLoading } = useDepartamentos();
+  const { data: entes = [] } = useEntes();
   const createMutation = useCreateDepartamento();
   const updateMutation = useUpdateDepartamento();
+  const deleteMutation = useDeleteDepartamento();
   const { toast } = useToast();
-  
+
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ nome: "", descricao: "" });
+  const [departamentoToDelete, setDepartamentoToDelete] = useState<Departamento | null>(null);
+  const [formData, setFormData] = useState({ nome: "", descricao: "", enteId: user?.enteId || "" });
 
-  const filtered = departamentos.filter((d: any) => 
-    d.nome.toLowerCase().includes(search.toLowerCase())
+  const filtered = departamentos.filter((departamento) =>
+    departamento.nome.toLowerCase().includes(search.toLowerCase())
   );
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData({ nome: "", descricao: "", enteId: user?.enteId || "" });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      updateMutation.mutate({ id: editingId, data: formData }, {
-        onSuccess: () => {
-          toast({ title: "Departamento atualizado!" });
-          setIsDialogOpen(false);
-          setEditingId(null);
-          setFormData({ nome: "", descricao: "" });
+      updateMutation.mutate(
+        { id: editingId, data: formData },
+        {
+          onSuccess: () => {
+            toast({ title: "Departamento atualizado!" });
+            setIsDialogOpen(false);
+            resetForm();
+          },
+          onError: (err) => toast({
+            variant: "destructive",
+            title: "Erro",
+            description: err instanceof Error ? err.message : "Erro ao atualizar departamento",
+          }),
         },
-        onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
-      });
-    } else {
-      createMutation.mutate(formData, {
-        onSuccess: () => {
-          toast({ title: "Departamento criado!" });
-          setIsDialogOpen(false);
-          setFormData({ nome: "", descricao: "" });
-        },
-        onError: (err) => toast({ variant: "destructive", title: "Erro", description: err.message })
-      });
+      );
+      return;
     }
+
+    createMutation.mutate(formData, {
+      onSuccess: () => {
+        toast({ title: "Departamento criado!" });
+        setIsDialogOpen(false);
+        resetForm();
+      },
+      onError: (err) => toast({
+        variant: "destructive",
+        title: "Erro",
+        description: err instanceof Error ? err.message : "Erro ao criar departamento",
+      }),
+    });
   };
 
-  const handleEdit = (dept: any) => {
-    setEditingId(dept.id);
-    setFormData({ nome: dept.nome, descricao: dept.descricao || "" });
+  const handleEdit = (departamento: Departamento) => {
+    setEditingId(departamento.id);
+    setFormData({ nome: departamento.nome, descricao: departamento.descricao || "", enteId: departamento.enteId || "" });
     setIsDialogOpen(true);
   };
 
@@ -58,15 +92,12 @@ export default function Departamentos() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Departamentos</h1>
-          <p className="text-muted-foreground mt-1">Gerencie os departamentos responsáveis.</p>
+          <p className="text-muted-foreground mt-1">Gerencie os departamentos responsaveis.</p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
-          if (!open) {
-            setEditingId(null);
-            setFormData({ nome: "", descricao: "" });
-          }
+          if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
             <Button className="shadow-lg shadow-primary/20">
@@ -74,17 +105,26 @@ export default function Departamentos() {
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Editar" : "Novo"} Departamento</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar" : "Novo"} Departamento</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nome</label>
-                <Input required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} />
+                <Input required value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Descrição</label>
-                <Input value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} />
+                <label className="text-sm font-medium">Ente</label>
+                <Select value={formData.enteId} onValueChange={(value) => setFormData({ ...formData, enteId: value })} disabled={user?.role !== "admin"}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o ente" /></SelectTrigger>
+                  <SelectContent>
+                    {entes.map((ente) => (
+                      <SelectItem key={ente.id} value={ente.id}>{ente.sigla} - {ente.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descricao</label>
+                <Input value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} />
               </div>
               <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
                 {editingId ? "Atualizar" : "Criar"} Departamento
@@ -96,33 +136,38 @@ export default function Departamentos() {
 
       <div className="bg-white dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800 p-6">
         <div className="mb-4">
-          <Input placeholder="Buscar departamento..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="Buscar departamento..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
+                <TableRow>
+                <TableHead>Ente</TableHead>
                 <TableHead>Nome</TableHead>
-                <TableHead>Descrição</TableHead>
+                <TableHead>Descricao</TableHead>
                 <TableHead>Criado em</TableHead>
-                <TableHead className="w-20">Ação</TableHead>
+                <TableHead className="w-20">Acao</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-8"><div className="flex flex-col items-center"><Building2 className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhum departamento</p></div></TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-8"><div className="flex flex-col items-center"><Building2 className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhum departamento</p></div></TableCell></TableRow>
               ) : (
-                filtered.map((dept: any) => (
-                  <TableRow key={dept.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
-                    <TableCell className="font-medium">{dept.nome}</TableCell>
-                    <TableCell className="text-muted-foreground">{dept.descricao || "-"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{formatDate(dept.criadoEm)}</TableCell>
+                filtered.map((departamento) => (
+                  <TableRow key={departamento.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
+                    <TableCell>{entes.find((ente) => ente.id === departamento.enteId)?.sigla || "-"}</TableCell>
+                    <TableCell className="font-medium">{departamento.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{departamento.descricao || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{formatDate(departamento.criadoEm?.toString())}</TableCell>
                     <TableCell>
-                      <Button size="sm" variant="ghost" onClick={() => handleEdit(dept)} data-testid={`button-edit-${dept.id}`}>
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(departamento)} data-testid={`button-edit-${departamento.id}`}>
                         <Edit2 size={16} />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setDepartamentoToDelete(departamento)} data-testid={`button-delete-${departamento.id}`}>
+                        <Trash2 size={16} />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -132,6 +177,36 @@ export default function Departamentos() {
           </Table>
         </div>
       </div>
+
+      <AlertDialog open={!!departamentoToDelete} onOpenChange={(open) => { if (!open) setDepartamentoToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir departamento</AlertDialogTitle>
+            <AlertDialogDescription>Voce deseja realmente excluir este item?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!departamentoToDelete) return;
+                deleteMutation.mutate(departamentoToDelete.id, {
+                  onSuccess: () => {
+                    toast({ title: "Departamento excluido com sucesso!" });
+                    setDepartamentoToDelete(null);
+                  },
+                  onError: (err) => toast({
+                    variant: "destructive",
+                    title: "Erro",
+                    description: err instanceof Error ? err.message : "Erro ao excluir departamento",
+                  }),
+                });
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

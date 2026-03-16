@@ -1,9 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import type { InsertFornecedor } from "@shared/schema";
+import type { Fornecedor, InsertFornecedor } from "@shared/schema";
+
+async function readErrorMessage(res: Response, fallback: string) {
+  try {
+    const body = await res.json();
+    return body.message ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function useFornecedores() {
-  return useQuery({
+  return useQuery<Fornecedor[]>({
     queryKey: [api.fornecedores.list.path],
     queryFn: async () => {
       const res = await fetch(api.fornecedores.list.path, { credentials: "include" });
@@ -23,7 +32,7 @@ export function useCreateFornecedor() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Erro ao criar fornecedor");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao criar fornecedor"));
       return res.json();
     },
     onSuccess: () => {
@@ -43,11 +52,46 @@ export function useUpdateFornecedor() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Erro ao atualizar fornecedor");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar fornecedor"));
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.fornecedores.list.path] });
     }
+  });
+}
+
+export function useDeleteFornecedor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const url = buildUrl(api.fornecedores.delete.path, { id });
+      const res = await fetch(url, {
+        method: api.fornecedores.delete.method,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao excluir fornecedor"));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fornecedores.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
+    },
+  });
+}
+
+export type CnpjLookupResult = Omit<InsertFornecedor, "cnpj"> & { cnpj: string };
+
+export function useLookupFornecedorCnpj() {
+  return useMutation({
+    mutationFn: async (cnpj: string): Promise<CnpjLookupResult> => {
+      const url = buildUrl(api.fornecedores.lookupCnpj.path, { cnpj });
+      const res = await fetch(url, {
+        method: api.fornecedores.lookupCnpj.method,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao consultar CNPJ"));
+      return res.json();
+    },
   });
 }
