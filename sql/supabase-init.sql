@@ -28,6 +28,12 @@ create table if not exists password_reset_tokens (
   created_at timestamp default now()
 );
 
+create table if not exists session (
+  sid varchar not null collate "default" primary key,
+  sess json not null,
+  expire timestamp(6) not null
+);
+
 create table if not exists audit_logs (
   id varchar primary key default gen_random_uuid(),
   user_id varchar references users(id) on delete set null,
@@ -208,6 +214,9 @@ create index if not exists idx_contrato_anexos_contrato_id
 
 create index if not exists idx_password_reset_tokens_user_id
   on password_reset_tokens (user_id);
+
+create index if not exists idx_session_expire
+  on session (expire);
 
 create index if not exists idx_audit_logs_user_id
   on audit_logs (user_id);

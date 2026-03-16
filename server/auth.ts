@@ -44,7 +44,7 @@ export function setupAuth(app: Express) {
     saveUninitialized: false,
     store: new PostgresStore({
       pool,
-      createTableIfMissing: true,
+      tableName: "session",
     }),
     cookie: {
       secure: app.get("env") === "production",
