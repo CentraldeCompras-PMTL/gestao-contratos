@@ -212,14 +212,18 @@ export default function Contratos() {
                   <Select disabled value={fornecedorId} onValueChange={setFornecedorId}>
                     <SelectTrigger><SelectValue placeholder="Vinculado a fase..." /></SelectTrigger>
                     <SelectContent>
-                      {selectedFase?.fornecedor && (
-                        <SelectItem value={selectedFase.fornecedor.id}>{selectedFase.fornecedor.nome}</SelectItem>
-                      )}
+                      {fornecedorId && (
+  <SelectItem value={fornecedorId}>
+    Fornecedor vinculado automaticamente
+  </SelectItem>
+)}
                     </SelectContent>
                   </Select>
-                  {faseId && !selectedFase?.fornecedor && (
-                    <p className="text-xs text-destructive mt-1">Esta fase nao possui fornecedor vencedor vinculado.</p>
-                  )}
+                  {faseId && !fornecedorId && (
+  <p className="text-xs text-destructive mt-1">
+    Esta fase nao possui fornecedor vencedor vinculado.
+  </p>
+)}
                 </div>
               </div>
 
