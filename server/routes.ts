@@ -577,19 +577,40 @@ export async function registerRoutes(
   });
 
   app.get(api.processos.list.path, requireAuth, async (req, res) => {
-    const p = await storage.getProcessosDigitais();
-    if (!isAdmin(req)) {
-      return res.json(p.filter((item) => item.departamento?.enteId === getUserEnteId(req)));
-    }
-    res.json(p);
-  });
+  const p = await storage.getProcessosDigitais();
 
-  app.get(api.processos.get.path, requireAuth, async (req, res) => {
-    const p = await storage.getProcessoDigital(req.params.id);
-    if (!p) return res.status(404).json({ message: "Processo nao encontrado" });
-    ensureEnteAccess(req, p.departamento?.enteId);
-    res.json(p);
-  });
+  const format = (processos: any[]) =>
+    processos.map((proc) => ({
+      ...proc,
+      fases: proc.fases.map((f: any) => ({
+        ...f,
+        fornecedorId: f.fornecedor_id, // 🔥 AQUI É A CORREÇÃO
+      })),
+    }));
+
+  if (!isAdmin(req)) {
+    const filtrados = p.filter((item) => item.departamento?.enteId === getUserEnteId(req));
+    return res.json(format(filtrados));
+  }
+
+  res.json(format(p));
+});
+
+ app.get(api.processos.get.path, requireAuth, async (req, res) => {
+  const p = await storage.getProcessoDigital(req.params.id);
+  if (!p) return res.status(404).json({ message: "Processo nao encontrado" });
+  ensureEnteAccess(req, p.departamento?.enteId);
+
+  const formatted = {
+    ...p,
+    fases: p.fases.map((f: any) => ({
+      ...f,
+      fornecedorId: f.fornecedor_id,
+    })),
+  };
+
+  res.json(formatted);
+});
 
   app.post(api.processos.create.path, requireAuth, async (req, res) => {
     try {

@@ -224,6 +224,7 @@ export default function Contratos() {
                 </div>
 
                 <div className="space-y-2">
+<<<<<<< HEAD
                   <label className="text-sm font-medium text-primary">3. Fornecedor da Etapa</label>
                   <Input
                     value={selectedFase?.fornecedor?.nome ?? ""}
@@ -238,6 +239,24 @@ export default function Contratos() {
                   {faseId && !selectedFase?.fornecedor && (
                     <p className="text-xs text-destructive mt-1">Esta etapa nao possui fornecedor vinculado.</p>
                   )}
+=======
+                  <label className="text-sm font-medium text-primary">3. Fornecedor</label>
+                  <Select disabled value={fornecedorId} onValueChange={setFornecedorId}>
+                    <SelectTrigger><SelectValue placeholder="Vinculado a fase..." /></SelectTrigger>
+                    <SelectContent>
+                      {fornecedorId && (
+  <SelectItem value={fornecedorId}>
+    Fornecedor vinculado automaticamente
+  </SelectItem>
+)}
+                    </SelectContent>
+                  </Select>
+                  {faseId && !fornecedorId && (
+  <p className="text-xs text-destructive mt-1">
+    Esta fase nao possui fornecedor vencedor vinculado.
+  </p>
+)}
+>>>>>>> 646e84a2d29da2a259ee5bf3bdbeb72125eb99ce
                 </div>
               </div>
 
