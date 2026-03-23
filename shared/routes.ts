@@ -119,6 +119,17 @@ export const api = {
       }),
       responses: { 201: publicUserSchema, 400: errorSchemas.validation, 401: errorSchemas.unauthorized },
     },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/users/:id' as const,
+      input: z.object({
+        email: z.string().email(),
+        name: z.string().min(1),
+        role: z.enum(["admin", "operacional"]),
+        enteId: z.string().optional(),
+      }),
+      responses: { 200: publicUserSchema, 400: errorSchemas.validation, 401: errorSchemas.unauthorized, 404: errorSchemas.notFound },
+    },
     resetPassword: {
       method: 'POST' as const,
       path: '/api/users/:id/reset-password' as const,

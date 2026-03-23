@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useContratos, useCreateContrato, useUpdateContrato } from "@/hooks/use-contratos";
+import { useFases } from "@/hooks/use-fases";
 import { useProcessos } from "@/hooks/use-processos";
 import { useEntes } from "@/hooks/use-entes";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,6 +38,7 @@ export default function Contratos() {
   const { user } = useAuth();
   const { data: contratos = [], isLoading } = useContratos();
   const { data: processos = [] } = useProcessos();
+  const { data: fases = [] } = useFases();
   const { data: entes = [] } = useEntes();
   const createContrato = useCreateContrato();
   const updateContrato = useUpdateContrato();
@@ -58,15 +60,29 @@ export default function Contratos() {
   const [vigenciaFinal, setVigenciaFinal] = useState("");
 
   const selectedProcesso = processos.find((p: ProcessoDigitalWithRelations) => p.id === procId);
-  const selectedFase = selectedProcesso?.fases.find((f: FaseContratacaoWithRelations) => f.id === faseId);
+  const fasesDoProcesso = useMemo(
+    () => fases.filter((fase: FaseContratacaoWithRelations) => fase.processoDigitalId === procId),
+    [fases, procId],
+  );
+  const selectedFase = useMemo(
+    () => fasesDoProcesso.find((f: FaseContratacaoWithRelations) => f.id === faseId),
+    [fasesDoProcesso, faseId],
+  );
 
   const handleFaseSelect = (fid: string) => {
     setFaseId(fid);
-    const fase = selectedProcesso?.fases.find((f: FaseContratacaoWithRelations) => f.id === fid);
-    if (fase?.fornecedorId) {
-      setFornecedorId(fase.fornecedorId);
-    }
   };
+
+  useEffect(() => {
+    if (selectedFase?.fornecedorId) {
+      setFornecedorId(selectedFase.fornecedorId);
+      return;
+    }
+
+    if (faseId) {
+      setFornecedorId("");
+    }
+  }, [selectedFase, faseId]);
 
   const filtered = contratos.filter((c: ContratoWithRelations) =>
     (c.numeroContrato.toLowerCase().includes(search.toLowerCase()) ||
@@ -200,7 +216,7 @@ export default function Contratos() {
                   <Select disabled={!procId} value={faseId} onValueChange={handleFaseSelect}>
                     <SelectTrigger><SelectValue placeholder="Selecione a fase..." /></SelectTrigger>
                     <SelectContent>
-                      {selectedProcesso?.fases.map((f: FaseContratacaoWithRelations) => (
+                      {fasesDoProcesso.map((f: FaseContratacaoWithRelations) => (
                         <SelectItem key={f.id} value={f.id}>{f.nomeFase}</SelectItem>
                       ))}
                     </SelectContent>
@@ -208,17 +224,19 @@ export default function Contratos() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-primary">3. Fornecedor</label>
-                  <Select disabled value={fornecedorId} onValueChange={setFornecedorId}>
-                    <SelectTrigger><SelectValue placeholder="Vinculado a fase..." /></SelectTrigger>
-                    <SelectContent>
-                      {selectedFase?.fornecedor && (
-                        <SelectItem value={selectedFase.fornecedor.id}>{selectedFase.fornecedor.nome}</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-sm font-medium text-primary">3. Fornecedor da Etapa</label>
+                  <Input
+                    value={selectedFase?.fornecedor?.nome ?? ""}
+                    readOnly
+                    placeholder="Selecione uma etapa com fornecedor vinculado"
+                  />
+                  {selectedFase?.fornecedor && (
+                    <p className="text-xs text-muted-foreground">
+                      CNPJ: {selectedFase.fornecedor.cnpj}
+                    </p>
+                  )}
                   {faseId && !selectedFase?.fornecedor && (
-                    <p className="text-xs text-destructive mt-1">Esta fase nao possui fornecedor vencedor vinculado.</p>
+                    <p className="text-xs text-destructive mt-1">Esta etapa nao possui fornecedor vinculado.</p>
                   )}
                 </div>
               </div>

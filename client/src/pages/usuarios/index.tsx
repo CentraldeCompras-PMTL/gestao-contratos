@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useCreateUser, useResetUserPassword, useUsers } from "@/hooks/use-users";
+import { useCreateUser, useResetUserPassword, useUpdateUser, useUsers } from "@/hooks/use-users";
 import { useEntes } from "@/hooks/use-entes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/formatters";
-import { Plus, Shield, UserCog, KeyRound } from "lucide-react";
+import { Plus, Shield, UserCog, KeyRound, Edit2 } from "lucide-react";
 import type { PublicUser } from "@shared/schema";
 
 export default function Usuarios() {
@@ -29,10 +29,12 @@ export default function Usuarios() {
   const { data: users = [], isLoading } = useUsers(user?.role === "admin");
   const { data: entes = [] } = useEntes();
   const createUser = useCreateUser();
+  const updateUser = useUpdateUser();
   const resetUserPassword = useResetUserPassword();
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -48,6 +50,7 @@ export default function Usuarios() {
   }
 
   const resetForm = () => {
+    setEditingUserId(null);
     setForm({
       name: "",
       email: "",
@@ -68,6 +71,25 @@ export default function Usuarios() {
       return;
     }
 
+    if (editingUserId) {
+      updateUser.mutate(
+        { id: editingUserId, ...form, enteId: form.role === "admin" ? undefined : form.enteId },
+        {
+          onSuccess: () => {
+            toast({ title: "Registro atualizado com sucesso!" });
+            setDialogOpen(false);
+            resetForm();
+          },
+          onError: (err) => toast({
+            variant: "destructive",
+            title: "Erro",
+            description: err instanceof Error ? err.message : "Erro ao atualizar usuario",
+          }),
+        },
+      );
+      return;
+    }
+
     createUser.mutate({ ...form, enteId: form.role === "admin" ? undefined : form.enteId }, {
       onSuccess: () => {
         toast({ title: "Cadastro realizado com sucesso!" });
@@ -80,6 +102,18 @@ export default function Usuarios() {
         description: err instanceof Error ? err.message : "Erro ao criar usuario",
       }),
     });
+  };
+
+  const handleEdit = (target: PublicUser) => {
+    setEditingUserId(target.id);
+    setForm({
+      name: target.name ?? "",
+      email: target.email,
+      password: "",
+      role: target.role === "admin" ? "admin" : "operacional",
+      enteId: target.enteId ?? "",
+    });
+    setDialogOpen(true);
   };
 
   const handleResetPassword = () => {
@@ -119,7 +153,7 @@ export default function Usuarios() {
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Cadastrar Usuario</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingUserId ? "Editar Usuario" : "Cadastrar Usuario"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="user-name">Nome</Label>
@@ -129,10 +163,12 @@ export default function Usuarios() {
                 <Label htmlFor="user-email">E-mail</Label>
                 <Input id="user-email" type="email" value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} required />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-password">Senha Inicial</Label>
-                <Input id="user-password" type="password" minLength={6} value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} required />
-              </div>
+              {!editingUserId && (
+                <div className="space-y-2">
+                  <Label htmlFor="user-password">Senha Inicial</Label>
+                  <Input id="user-password" type="password" minLength={6} value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} required />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Perfil</Label>
                 <Select
@@ -168,8 +204,8 @@ export default function Usuarios() {
                   <p className="text-xs text-muted-foreground">Usuarios operacionais devem ser vinculados a um ente.</p>
                 )}
               </div>
-              <Button type="submit" className="w-full" disabled={createUser.isPending}>
-                {createUser.isPending ? "Salvando..." : "Salvar Usuario"}
+              <Button type="submit" className="w-full" disabled={createUser.isPending || updateUser.isPending}>
+                {createUser.isPending || updateUser.isPending ? "Salvando..." : "Salvar Usuario"}
               </Button>
             </form>
           </DialogContent>
@@ -223,6 +259,10 @@ export default function Usuarios() {
                   <TableCell>{item.role === "admin" ? "Todos" : entes.find((ente) => ente.id === item.enteId)?.sigla || "-"}</TableCell>
                   <TableCell>{formatDate(item.createdAt ? String(item.createdAt) : "")}</TableCell>
                   <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>
+                      <Edit2 size={16} className="mr-2" />
+                      Editar
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => setResetTarget(item)}>
                       <KeyRound size={16} className="mr-2" />
                       Resetar senha

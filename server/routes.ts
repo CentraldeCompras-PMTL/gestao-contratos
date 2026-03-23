@@ -243,6 +243,49 @@ export async function registerRoutes(
     }
   });
 
+  app.put(api.users.update.path, requireAdmin, async (req, res) => {
+    try {
+      const data = api.users.update.input.parse(req.body);
+      if (data.role === "operacional" && !data.enteId) {
+        throw new HttpError(400, "Usuario operacional deve ser vinculado a um ente");
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "Usuario nao encontrado" });
+      }
+
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser && existingUser.id !== targetUser.id) {
+        throw new HttpError(400, "Email ja cadastrado");
+      }
+
+      const updatedUser = await storage.updateUser(targetUser.id, {
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        enteId: data.role === "admin" ? null : data.enteId ?? null,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "Usuario nao encontrado" });
+      }
+
+      await audit(req, "update", "user", updatedUser.id, `Usuario ${updatedUser.email} atualizado`);
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name ?? null,
+        role: updatedUser.role === "admin" ? "admin" : "operacional",
+        enteId: updatedUser.enteId ?? null,
+        forcePasswordChange: Boolean(updatedUser.forcePasswordChange),
+        createdAt: updatedUser.createdAt ?? null,
+      });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar usuario") });
+    }
+  });
+
   app.post(api.users.resetPassword.path, requireAdmin, async (req, res) => {
     try {
       const data = api.users.resetPassword.input.parse(req.body);
@@ -511,7 +554,10 @@ export async function registerRoutes(
 
   app.put(api.processos.update.path, requireAuth, async (req, res) => {
     try {
-      const data = api.processos.update.input.parse(req.body);
+      const data = api.processos.update.input.parse({
+        ...req.body,
+        departamentoId: req.body.departamentoId || undefined,
+      });
       const current = await storage.getProcessoDigital(req.params.id);
       if (!current) {
         return res.status(404).json({ message: "Processo nao encontrado" });
@@ -547,7 +593,10 @@ export async function registerRoutes(
 
   app.post(api.processos.create.path, requireAuth, async (req, res) => {
     try {
-      const data = api.processos.create.input.parse(req.body);
+      const data = api.processos.create.input.parse({
+        ...req.body,
+        departamentoId: req.body.departamentoId || undefined,
+      });
       if (data.departamentoId) {
         const departamento = await storage.getDepartamento(data.departamentoId);
         if (!departamento) throw new HttpError(404, "Departamento nao encontrado");

@@ -43,6 +43,26 @@ export function useCreateUser() {
   });
 }
 
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; email: string; name: string; role: "admin" | "operacional"; enteId?: string }) => {
+      const url = buildUrl(api.users.update.path, { id });
+      const res = await fetch(url, {
+        method: api.users.update.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar usuario"));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+    },
+  });
+}
+
 export function useResetUserPassword() {
   const queryClient = useQueryClient();
   return useMutation({

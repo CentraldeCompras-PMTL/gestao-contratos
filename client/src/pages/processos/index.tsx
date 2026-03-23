@@ -90,9 +90,13 @@ export default function Processos() {
 
   const handleCreateProcesso = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...procForm,
+      departamentoId: procForm.departamentoId || undefined,
+    };
     if (editingProcId) {
       updateProcesso.mutate(
-        { id: editingProcId, data: procForm },
+        { id: editingProcId, data: payload },
         {
           onSuccess: () => {
             toast({ title: "Registro atualizado com sucesso!" });
@@ -110,7 +114,7 @@ export default function Processos() {
       return;
     }
 
-    createProcesso.mutate(procForm, {
+    createProcesso.mutate(payload, {
       onSuccess: () => {
         toast({ title: "Cadastro realizado com sucesso!" });
         setProcessoDialog(false);
@@ -156,7 +160,7 @@ export default function Processos() {
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Processos Digitais</h1>
-          <p className="text-muted-foreground mt-1">Acompanhe processos e suas respectivas fases.</p>
+          <p className="text-muted-foreground mt-1">Acompanhe processos digitais e as etapas vinculadas aos fornecedores.</p>
         </div>
 
         <Dialog open={processoDialog} onOpenChange={(open) => {
@@ -264,18 +268,18 @@ export default function Processos() {
                       }}>
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="sm" className="text-xs">
-                            <Plus size={14} className="mr-1" /> Add Fase
+                            <Plus size={14} className="mr-1" /> Add Etapa
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
-                          <DialogHeader><DialogTitle>Adicionar Fase - {processo.numeroProcessoDigital}</DialogTitle></DialogHeader>
+                          <DialogHeader><DialogTitle>Adicionar Etapa do Fornecedor - {processo.numeroProcessoDigital}</DialogTitle></DialogHeader>
                           <form onSubmit={handleCreateFase} className="space-y-4 pt-4">
                             <div className="space-y-2">
-                              <label className="text-sm font-medium">Nome da Fase</label>
-                              <Input required value={faseForm.nomeFase} onChange={(e) => setFaseForm({ ...faseForm, nomeFase: e.target.value })} placeholder="Ex: Pregao Eletronico" />
+                              <label className="text-sm font-medium">Etapa do Processo do Fornecedor</label>
+                              <Input required value={faseForm.nomeFase} onChange={(e) => setFaseForm({ ...faseForm, nomeFase: e.target.value })} placeholder="Ex: Habilitacao, proposta aprovada, documentacao complementar" />
                             </div>
                             <div className="space-y-2">
-                              <label className="text-sm font-medium">Fornecedor Vencedor</label>
+                              <label className="text-sm font-medium">Fornecedor Relacionado</label>
                               <Select value={faseForm.fornecedorId} onValueChange={(value) => setFaseForm({ ...faseForm, fornecedorId: value })}>
                                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                                 <SelectContent>
@@ -287,8 +291,8 @@ export default function Processos() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <label className="text-sm font-medium">Modalidade</label>
-                                <Input required value={faseForm.modalidade} onChange={(e) => setFaseForm({ ...faseForm, modalidade: e.target.value })} placeholder="Ex: Pregao Eletronico" />
+                              <label className="text-sm font-medium">Modalidade</label>
+                              <Input required value={faseForm.modalidade} onChange={(e) => setFaseForm({ ...faseForm, modalidade: e.target.value })} placeholder="Ex: Pregao Eletronico" />
                               </div>
                               <div className="space-y-2">
                                 <label className="text-sm font-medium">Numero da Modalidade</label>

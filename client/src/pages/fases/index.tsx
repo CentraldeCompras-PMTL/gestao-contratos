@@ -114,7 +114,7 @@ export default function Fases() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Fases de Contratacao</h1>
-          <p className="text-muted-foreground mt-1">Gerencie as fases de contratacao dos processos administrativos.</p>
+          <p className="text-muted-foreground mt-1">Gerencie as etapas do processo digital vinculadas a cada fornecedor.</p>
         </div>
         <Dialog open={isCreateOpen && !editingId} onOpenChange={(open) => {
           if (!open) resetForm();
@@ -124,7 +124,7 @@ export default function Fases() {
             <Button className="gap-2"><Plus size={18} /> Nova Fase</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
-            <DialogHeader><DialogTitle>Criar Nova Fase de Contratacao</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Criar Nova Etapa do Fornecedor</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -139,7 +139,7 @@ export default function Fases() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Fornecedor *</Label>
+                  <Label>Fornecedor Relacionado *</Label>
                   <Select value={formData.fornecedorId} onValueChange={(v) => setFormData({ ...formData, fornecedorId: v })}>
                     <SelectTrigger><SelectValue placeholder="Selecione o fornecedor" /></SelectTrigger>
                     <SelectContent>
@@ -150,7 +150,7 @@ export default function Fases() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Nome da Fase *</Label>
+                  <Label>Etapa do Processo do Fornecedor *</Label>
                   <Input value={formData.nomeFase} onChange={(e) => setFormData({ ...formData, nomeFase: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
@@ -186,10 +186,10 @@ export default function Fases() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Fases Cadastradas</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Etapas Cadastradas</CardTitle></CardHeader>
         <CardContent>
           {fases.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Nenhuma fase cadastrada ainda.</p>
+            <p className="text-muted-foreground text-center py-8">Nenhuma etapa cadastrada ainda.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -237,7 +237,7 @@ export default function Fases() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label>Fornecedor</Label>
+                                <Label>Fornecedor Relacionado</Label>
                                 <Select value={formData.fornecedorId} onValueChange={(v) => setFormData({ ...formData, fornecedorId: v })}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
@@ -248,7 +248,7 @@ export default function Fases() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label>Nome da Fase</Label>
+                                <Label>Etapa do Processo do Fornecedor</Label>
                                 <Input value={formData.nomeFase} onChange={(e) => setFormData({ ...formData, nomeFase: e.target.value })} />
                               </div>
                               <div className="space-y-2">
