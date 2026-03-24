@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { count, eq } from "drizzle-orm";
 import { 
-  users, entes, departamentos, fornecedores, processosDigitais, fasesContratacao, contratos, empenhos, afs, notasFiscais, contratoAditivos, contratoAnexos, passwordResetTokens, auditLogs,
+  users, userEntes, entes, departamentos, fornecedores, processosDigitais, fasesContratacao, contratos, empenhos, afs, notasFiscais, contratoAditivos, contratoAnexos, passwordResetTokens, auditLogs,
   type User, type InsertUser, type Ente, type InsertEnte, type Departamento, type InsertDepartamento, type Fornecedor, type InsertFornecedor,
   type ProcessoDigital, type InsertProcessoDigital, type FaseContratacao, type InsertFaseContratacao,
   type Contrato, type InsertContrato, type Empenho, type InsertEmpenho, type Af, type InsertAf, type NotaFiscal, type InsertNotaFiscal,
@@ -14,6 +14,8 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  getUserEnteIds(userId: string): Promise<string[]>;
+  setUserEntes(userId: string, enteIds: string[]): Promise<void>;
   updateUser(id: string, user: { email: string; name: string; role: string; enteId?: string | null }): Promise<User | undefined>;
   updateUserPassword(id: string, password: string, forcePasswordChange?: boolean): Promise<User | undefined>;
   createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
@@ -119,6 +121,24 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async getUserEnteIds(userId: string): Promise<string[]> {
+    const rows = await db.select().from(userEntes).where(eq(userEntes.userId, userId));
+    return rows.map((row) => row.enteId);
+  }
+
+  async setUserEntes(userId: string, enteIds: string[]): Promise<void> {
+    await db.delete(userEntes).where(eq(userEntes.userId, userId));
+    if (enteIds.length === 0) {
+      return;
+    }
+    await db.insert(userEntes).values(
+      enteIds.map((enteId) => ({
+        userId,
+        enteId,
+      })),
+    );
   }
 
   async updateUser(id: string, user: { email: string; name: string; role: string; enteId?: string | null }): Promise<User | undefined> {

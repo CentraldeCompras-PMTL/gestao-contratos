@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDepartamentos, useCreateDepartamento, useUpdateDepartamento, useDeleteDepartamento } from "@/hooks/use-departamentos";
 import { useAuth } from "@/hooks/use-auth";
 import { useEntes } from "@/hooks/use-entes";
@@ -35,7 +35,18 @@ export default function Departamentos() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [departamentoToDelete, setDepartamentoToDelete] = useState<Departamento | null>(null);
-  const [formData, setFormData] = useState({ nome: "", descricao: "", enteId: user?.enteId || "" });
+  const accessibleEnteIds = user?.accessibleEnteIds ?? (user?.enteId ? [user.enteId] : []);
+  const availableEntes = useMemo(
+    () => (user?.role === "admin" ? entes : entes.filter((ente) => accessibleEnteIds.includes(ente.id))),
+    [accessibleEnteIds, entes, user?.role],
+  );
+  const [formData, setFormData] = useState({ nome: "", descricao: "", enteId: "" });
+
+  useEffect(() => {
+    if (!editingId && !formData.enteId && availableEntes.length > 0) {
+      setFormData((current) => ({ ...current, enteId: availableEntes[0].id }));
+    }
+  }, [availableEntes, editingId, formData.enteId]);
 
   const filtered = departamentos.filter((departamento) =>
     departamento.nome.toLowerCase().includes(search.toLowerCase())
@@ -43,7 +54,7 @@ export default function Departamentos() {
 
   const resetForm = () => {
     setEditingId(null);
-    setFormData({ nome: "", descricao: "", enteId: user?.enteId || "" });
+    setFormData({ nome: "", descricao: "", enteId: availableEntes[0]?.id || "" });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -113,10 +124,10 @@ export default function Departamentos() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Ente</label>
-                <Select value={formData.enteId} onValueChange={(value) => setFormData({ ...formData, enteId: value })} disabled={user?.role !== "admin"}>
+                <Select value={formData.enteId} onValueChange={(value) => setFormData({ ...formData, enteId: value })} disabled={availableEntes.length <= 1}>
                   <SelectTrigger><SelectValue placeholder="Selecione o ente" /></SelectTrigger>
                   <SelectContent>
-                    {entes.map((ente) => (
+                    {availableEntes.map((ente) => (
                       <SelectItem key={ente.id} value={ente.id}>{ente.sigla} - {ente.nome}</SelectItem>
                     ))}
                   </SelectContent>

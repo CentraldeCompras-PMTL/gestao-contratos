@@ -181,8 +181,18 @@ export async function registerRoutes(
   };
 
   const getUserId = (req: any): string | null => req.user?.id ?? null;
-  const getUserEnteId = (req: any): string | null => req.user?.enteId ?? null;
+  const getUserEnteIds = (req: any): string[] => {
+    if (Array.isArray(req.user?.accessibleEnteIds) && req.user.accessibleEnteIds.length > 0) {
+      return req.user.accessibleEnteIds;
+    }
+    return req.user?.enteId ? [req.user.enteId] : [];
+  };
   const isAdmin = (req: any): boolean => req.user?.role === "admin";
+  const hasEnteAccess = (req: any, enteId: string | null | undefined) => {
+    if (isAdmin(req)) return true;
+    if (!enteId) return false;
+    return getUserEnteIds(req).includes(enteId);
+  };
   const audit = async (req: any, action: string, entity: string, entityId?: string | null, details?: string | null) => {
     await storage.createAuditLog({
       userId: getUserId(req),
@@ -194,29 +204,34 @@ export async function registerRoutes(
   };
 
   const ensureEnteAccess = (req: any, enteId: string | null | undefined) => {
-    if (isAdmin(req)) return;
-    if (!enteId || enteId !== getUserEnteId(req)) {
+    if (!hasEnteAccess(req, enteId)) {
       throw new HttpError(403, "Acesso restrito ao ente do usuario");
     }
   };
 
-  app.get(api.users.list.path, requireAdmin, async (_req, res) => {
-    const users = await storage.getUsers();
-    res.json(users.map((user) => ({
+  const toPublicUser = async (user: any) => {
+    const accessibleEnteIds = await storage.getUserEnteIds(user.id);
+    return {
       id: user.id,
       email: user.email,
       name: user.name ?? null,
       role: user.role === "admin" ? "admin" : "operacional",
       enteId: user.enteId ?? null,
+      accessibleEnteIds,
       forcePasswordChange: Boolean(user.forcePasswordChange),
       createdAt: user.createdAt ?? null,
-    })));
+    };
+  };
+
+  app.get(api.users.list.path, requireAdmin, async (_req, res) => {
+    const users = await storage.getUsers();
+    res.json(await Promise.all(users.map((user) => toPublicUser(user))));
   });
 
   app.post(api.users.create.path, requireAdmin, async (req, res) => {
     try {
       const data = api.users.create.input.parse(req.body);
-      if (data.role === "operacional" && !data.enteId) {
+      if (data.role === "operacional" && (!data.enteIds || data.enteIds.length === 0)) {
         throw new HttpError(400, "Usuario operacional deve ser vinculado a um ente");
       }
       const existingUser = await storage.getUserByEmail(data.email);
@@ -225,19 +240,13 @@ export async function registerRoutes(
       }
       const user = await storage.createUser({
         ...data,
+        enteId: data.role === "admin" ? null : data.enteIds?.[0] ?? null,
         password: await hashPassword(data.password),
         forcePasswordChange: true,
       });
+      await storage.setUserEntes(user.id, data.role === "admin" ? [] : data.enteIds ?? []);
       await audit(req, "create", "user", user.id, `Usuario ${user.email} criado com perfil ${user.role}`);
-      res.status(201).json({
-        id: user.id,
-        email: user.email,
-        name: user.name ?? null,
-        role: user.role === "admin" ? "admin" : "operacional",
-        enteId: user.enteId ?? null,
-        forcePasswordChange: Boolean(user.forcePasswordChange),
-        createdAt: user.createdAt ?? null,
-      });
+      res.status(201).json(await toPublicUser(user));
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao criar usuario") });
     }
@@ -246,7 +255,7 @@ export async function registerRoutes(
   app.put(api.users.update.path, requireAdmin, async (req, res) => {
     try {
       const data = api.users.update.input.parse(req.body);
-      if (data.role === "operacional" && !data.enteId) {
+      if (data.role === "operacional" && (!data.enteIds || data.enteIds.length === 0)) {
         throw new HttpError(400, "Usuario operacional deve ser vinculado a um ente");
       }
 
@@ -264,23 +273,16 @@ export async function registerRoutes(
         email: data.email,
         name: data.name,
         role: data.role,
-        enteId: data.role === "admin" ? null : data.enteId ?? null,
+        enteId: data.role === "admin" ? null : data.enteIds?.[0] ?? null,
       });
 
+      await storage.setUserEntes(targetUser.id, data.role === "admin" ? [] : data.enteIds ?? []);
       if (!updatedUser) {
         return res.status(404).json({ message: "Usuario nao encontrado" });
       }
 
       await audit(req, "update", "user", updatedUser.id, `Usuario ${updatedUser.email} atualizado`);
-      res.json({
-        id: updatedUser.id,
-        email: updatedUser.email,
-        name: updatedUser.name ?? null,
-        role: updatedUser.role === "admin" ? "admin" : "operacional",
-        enteId: updatedUser.enteId ?? null,
-        forcePasswordChange: Boolean(updatedUser.forcePasswordChange),
-        createdAt: updatedUser.createdAt ?? null,
-      });
+      res.json(await toPublicUser(updatedUser));
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar usuario") });
     }
@@ -312,7 +314,7 @@ export async function registerRoutes(
     if (isAdmin(req)) {
       return res.json(entes);
     }
-    return res.json(entes.filter((ente) => ente.id === getUserEnteId(req)));
+    return res.json(entes.filter((ente) => getUserEnteIds(req).includes(ente.id)));
   });
 
   app.post(api.entes.create.path, requireAdmin, async (req, res) => {
@@ -421,7 +423,7 @@ export async function registerRoutes(
   app.get(api.departamentos.list.path, requireAuth, async (req, res) => {
     const d = await storage.getDepartamentos();
     if (!isAdmin(req)) {
-      return res.json(d.filter((item) => item.enteId === getUserEnteId(req)));
+      return res.json(d.filter((item) => hasEnteAccess(req, item.enteId)));
     }
     res.json(d);
   });
@@ -577,7 +579,7 @@ export async function registerRoutes(
   });
 
   app.get(api.processos.list.path, requireAuth, async (req, res) => {
-  const p = await storage.getProcessosDigitais();
+    const p = await storage.getProcessosDigitais();
 
   const format = (processos: any[]) =>
     processos.map((proc) => ({
@@ -589,11 +591,10 @@ export async function registerRoutes(
     }));
 
   if (!isAdmin(req)) {
-    const filtrados = p.filter((item) => item.departamento?.enteId === getUserEnteId(req));
-    return res.json(format(filtrados));
+    return res.json(p.filter((item) => hasEnteAccess(req, item.departamento?.enteId)));
   }
 
-  res.json(format(p));
+  res.json(p);
 });
 
  app.get(api.processos.get.path, requireAuth, async (req, res) => {
@@ -609,7 +610,7 @@ export async function registerRoutes(
     })),
   };
 
-  res.json(formatted);
+  res.json(p);
 });
 
   app.post(api.processos.create.path, requireAuth, async (req, res) => {
@@ -661,7 +662,7 @@ export async function registerRoutes(
     if (!isAdmin(req)) {
       const processos = await storage.getProcessosDigitais();
       const allowedIds = new Set(
-        processos.filter((item) => item.departamento?.enteId === getUserEnteId(req)).map((item) => item.id),
+        processos.filter((item) => hasEnteAccess(req, item.departamento?.enteId)).map((item) => item.id),
       );
       return res.json(f.filter((item) => allowedIds.has(item.processoDigitalId)));
     }
@@ -747,7 +748,7 @@ export async function registerRoutes(
   app.get(api.contratos.list.path, requireAuth, async (req, res) => {
     const c = await storage.getContratos();
     if (!isAdmin(req)) {
-      return res.json(c.filter((item) => item.processoDigital.departamento?.enteId === getUserEnteId(req)));
+      return res.json(c.filter((item) => hasEnteAccess(req, item.processoDigital.departamento?.enteId)));
     }
     res.json(c);
   });
@@ -1119,7 +1120,7 @@ export async function registerRoutes(
   app.get(api.afs.list.path, requireAuth, async (req, res) => {
     const afs = await storage.getAfs();
     if (!isAdmin(req)) {
-      return res.json(afs.filter((item) => item.empenho.contrato.processoDigital.departamento?.enteId === getUserEnteId(req)));
+      return res.json(afs.filter((item) => hasEnteAccess(req, item.empenho.contrato.processoDigital.departamento?.enteId)));
     }
     res.json(afs);
   });
@@ -1247,7 +1248,7 @@ export async function registerRoutes(
   app.get(api.notasFiscais.list.path, requireAuth, async (req, res) => {
     const notas = await storage.getNotasFiscais();
     if (!isAdmin(req)) {
-      return res.json(notas.filter((item) => item.contrato.processoDigital.departamento?.enteId === getUserEnteId(req)));
+      return res.json(notas.filter((item) => hasEnteAccess(req, item.contrato.processoDigital.departamento?.enteId)));
     }
     res.json(notas);
   });
@@ -1355,7 +1356,7 @@ export async function registerRoutes(
   app.get(api.notificacoes.list.path, requireAuth, async (req, res) => {
     let afs = await storage.getAfs();
     if (!isAdmin(req)) {
-      afs = afs.filter((item) => item.empenho.contrato.processoDigital.departamento?.enteId === getUserEnteId(req));
+      afs = afs.filter((item) => hasEnteAccess(req, item.empenho.contrato.processoDigital.departamento?.enteId));
     }
     const today = startOfTodayUtc();
 
@@ -1393,9 +1394,8 @@ export async function registerRoutes(
     ]);
 
     if (!isAdmin(req)) {
-      const enteId = getUserEnteId(req);
-      contratos = contratos.filter((item) => item.processoDigital.departamento?.enteId === enteId);
-      procs = procs.filter((item) => item.departamento?.enteId === enteId);
+      contratos = contratos.filter((item) => hasEnteAccess(req, item.processoDigital.departamento?.enteId));
+      procs = procs.filter((item) => hasEnteAccess(req, item.departamento?.enteId));
     }
 
     const totalContratos = contratos.length;

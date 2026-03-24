@@ -25,13 +25,16 @@ export async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-function toPublicUser(user: User): PublicUser {
+type AuthenticatedUser = User & { accessibleEnteIds?: string[] };
+
+function toPublicUser(user: AuthenticatedUser): PublicUser {
   return {
     id: user.id,
     email: user.email,
     name: user.name ?? null,
     role: user.role === "admin" ? "admin" : "operacional",
     enteId: user.enteId ?? null,
+    accessibleEnteIds: user.accessibleEnteIds ?? (user.enteId ? [user.enteId] : []),
     forcePasswordChange: Boolean(user.forcePasswordChange),
     createdAt: user.createdAt ?? null,
   };
@@ -75,7 +78,12 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
-      done(null, user);
+      if (!user) {
+        done(null, false);
+        return;
+      }
+      const accessibleEnteIds = await storage.getUserEnteIds(user.id);
+      done(null, { ...user, accessibleEnteIds });
     } catch (err) {
       done(err);
     }
@@ -91,7 +99,11 @@ export function setupAuth(app: Express) {
       if (!user) return res.status(401).json({ message: info?.message || "Erro no login" });
       req.login(user, (loginErr) => {
         if (loginErr) return next(loginErr);
-        res.status(200).json(toPublicUser(user));
+        storage.getUserEnteIds(user.id)
+          .then((accessibleEnteIds) => {
+            res.status(200).json(toPublicUser({ ...user, accessibleEnteIds }));
+          })
+          .catch(next);
       });
     })(req, res, next);
   });
@@ -107,6 +119,6 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Nao autorizado" });
     }
-    res.json(toPublicUser(req.user as User));
+    res.json(toPublicUser(req.user as AuthenticatedUser));
   });
 }

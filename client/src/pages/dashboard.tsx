@@ -3,6 +3,7 @@ import { useDashboardStats } from "@/hooks/use-dashboard";
 import { useContratos } from "@/hooks/use-contratos";
 import { useNotificacoes } from "@/hooks/use-notificacoes";
 import { useDepartamentos } from "@/hooks/use-departamentos";
+import { useEntes } from "@/hooks/use-entes";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency, parseNumberString } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,37 +51,45 @@ export default function Dashboard() {
   const { data: contratos = [], isLoading: contratosLoading } = useContratos();
   const { data: notificacoes = [], isLoading: notifLoading } = useNotificacoes();
   const { data: departamentos = [], isLoading: departamentosLoading } = useDepartamentos();
+  const { data: entes = [], isLoading: entesLoading } = useEntes();
 
   const [filterFornecedor, setFilterFornecedor] = useState("");
   const [filterProcesso, setFilterProcesso] = useState("");
   const [filterDepartamento, setFilterDepartamento] = useState("");
+  const [filterEnte, setFilterEnte] = useState("");
+
+  const accessibleEnteIds = user?.accessibleEnteIds ?? (user?.enteId ? [user.enteId] : []);
+  const showEnteFilter = user?.role === "operacional" && accessibleEnteIds.length > 1;
 
   const filteredContratos = useMemo(() => {
     return contratos.filter((contrato) => {
+      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
       if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
       return true;
     });
-  }, [contratos, filterFornecedor, filterProcesso, filterDepartamento]);
+  }, [contratos, filterDepartamento, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const fornecedoresUnicos = useMemo(() => {
     const base = contratos.filter((contrato) => {
+      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
       if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.fornecedor.id, (contrato) => contrato.fornecedor.nome);
-  }, [contratos, filterProcesso, filterDepartamento]);
+  }, [contratos, filterDepartamento, filterEnte, filterProcesso, showEnteFilter]);
 
   const processosUnicos = useMemo(() => {
     const base = contratos.filter((contrato) => {
+      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.processoDigital.id, (contrato) => contrato.processoDigital.numeroProcessoDigital);
-  }, [contratos, filterFornecedor, filterDepartamento]);
+  }, [contratos, filterDepartamento, filterEnte, filterFornecedor, showEnteFilter]);
 
   const departamentosUnicos = useMemo(() => {
     if (filterProcesso) {
@@ -94,15 +103,20 @@ export default function Dashboard() {
       }];
     }
 
+    const departamentosFiltradosPorEnte = showEnteFilter && filterEnte
+      ? departamentos.filter((departamento) => departamento.enteId === filterEnte)
+      : departamentos;
+
     const departamentosBase = filterFornecedor
-      ? departamentos.filter((departamento) =>
+      ? departamentosFiltradosPorEnte.filter((departamento) =>
           contratos.some(
             (contrato) =>
+              (!showEnteFilter || !filterEnte || contrato.processoDigital.departamento?.enteId === filterEnte) &&
               contrato.fornecedor.id === filterFornecedor &&
               contrato.processoDigital.departamentoId === departamento.id,
           ),
         )
-      : departamentos;
+      : departamentosFiltradosPorEnte;
 
     return departamentosBase
       .map((departamento) => ({
@@ -112,7 +126,12 @@ export default function Dashboard() {
         value: 0,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [contratos, departamentos, filterFornecedor, filterProcesso]);
+  }, [contratos, departamentos, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
+
+  const entesDisponiveis = useMemo(() => {
+    if (!showEnteFilter) return [];
+    return entes.filter((ente) => accessibleEnteIds.includes(ente.id));
+  }, [accessibleEnteIds, entes, showEnteFilter]);
 
   const saldoFiltrado = useMemo(() => {
     let total = 0;
@@ -156,7 +175,7 @@ export default function Dashboard() {
     };
   }, [filteredContratos]);
 
-  if (statsLoading || notifLoading || contratosLoading || departamentosLoading) {
+  if (statsLoading || notifLoading || contratosLoading || departamentosLoading || entesLoading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -226,7 +245,11 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold tracking-tight">Visao Geral</h1>
         <p className="text-muted-foreground mt-2">Acompanhe os indicadores principais dos contratos e AFs.</p>
         {user?.role !== "admin" && (
-          <p className="text-sm text-muted-foreground mt-2">Voce esta visualizando somente os dados vinculados ao seu ente.</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {showEnteFilter
+              ? "Voce esta visualizando os dados dos entes vinculados ao seu usuario e pode filtrar por ente."
+              : "Voce esta visualizando somente os dados vinculados ao seu ente."}
+          </p>
         )}
       </div>
 
@@ -241,7 +264,19 @@ export default function Dashboard() {
 
       <div className="bg-white dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800 p-6">
         <h3 className="font-semibold mb-4">Filtros</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 ${showEnteFilter ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4`}>
+          {showEnteFilter && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">Ente</label>
+              <Select value={filterEnte || "all"} onValueChange={(v) => setFilterEnte(v === "all" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Todos os entes vinculados" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os entes vinculados</SelectItem>
+                  {entesDisponiveis.map((ente) => <SelectItem key={ente.id} value={ente.id}>{ente.sigla}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium mb-2 block">Fornecedor</label>
             <Select value={filterFornecedor || "all"} onValueChange={(v) => setFilterFornecedor(v === "all" ? "" : v)}>

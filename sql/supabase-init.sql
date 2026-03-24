@@ -19,6 +19,13 @@ create table if not exists entes (
   atualizado_em timestamp default now()
 );
 
+create table if not exists user_entes (
+  id varchar primary key default gen_random_uuid(),
+  user_id varchar not null references users(id) on delete cascade,
+  ente_id varchar not null references entes(id) on delete cascade,
+  created_at timestamp default now()
+);
+
 create table if not exists password_reset_tokens (
   id varchar primary key default gen_random_uuid(),
   user_id varchar not null references users(id) on delete cascade,
@@ -189,6 +196,15 @@ create index if not exists idx_processos_digitais_departamento_id
 
 create index if not exists idx_departamentos_ente_id
   on departamentos (ente_id);
+
+create index if not exists idx_user_entes_user_id
+  on user_entes (user_id);
+
+create index if not exists idx_user_entes_ente_id
+  on user_entes (ente_id);
+
+create unique index if not exists idx_user_entes_unique
+  on user_entes (user_id, ente_id);
 
 create index if not exists idx_fases_contratacao_processo_digital_id
   on fases_contratacao (processo_digital_id);

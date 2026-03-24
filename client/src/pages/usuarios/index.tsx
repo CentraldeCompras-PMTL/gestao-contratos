@@ -40,7 +40,7 @@ export default function Usuarios() {
     email: "",
     password: "",
     role: "operacional" as "admin" | "operacional",
-    enteId: "",
+    enteIds: [] as string[],
   });
   const [resetTarget, setResetTarget] = useState<PublicUser | null>(null);
   const [resetPassword, setResetPassword] = useState("");
@@ -56,24 +56,24 @@ export default function Usuarios() {
       email: "",
       password: "",
       role: "operacional",
-      enteId: "",
+      enteIds: [],
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.role === "operacional" && !form.enteId) {
+    if (form.role === "operacional" && form.enteIds.length === 0) {
       toast({
         variant: "destructive",
         title: "Preencha os campos obrigatorios",
-        description: "Selecione o ente do usuario operacional antes de salvar.",
+        description: "Selecione pelo menos um ente do usuario operacional antes de salvar.",
       });
       return;
     }
 
     if (editingUserId) {
       updateUser.mutate(
-        { id: editingUserId, ...form, enteId: form.role === "admin" ? undefined : form.enteId },
+        { id: editingUserId, ...form, enteIds: form.role === "admin" ? undefined : form.enteIds },
         {
           onSuccess: () => {
             toast({ title: "Registro atualizado com sucesso!" });
@@ -90,7 +90,7 @@ export default function Usuarios() {
       return;
     }
 
-    createUser.mutate({ ...form, enteId: form.role === "admin" ? undefined : form.enteId }, {
+    createUser.mutate({ ...form, enteIds: form.role === "admin" ? undefined : form.enteIds }, {
       onSuccess: () => {
         toast({ title: "Cadastro realizado com sucesso!" });
         setDialogOpen(false);
@@ -111,9 +111,18 @@ export default function Usuarios() {
       email: target.email,
       password: "",
       role: target.role === "admin" ? "admin" : "operacional",
-      enteId: target.enteId ?? "",
+      enteIds: target.role === "admin" ? [] : (target.accessibleEnteIds?.length ? target.accessibleEnteIds : target.enteId ? [target.enteId] : []),
     });
     setDialogOpen(true);
+  };
+
+  const toggleEnte = (enteId: string, checked: boolean) => {
+    setForm((current) => ({
+      ...current,
+      enteIds: checked
+        ? Array.from(new Set([...current.enteIds, enteId]))
+        : current.enteIds.filter((id) => id !== enteId),
+    }));
   };
 
   const handleResetPassword = () => {
@@ -176,7 +185,7 @@ export default function Usuarios() {
                   onValueChange={(value: "admin" | "operacional") => setForm((current) => ({
                     ...current,
                     role: value,
-                    enteId: value === "admin" ? "" : current.enteId,
+                    enteIds: value === "admin" ? [] : current.enteIds,
                   }))}
                 >
                   <SelectTrigger>
@@ -189,19 +198,28 @@ export default function Usuarios() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Ente {form.role === "operacional" ? "*" : ""}</Label>
-                <Select value={form.enteId} onValueChange={(value) => setForm((current) => ({ ...current, enteId: value }))} disabled={form.role === "admin"}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={form.role === "admin" ? "Administrador acessa todos" : "Selecione o ente"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entes.map((ente) => (
-                      <SelectItem key={ente.id} value={ente.id}>{ente.sigla} - {ente.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Entes {form.role === "operacional" ? "*" : ""}</Label>
+                <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border p-3">
+                  {form.role === "admin" ? (
+                    <p className="text-sm text-muted-foreground">Administrador acessa todos os entes.</p>
+                  ) : entes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum ente cadastrado.</p>
+                  ) : (
+                    entes.map((ente) => (
+                      <label key={ente.id} className="flex items-center gap-3 text-sm">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={form.enteIds.includes(ente.id)}
+                          onChange={(event) => toggleEnte(ente.id, event.target.checked)}
+                        />
+                        <span>{ente.sigla} - {ente.nome}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
                 {form.role === "operacional" && (
-                  <p className="text-xs text-muted-foreground">Usuarios operacionais devem ser vinculados a um ente.</p>
+                  <p className="text-xs text-muted-foreground">Usuarios operacionais podem ser vinculados a um ou mais entes.</p>
                 )}
               </div>
               <Button type="submit" className="w-full" disabled={createUser.isPending || updateUser.isPending}>
@@ -256,7 +274,14 @@ export default function Usuarios() {
                   <TableCell>{item.name || "-"}</TableCell>
                   <TableCell>{item.email}</TableCell>
                   <TableCell>{item.role === "admin" ? "Administrador" : "Operacional"}</TableCell>
-                  <TableCell>{item.role === "admin" ? "Todos" : entes.find((ente) => ente.id === item.enteId)?.sigla || "-"}</TableCell>
+                  <TableCell>
+                    {item.role === "admin"
+                      ? "Todos"
+                      : entes
+                          .filter((ente) => (item.accessibleEnteIds?.length ? item.accessibleEnteIds : item.enteId ? [item.enteId] : []).includes(ente.id))
+                          .map((ente) => ente.sigla)
+                          .join(", ") || "-"}
+                  </TableCell>
                   <TableCell>{formatDate(item.createdAt ? String(item.createdAt) : "")}</TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>

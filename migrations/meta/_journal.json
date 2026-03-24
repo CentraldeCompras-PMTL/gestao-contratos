@@ -71,6 +71,13 @@
       "when": 1770000009000,
       "tag": "0009_empenho_anulacao",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1770000010000,
+      "tag": "0010_user_entes",
+      "breakpoints": true
     }
   ]
 }

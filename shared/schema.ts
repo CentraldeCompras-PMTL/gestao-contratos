@@ -23,6 +23,13 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const userEntes = pgTable("user_entes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const entes = pgTable("entes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nome: text("nome").notNull().unique(),
@@ -270,6 +277,7 @@ export const publicUserSchema = z.object({
   name: z.string().nullable(),
   role: userRoleSchema,
   enteId: z.string().nullable().optional(),
+  accessibleEnteIds: z.array(z.string()).default([]),
   forcePasswordChange: z.boolean(),
   createdAt: timestampSchema.nullable().optional(),
 });
@@ -499,7 +507,7 @@ export const dashboardStatsResponseSchema = z.object({
 });
 
 export type User = typeof users.$inferSelect;
-export type PublicUser = Omit<User, "password">;
+export type PublicUser = Omit<User, "password"> & { accessibleEnteIds: string[] };
 export type Fornecedor = typeof fornecedores.$inferSelect;
 export type ProcessoDigital = typeof processosDigitais.$inferSelect;
 export type FaseContratacao = typeof fasesContratacao.$inferSelect;
@@ -521,6 +529,7 @@ export type InsertContratoAditivo = z.infer<typeof insertContratoAditivoSchema>;
 export type InsertContratoAnexo = z.infer<typeof insertContratoAnexoSchema>;
 export type Departamento = typeof departamentos.$inferSelect;
 export type Ente = typeof entes.$inferSelect;
+export type UserEnte = typeof userEntes.$inferSelect;
 export type NotaFiscal = typeof notasFiscais.$inferSelect;
 export type ContratoAditivo = typeof contratoAditivos.$inferSelect;
 export type ContratoAnexo = typeof contratoAnexos.$inferSelect;
