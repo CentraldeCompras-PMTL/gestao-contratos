@@ -554,6 +554,95 @@ export async function registerRoutes(
     }
   });
 
+  app.get(api.fontesRecurso.list.path, requireAuth, async (_req, res) => {
+    const fontes = await storage.getFontesRecurso();
+    res.json(fontes);
+  });
+
+  app.post(api.fontesRecurso.create.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.fontesRecurso.create.input.parse(req.body);
+      const fonte = await storage.createFonteRecurso(data);
+      await audit(req, "create", "fonte_recurso", fonte.id, `${fonte.codigo} - ${fonte.nome}`);
+      res.status(201).json(fonte);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao criar fonte de recurso") });
+    }
+  });
+
+  app.put(api.fontesRecurso.update.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.fontesRecurso.update.input.parse(req.body);
+      const current = await storage.getFonteRecurso(req.params.id);
+      if (!current) return res.status(404).json({ message: "Fonte de recurso nao encontrada" });
+      const updated = await storage.updateFonteRecurso(req.params.id, data);
+      await audit(req, "update", "fonte_recurso", updated?.id, updated ? `${updated.codigo} - ${updated.nome}` : null);
+      res.json(updated);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar fonte de recurso") });
+    }
+  });
+
+  app.delete(api.fontesRecurso.delete.path, requireAuth, async (req, res) => {
+    try {
+      const fonte = await storage.getFonteRecurso(req.params.id);
+      if (!fonte) return res.status(404).json({ message: "Fonte de recurso nao encontrada" });
+      const contratos = await storage.getContratos();
+      const hasEmpenhos = contratos.some((contrato) => contrato.empenhos.some((empenho) => empenho.fonteRecursoId === fonte.id));
+      if (fonte.fichas.length > 0 || hasEmpenhos) {
+        throw new HttpError(400, "Nao e possivel excluir fonte com fichas ou empenhos vinculados");
+      }
+      const deleted = await storage.deleteFonteRecurso(fonte.id);
+      await audit(req, "delete", "fonte_recurso", deleted?.id, deleted ? `${deleted.codigo} - ${deleted.nome}` : null);
+      res.json({ message: "Fonte de recurso excluida com sucesso" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir fonte de recurso") });
+    }
+  });
+
+  app.post(api.fontesRecurso.createFicha.path, requireAuth, async (req, res) => {
+    try {
+      const fonte = await storage.getFonteRecurso(req.params.fonteRecursoId);
+      if (!fonte) return res.status(404).json({ message: "Fonte de recurso nao encontrada" });
+      const data = api.fontesRecurso.createFicha.input.parse(req.body);
+      const ficha = await storage.createFicha({ ...data, fonteRecursoId: fonte.id });
+      await audit(req, "create", "ficha_orcamentaria", ficha.id, `Fonte ${fonte.codigo} - Ficha ${ficha.codigo}`);
+      res.status(201).json(ficha);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao criar ficha") });
+    }
+  });
+
+  app.put(api.fontesRecurso.updateFicha.path, requireAuth, async (req, res) => {
+    try {
+      const current = await storage.getFicha(req.params.id);
+      if (!current) return res.status(404).json({ message: "Ficha nao encontrada" });
+      const data = api.fontesRecurso.updateFicha.input.parse(req.body);
+      const updated = await storage.updateFicha(req.params.id, data);
+      await audit(req, "update", "ficha_orcamentaria", updated?.id, updated ? `Ficha ${updated.codigo}` : null);
+      res.json(updated);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar ficha") });
+    }
+  });
+
+  app.delete(api.fontesRecurso.deleteFicha.path, requireAuth, async (req, res) => {
+    try {
+      const ficha = await storage.getFicha(req.params.id);
+      if (!ficha) return res.status(404).json({ message: "Ficha nao encontrada" });
+      const contratos = await storage.getContratos();
+      const hasEmpenhos = contratos.some((contrato) => contrato.empenhos.some((empenho) => empenho.fichaId === ficha.id));
+      if (hasEmpenhos) {
+        throw new HttpError(400, "Nao e possivel excluir ficha com empenhos vinculados");
+      }
+      const deleted = await storage.deleteFicha(ficha.id);
+      await audit(req, "delete", "ficha_orcamentaria", deleted?.id, deleted ? `Ficha ${deleted.codigo}` : null);
+      res.json({ message: "Ficha excluida com sucesso" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir ficha") });
+    }
+  });
+
   app.put(api.processos.update.path, requireAuth, async (req, res) => {
     try {
       const data = api.processos.update.input.parse({
@@ -679,10 +768,20 @@ export async function registerRoutes(
 
   app.post(api.fases.create.path, requireAuth, async (req, res) => {
     try {
-      const data = api.fases.create.input.parse(req.body);
-      const processo = await storage.getProcessoDigital(data.processoDigitalId);
+      const parsed = api.fases.create.input.parse(req.body);
+      const processo = await storage.getProcessoDigital(parsed.processoDigitalId);
       if (!processo) throw new HttpError(404, "Processo nao encontrado");
       ensureEnteAccess(req, processo.departamento?.enteId);
+      const departamentoId = parsed.departamentoId ?? processo.departamentoId ?? null;
+      if (departamentoId) {
+        const departamento = await storage.getDepartamento(departamentoId);
+        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
+        ensureEnteAccess(req, departamento.enteId);
+      }
+      const data = {
+        ...parsed,
+        departamentoId: departamentoId ?? undefined,
+      };
       parseDateOnly(data.dataInicio, "Data de inicio");
       if (data.dataFim) {
         ensureDateOrder(data.dataInicio, data.dataFim, "data de inicio", "data de fim");
@@ -698,13 +797,29 @@ export async function registerRoutes(
 
   app.put(api.fases.update.path, requireAuth, async (req, res) => {
     try {
-      const data = api.fases.update.input.parse(req.body);
+      const parsed = api.fases.update.input.parse(req.body);
       const current = await storage.getFase(req.params.id);
       if (!current) {
         return res.status(404).json({ message: "Fase nao encontrada" });
       }
       const currentProcesso = await storage.getProcessoDigital(current.processoDigitalId);
       ensureEnteAccess(req, currentProcesso?.departamento?.enteId);
+      const nextProcessoId = parsed.processoDigitalId ?? current.processoDigitalId;
+      const nextProcesso = await storage.getProcessoDigital(nextProcessoId);
+      if (!nextProcesso) {
+        throw new HttpError(404, "Processo nao encontrado");
+      }
+      ensureEnteAccess(req, nextProcesso.departamento?.enteId);
+      const departamentoId = parsed.departamentoId ?? current.departamentoId ?? nextProcesso.departamentoId ?? null;
+      if (departamentoId) {
+        const departamento = await storage.getDepartamento(departamentoId);
+        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
+        ensureEnteAccess(req, departamento.enteId);
+      }
+      const data = {
+        ...parsed,
+        departamentoId: departamentoId ?? undefined,
+      };
 
       const nextStart = data.dataInicio ?? current.dataInicio;
       const nextEnd = data.dataFim ?? current.dataFim;
@@ -763,23 +878,36 @@ export async function registerRoutes(
   app.post(api.contratos.create.path, requireAuth, async (req, res) => {
     try {
       const parsedBody = { ...req.body, valorContrato: String(req.body.valorContrato) };
-      const data = api.contratos.create.input.parse(parsedBody);
-      const processo = await storage.getProcessoDigital(data.processoDigitalId);
+      const parsed = api.contratos.create.input.parse(parsedBody);
+      const processo = await storage.getProcessoDigital(parsed.processoDigitalId);
       if (!processo) throw new HttpError(404, "Processo nao encontrado");
       ensureEnteAccess(req, processo.departamento?.enteId);
-      ensureDateOrder(data.vigenciaInicial, data.vigenciaFinal, "vigencia inicial", "vigencia final");
-      parseMoney(data.valorContrato, "Valor do contrato");
+      ensureDateOrder(parsed.vigenciaInicial, parsed.vigenciaFinal, "vigencia inicial", "vigencia final");
+      parseMoney(parsed.valorContrato, "Valor do contrato");
 
-      const fase = await storage.getFase(data.faseContratacaoId);
+      const fase = await storage.getFase(parsed.faseContratacaoId);
       if (!fase) {
         throw new HttpError(404, "Fase de contratacao nao encontrada");
       }
-      if (fase.processoDigitalId !== data.processoDigitalId) {
+      if (fase.processoDigitalId !== parsed.processoDigitalId) {
         throw new HttpError(400, "A fase informada nao pertence ao processo selecionado");
       }
-      if (fase.fornecedorId !== data.fornecedorId) {
+      if (fase.fornecedorId !== parsed.fornecedorId) {
         throw new HttpError(400, "O fornecedor do contrato deve ser o mesmo da fase selecionada");
       }
+      const departamentoId = parsed.departamentoId ?? fase.departamentoId ?? processo.departamentoId ?? null;
+      if (departamentoId) {
+        const departamento = await storage.getDepartamento(departamentoId);
+        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
+        ensureEnteAccess(req, departamento.enteId);
+      }
+      if (fase.departamentoId && departamentoId && fase.departamentoId !== departamentoId) {
+        throw new HttpError(400, "O departamento do contrato deve ser o mesmo da fase selecionada");
+      }
+      const data = {
+        ...parsed,
+        departamentoId: departamentoId ?? undefined,
+      };
 
       const c = await storage.createContrato(data);
       await audit(req, "create", "contrato", c.id, c.numeroContrato);
@@ -808,6 +936,7 @@ export async function registerRoutes(
       const nextData = {
         processoDigitalId: data.processoDigitalId ?? current.processoDigitalId,
         faseContratacaoId: data.faseContratacaoId ?? current.faseContratacaoId,
+        departamentoId: data.departamentoId ?? current.departamentoId ?? null,
         fornecedorId: data.fornecedorId ?? current.fornecedorId,
         valorContrato: data.valorContrato ?? String(current.valorContrato),
         vigenciaInicial: data.vigenciaInicial ?? current.vigenciaInicial,
@@ -827,8 +956,24 @@ export async function registerRoutes(
       if (fase.fornecedorId !== nextData.fornecedorId) {
         throw new HttpError(400, "O fornecedor do contrato deve ser o mesmo da fase selecionada");
       }
+      const processo = await storage.getProcessoDigital(nextData.processoDigitalId);
+      if (!processo) {
+        throw new HttpError(404, "Processo nao encontrado");
+      }
+      const departamentoId = nextData.departamentoId ?? fase.departamentoId ?? processo.departamentoId ?? null;
+      if (departamentoId) {
+        const departamento = await storage.getDepartamento(departamentoId);
+        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
+        ensureEnteAccess(req, departamento.enteId);
+      }
+      if (fase.departamentoId && departamentoId && fase.departamentoId !== departamentoId) {
+        throw new HttpError(400, "O departamento do contrato deve ser o mesmo da fase selecionada");
+      }
 
-      const updated = await storage.updateContrato(req.params.id, data);
+      const updated = await storage.updateContrato(req.params.id, {
+        ...data,
+        departamentoId: departamentoId ?? undefined,
+      });
       if (!updated) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
@@ -1015,6 +1160,18 @@ export async function registerRoutes(
 
       if (totalEmpenhado + novoEmpenho > valorContrato) {
         throw new HttpError(400, "O valor do empenho nao pode ultrapassar o saldo do contrato");
+      }
+
+      const fonte = await storage.getFonteRecurso(data.fonteRecursoId);
+      if (!fonte) {
+        throw new HttpError(404, "Fonte de recurso nao encontrada");
+      }
+      const ficha = await storage.getFicha(data.fichaId);
+      if (!ficha) {
+        throw new HttpError(404, "Ficha nao encontrada");
+      }
+      if (ficha.fonteRecursoId !== fonte.id) {
+        throw new HttpError(400, "A ficha informada nao pertence a fonte de recurso selecionada");
       }
 
       const e = await storage.createEmpenho({

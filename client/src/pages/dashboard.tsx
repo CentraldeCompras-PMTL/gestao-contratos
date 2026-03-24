@@ -19,6 +19,13 @@ type FilteredAggregate = {
   value: number;
 };
 
+type EmpenhoAggregate = {
+  id: string;
+  label: string;
+  valor: number;
+  execucao: number;
+};
+
 function aggregateBy<T extends string>(
   contratos: ContratoWithRelations[],
   getKey: (contrato: ContratoWithRelations) => T | null,
@@ -45,6 +52,26 @@ function aggregateBy<T extends string>(
   return Array.from(map.values());
 }
 
+function aggregateEmpenhos(
+  contratos: ContratoWithRelations[],
+  getKey: (contrato: ContratoWithRelations, empenho: ContratoWithRelations["empenhos"][number]) => string,
+  getLabel: (contrato: ContratoWithRelations, empenho: ContratoWithRelations["empenhos"][number]) => string,
+) {
+  const map = new Map<string, EmpenhoAggregate>();
+
+  contratos.forEach((contrato) => {
+    contrato.empenhos.forEach((empenho) => {
+      const key = getKey(contrato, empenho);
+      const current = map.get(key) ?? { id: key, label: getLabel(contrato, empenho), valor: 0, execucao: 0 };
+      current.valor += parseNumberString(empenho.valorEmpenho) - parseNumberString(empenho.valorAnulado);
+      current.execucao += empenho.afs.reduce((acc, af) => acc + parseNumberString(af.valorAf), 0);
+      map.set(key, current);
+    });
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.valor - a.valor);
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
@@ -57,39 +84,48 @@ export default function Dashboard() {
   const [filterProcesso, setFilterProcesso] = useState("");
   const [filterDepartamento, setFilterDepartamento] = useState("");
   const [filterEnte, setFilterEnte] = useState("");
+  const [filterFonteRecurso, setFilterFonteRecurso] = useState("");
+  const [filterFicha, setFilterFicha] = useState("");
 
   const accessibleEnteIds = user?.accessibleEnteIds ?? (user?.enteId ? [user.enteId] : []);
   const showEnteFilter = user?.role === "operacional" && accessibleEnteIds.length > 1;
 
   const filteredContratos = useMemo(() => {
     return contratos.filter((contrato) => {
+      const matchesFonte = !filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso);
+      const matchesFicha = !filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha);
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
       if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
+      if (!matchesFonte || !matchesFicha) return false;
       return true;
     });
-  }, [contratos, filterDepartamento, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [contratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const fornecedoresUnicos = useMemo(() => {
     const base = contratos.filter((contrato) => {
+      if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
+      if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
       if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.fornecedor.id, (contrato) => contrato.fornecedor.nome);
-  }, [contratos, filterDepartamento, filterEnte, filterProcesso, showEnteFilter]);
+  }, [contratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterProcesso, showEnteFilter]);
 
   const processosUnicos = useMemo(() => {
     const base = contratos.filter((contrato) => {
+      if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
+      if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.processoDigital.id, (contrato) => contrato.processoDigital.numeroProcessoDigital);
-  }, [contratos, filterDepartamento, filterEnte, filterFornecedor, showEnteFilter]);
+  }, [contratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, showEnteFilter]);
 
   const departamentosUnicos = useMemo(() => {
     if (filterProcesso) {
@@ -112,6 +148,8 @@ export default function Dashboard() {
           contratos.some(
             (contrato) =>
               (!showEnteFilter || !filterEnte || contrato.processoDigital.departamento?.enteId === filterEnte) &&
+              (!filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) &&
+              (!filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) &&
               contrato.fornecedor.id === filterFornecedor &&
               contrato.processoDigital.departamentoId === departamento.id,
           ),
@@ -126,12 +164,47 @@ export default function Dashboard() {
         value: 0,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [contratos, departamentos, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [contratos, departamentos, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const entesDisponiveis = useMemo(() => {
     if (!showEnteFilter) return [];
     return entes.filter((ente) => accessibleEnteIds.includes(ente.id));
   }, [accessibleEnteIds, entes, showEnteFilter]);
+
+  const fontesDisponiveis = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>();
+    contratos.forEach((contrato) => {
+      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
+      if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
+      if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
+      if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return;
+      contrato.empenhos.forEach((empenho) => {
+        map.set(empenho.fonteRecursoId, {
+          id: empenho.fonteRecursoId,
+          label: `${empenho.fonteRecurso.codigo} - ${empenho.fonteRecurso.nome}`,
+        });
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [contratos, filterDepartamento, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
+
+  const fichasDisponiveis = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>();
+    contratos.forEach((contrato) => {
+      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
+      if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
+      if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
+      if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return;
+      contrato.empenhos.forEach((empenho) => {
+        if (filterFonteRecurso && empenho.fonteRecursoId !== filterFonteRecurso) return;
+        map.set(empenho.fichaId, {
+          id: empenho.fichaId,
+          label: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`,
+        });
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [contratos, filterDepartamento, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const saldoFiltrado = useMemo(() => {
     let total = 0;
@@ -174,6 +247,16 @@ export default function Dashboard() {
       afsEntregues,
     };
   }, [filteredContratos]);
+
+  const fontesResumo = useMemo(
+    () => aggregateEmpenhos(filteredContratos, (_contrato, empenho) => empenho.fonteRecursoId, (_contrato, empenho) => `${empenho.fonteRecurso.codigo} - ${empenho.fonteRecurso.nome}`),
+    [filteredContratos],
+  );
+
+  const fichasResumo = useMemo(
+    () => aggregateEmpenhos(filteredContratos, (_contrato, empenho) => empenho.fichaId, (_contrato, empenho) => `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`),
+    [filteredContratos],
+  );
 
   if (statsLoading || notifLoading || contratosLoading || departamentosLoading || entesLoading) {
     return (
@@ -264,7 +347,7 @@ export default function Dashboard() {
 
       <div className="bg-white dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800 p-6">
         <h3 className="font-semibold mb-4">Filtros</h3>
-        <div className={`grid grid-cols-1 ${showEnteFilter ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4`}>
+        <div className={`grid grid-cols-1 ${showEnteFilter ? "md:grid-cols-3 lg:grid-cols-6" : "md:grid-cols-3 lg:grid-cols-5"} gap-4`}>
           {showEnteFilter && (
             <div>
               <label className="text-sm font-medium mb-2 block">Ente</label>
@@ -304,6 +387,30 @@ export default function Dashboard() {
               <SelectContent>
                 <SelectItem value="all">Todos os departamentos</SelectItem>
                 {departamentosUnicos.map((d) => <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Fonte de Recurso</label>
+            <Select value={filterFonteRecurso || "all"} onValueChange={(v) => {
+              const nextFonte = v === "all" ? "" : v;
+              setFilterFonteRecurso(nextFonte);
+              setFilterFicha("");
+            }}>
+              <SelectTrigger><SelectValue placeholder="Todas as fontes" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as fontes</SelectItem>
+                {fontesDisponiveis.map((fonte) => <SelectItem key={fonte.id} value={fonte.id}>{fonte.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Ficha</label>
+            <Select value={filterFicha || "all"} onValueChange={(v) => setFilterFicha(v === "all" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Todas as fichas" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as fichas</SelectItem>
+                {fichasDisponiveis.map((ficha) => <SelectItem key={ficha.id} value={ficha.id}>{ficha.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -384,6 +491,42 @@ export default function Dashboard() {
                 <div key={d.id} className="p-4 flex justify-between items-start hover:bg-muted/30 transition-colors">
                   <div><p className="font-medium text-sm">{d.label}</p><p className="text-xs text-muted-foreground">{d.count} contrato{d.count !== 1 ? "s" : ""}</p></div>
                   <p className="font-semibold text-sm">{formatCurrency(d.value)}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20"><CardTitle className="text-lg">Valor e Execucao por Fonte</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50 max-h-[360px] overflow-auto">
+              {fontesResumo.length === 0 ? <div className="p-4 text-center text-muted-foreground">Nenhum empenho com fonte cadastrada</div> : fontesResumo.map((fonte) => (
+                <div key={fonte.id} className="p-4 flex justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-sm">{fonte.label}</p>
+                    <p className="text-xs text-muted-foreground">Execucao: {formatCurrency(fonte.execucao)}</p>
+                  </div>
+                  <p className="font-semibold text-sm">{formatCurrency(fonte.valor)}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20"><CardTitle className="text-lg">Valor e Execucao por Ficha</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50 max-h-[360px] overflow-auto">
+              {fichasResumo.length === 0 ? <div className="p-4 text-center text-muted-foreground">Nenhum empenho com ficha cadastrada</div> : fichasResumo.map((ficha) => (
+                <div key={ficha.id} className="p-4 flex justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-sm">{ficha.label}</p>
+                    <p className="text-xs text-muted-foreground">Execucao: {formatCurrency(ficha.execucao)}</p>
+                  </div>
+                  <p className="font-semibold text-sm">{formatCurrency(ficha.valor)}</p>
                 </div>
               ))}
             </div>

@@ -13,6 +13,7 @@ import {
   useDeleteContratoAnexo,
 } from "@/hooks/use-contratos";
 import { useCreateAf } from "@/hooks/use-afs";
+import { useFontesRecurso } from "@/hooks/use-fontes-recurso";
 import { formatCurrency, formatDate, parseNumberString } from "@/lib/formatters";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,11 +60,12 @@ export default function ContratoDetail() {
   const createAnexo = useCreateContratoAnexo();
   const deleteAnexo = useDeleteContratoAnexo();
   const createAf = useCreateAf();
+  const { data: fontesRecurso = [] } = useFontesRecurso();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
   const [empenhoDialog, setEmpenhoDialog] = useState(false);
-  const [empForm, setEmpForm] = useState({ dataEmpenho: "", valorEmpenho: "" });
+  const [empForm, setEmpForm] = useState({ dataEmpenho: "", valorEmpenho: "", fonteRecursoId: "", fichaId: "" });
 
   const [afDialog, setAfDialog] = useState<string | null>(null);
   const [afForm, setAfForm] = useState({ dataPedidoAf: "", valorAf: "" });
@@ -115,7 +117,7 @@ export default function ContratoDetail() {
         onSuccess: () => {
           toast({ title: "Empenho registrado!" });
           setEmpenhoDialog(false);
-          setEmpForm({ dataEmpenho: "", valorEmpenho: "" });
+          setEmpForm({ dataEmpenho: "", valorEmpenho: "", fonteRecursoId: "", fichaId: "" });
         },
       },
     );
@@ -170,6 +172,7 @@ export default function ContratoDetail() {
   };
 
   const allAfs: Af[] = contrato.empenhos.flatMap((empenho) => empenho.afs);
+  const fichasDaFonte = fontesRecurso.find((fonte) => fonte.id === empForm.fonteRecursoId)?.fichas ?? [];
   const hasPendingAfs = allAfs.some((af) => !af.dataEntregaReal);
   const hasPendingNotas = contrato.notasFiscais.some((nota) => nota.statusPagamento !== "pago");
   const canClose = contrato.status !== "encerrado" && !hasPendingAfs && !hasPendingNotas;
@@ -426,6 +429,35 @@ export default function ContratoDetail() {
                       <label className="text-sm font-medium">Valor (R$)</label>
                       <Input type="number" step="0.01" required value={empForm.valorEmpenho} onChange={(e) => setEmpForm({ ...empForm, valorEmpenho: e.target.value })} />
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Fonte de Recurso</label>
+                      <select
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        required
+                        value={empForm.fonteRecursoId}
+                        onChange={(e) => setEmpForm({ ...empForm, fonteRecursoId: e.target.value, fichaId: "" })}
+                      >
+                        <option value="">Selecione a fonte</option>
+                        {fontesRecurso.map((fonte) => (
+                          <option key={fonte.id} value={fonte.id}>{fonte.codigo} - {fonte.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Ficha</label>
+                      <select
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        required
+                        value={empForm.fichaId}
+                        onChange={(e) => setEmpForm({ ...empForm, fichaId: e.target.value })}
+                        disabled={!empForm.fonteRecursoId}
+                      >
+                        <option value="">Selecione a ficha</option>
+                        {fichasDaFonte.map((ficha) => (
+                          <option key={ficha.id} value={ficha.id}>{ficha.codigo} - {ficha.classificacao}</option>
+                        ))}
+                      </select>
+                    </div>
                     <Button type="submit" className="w-full" disabled={createEmpenho.isPending}>Salvar</Button>
                   </form>
                 </DialogContent>
@@ -436,6 +468,8 @@ export default function ContratoDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Data</TableHead>
+                    <TableHead>Fonte</TableHead>
+                    <TableHead>Ficha</TableHead>
                     <TableHead>Valor Total</TableHead>
                     <TableHead>Executado (AFs)</TableHead>
                     <TableHead>Valor Anulado</TableHead>
@@ -445,12 +479,14 @@ export default function ContratoDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {contrato.empenhos.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum empenho registrado</TableCell></TableRow>}
+                  {contrato.empenhos.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhum empenho registrado</TableCell></TableRow>}
                   {contrato.empenhos.map((empenho) => {
                     const { valorTotal, totalAfs, valorAnulado, saldoDisponivel } = getEmpenhoMetrics(empenho);
                     return (
                       <TableRow key={empenho.id}>
                         <TableCell>{formatDate(empenho.dataEmpenho)}</TableCell>
+                        <TableCell>{empenho.fonteRecurso.codigo}</TableCell>
+                        <TableCell>{empenho.ficha.codigo}</TableCell>
                         <TableCell className="font-medium">{formatCurrency(valorTotal)}</TableCell>
                         <TableCell className="text-blue-600">{formatCurrency(totalAfs)}</TableCell>
                         <TableCell className="text-amber-600">{formatCurrency(valorAnulado)}</TableCell>

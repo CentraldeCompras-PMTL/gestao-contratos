@@ -3,6 +3,8 @@ import {
   insertUserSchema, 
   insertDepartamentoSchema,
   insertFornecedorSchema, 
+  insertFonteRecursoSchema,
+  insertFichaOrcamentariaSchema,
   insertEnteSchema,
   insertProcessoDigitalSchema, 
   insertFaseContratacaoSchema,
@@ -16,6 +18,9 @@ import {
   auditLogResponseSchema,
   departamentoResponseSchema,
   fornecedorResponseSchema,
+  fonteRecursoResponseSchema,
+  fonteRecursoWithFichasSchema,
+  fichaOrcamentariaResponseSchema,
   enteResponseSchema,
   cnpjLookupResponseSchema,
   processoDigitalResponseSchema,
@@ -184,6 +189,47 @@ export const api = {
       path: '/api/fornecedores/cnpj/:cnpj' as const,
       responses: { 200: cnpjLookupResponseSchema, 404: errorSchemas.notFound },
     }
+  },
+  fontesRecurso: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/fontes-recurso' as const,
+      responses: { 200: z.array(fonteRecursoWithFichasSchema) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/fontes-recurso' as const,
+      input: insertFonteRecursoSchema,
+      responses: { 201: fonteRecursoResponseSchema },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/fontes-recurso/:id' as const,
+      input: insertFonteRecursoSchema.partial(),
+      responses: { 200: fonteRecursoResponseSchema, 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/fontes-recurso/:id' as const,
+      responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
+    },
+    createFicha: {
+      method: 'POST' as const,
+      path: '/api/fontes-recurso/:fonteRecursoId/fichas' as const,
+      input: insertFichaOrcamentariaSchema.omit({ fonteRecursoId: true }),
+      responses: { 201: fichaOrcamentariaResponseSchema, 404: errorSchemas.notFound },
+    },
+    updateFicha: {
+      method: 'PUT' as const,
+      path: '/api/fichas/:id' as const,
+      input: insertFichaOrcamentariaSchema.omit({ fonteRecursoId: true }).partial(),
+      responses: { 200: fichaOrcamentariaResponseSchema, 404: errorSchemas.notFound },
+    },
+    deleteFicha: {
+      method: 'DELETE' as const,
+      path: '/api/fichas/:id' as const,
+      responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
+    },
   },
   processos: {
     list: {

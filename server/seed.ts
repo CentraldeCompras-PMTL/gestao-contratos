@@ -1,7 +1,7 @@
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { db } from "./db";
-import { users, fornecedores, processosDigitais, fasesContratacao, contratos, empenhos, afs } from "@shared/schema";
+import { users, fornecedores, fontesRecurso, fichasOrcamentarias, processosDigitais, fasesContratacao, contratos, empenhos, afs } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
@@ -61,6 +61,25 @@ async function seed() {
     console.log("2 Processos Digitais created.");
   }
 
+  const existingFontes = await db.select().from(fontesRecurso);
+  let fontes = existingFontes;
+  if (existingFontes.length === 0) {
+    fontes = await db.insert(fontesRecurso).values([
+      { nome: "Recursos Ordinarios", codigo: "1.500.0000" },
+      { nome: "Transferencias da Saude", codigo: "1.600.0000" },
+    ]).returning();
+  }
+
+  const existingFichas = await db.select().from(fichasOrcamentarias);
+  let fichas = existingFichas;
+  if (existingFichas.length === 0) {
+    fichas = await db.insert(fichasOrcamentarias).values([
+      { fonteRecursoId: fontes[0].id, codigo: "001", classificacao: "consumo" },
+      { fonteRecursoId: fontes[0].id, codigo: "002", classificacao: "servico" },
+      { fonteRecursoId: fontes[1].id, codigo: "003", classificacao: "permanente" },
+    ]).returning();
+  }
+
   const existingFases = await db.select().from(fasesContratacao);
   let fases = existingFases;
   if (existingFases.length === 0) {
@@ -91,8 +110,8 @@ async function seed() {
   let emps = existingEmpenhos;
   if (existingEmpenhos.length === 0) {
     const data = [
-      { contratoId: contrs[0].id, dataEmpenho: "2024-03-06", valorEmpenho: "50000.00" },
-      { contratoId: contrs[1].id, dataEmpenho: "2024-04-02", valorEmpenho: "25000.00" },
+      { contratoId: contrs[0].id, fonteRecursoId: fontes[1].id, fichaId: fichas[2].id, dataEmpenho: "2024-03-06", valorEmpenho: "50000.00" },
+      { contratoId: contrs[1].id, fonteRecursoId: fontes[0].id, fichaId: fichas[1].id, dataEmpenho: "2024-04-02", valorEmpenho: "25000.00" },
     ];
     emps = await db.insert(empenhos).values(data).returning();
     console.log("2 Empenhos created.");

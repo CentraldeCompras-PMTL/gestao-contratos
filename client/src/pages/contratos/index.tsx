@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useContratos, useCreateContrato, useUpdateContrato } from "@/hooks/use-contratos";
 import { useFases } from "@/hooks/use-fases";
 import { useProcessos } from "@/hooks/use-processos";
+import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useEntes } from "@/hooks/use-entes";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -39,6 +40,7 @@ export default function Contratos() {
   const { data: contratos = [], isLoading } = useContratos();
   const { data: processos = [] } = useProcessos();
   const { data: fases = [] } = useFases();
+  const { data: departamentosData = [] } = useDepartamentos();
   const { data: entes = [] } = useEntes();
   const createContrato = useCreateContrato();
   const updateContrato = useUpdateContrato();
@@ -53,6 +55,7 @@ export default function Contratos() {
 
   const [procId, setProcId] = useState("");
   const [faseId, setFaseId] = useState("");
+  const [departamentoId, setDepartamentoId] = useState("");
   const [fornecedorId, setFornecedorId] = useState("");
   const [numeroContrato, setNumeroContrato] = useState("");
   const [valorContrato, setValorContrato] = useState("");
@@ -76,20 +79,25 @@ export default function Contratos() {
   useEffect(() => {
     if (selectedFase?.fornecedorId) {
       setFornecedorId(selectedFase.fornecedorId);
-      return;
-    }
-
-    if (faseId) {
+    } else if (faseId) {
       setFornecedorId("");
     }
-  }, [selectedFase, faseId]);
+
+    if (selectedFase?.departamentoId) {
+      setDepartamentoId(selectedFase.departamentoId);
+    } else if (selectedProcesso?.departamentoId && !editingId) {
+      setDepartamentoId(selectedProcesso.departamentoId);
+    } else if (!faseId && !selectedProcesso?.departamentoId) {
+      setDepartamentoId("");
+    }
+  }, [editingId, faseId, selectedFase, selectedProcesso]);
 
   const filtered = contratos.filter((c: ContratoWithRelations) =>
     (c.numeroContrato.toLowerCase().includes(search.toLowerCase()) ||
       c.fornecedor.nome.toLowerCase().includes(search.toLowerCase())) &&
     (statusFilter === "all" || c.status === statusFilter) &&
     (enteFilter === "all" || c.processoDigital.departamento?.enteId === enteFilter) &&
-    (departamentoFilter === "all" || c.processoDigital.departamentoId === departamentoFilter)
+    (departamentoFilter === "all" || (c.departamentoId ?? c.processoDigital.departamentoId) === departamentoFilter)
   );
 
   const departamentos = Array.from(
@@ -105,6 +113,7 @@ export default function Contratos() {
     setEditingId(c.id);
     setProcId(c.processoDigitalId);
     setFaseId(c.faseContratacaoId);
+    setDepartamentoId(c.departamentoId ?? c.faseContratacao.departamentoId ?? c.processoDigital.departamentoId ?? "");
     setFornecedorId(c.fornecedorId);
     setNumeroContrato(c.numeroContrato);
     setValorContrato(String(c.valorContrato));
@@ -123,6 +132,7 @@ export default function Contratos() {
     const payload = {
       processoDigitalId: procId,
       faseContratacaoId: faseId,
+      departamentoId: departamentoId || undefined,
       fornecedorId,
       numeroContrato,
       valorContrato,
@@ -138,6 +148,7 @@ export default function Contratos() {
             toast({ title: "Registro atualizado com sucesso!" });
             setDialogOpen(false);
             setEditingId(null);
+            setDepartamentoId("");
             resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
           },
           onError: (error) => {
@@ -156,6 +167,7 @@ export default function Contratos() {
       onSuccess: () => {
         toast({ title: "Cadastro realizado com sucesso!" });
         setDialogOpen(false);
+        setDepartamentoId("");
         resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
       },
       onError: (error) => {
@@ -180,6 +192,7 @@ export default function Contratos() {
           setDialogOpen(open);
           if (!open) {
             setEditingId(null);
+            setDepartamentoId("");
             resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
           }
         }}>
@@ -194,7 +207,13 @@ export default function Contratos() {
               <div className="p-4 bg-muted/50 rounded-xl space-y-4 border border-border">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-primary">1. Processo Digital</label>
-                  <Select value={procId} onValueChange={(val) => { setProcId(val); setFaseId(""); setFornecedorId(""); }}>
+                  <Select value={procId} onValueChange={(val) => {
+                    const processo = processos.find((item: ProcessoDigitalWithRelations) => item.id === val);
+                    setProcId(val);
+                    setFaseId("");
+                    setFornecedorId("");
+                    setDepartamentoId(processo?.departamentoId ?? "");
+                  }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o processo..." /></SelectTrigger>
                     <SelectContent>
                       {processos.map((p: ProcessoDigitalWithRelations) => (
@@ -212,7 +231,20 @@ export default function Contratos() {
                 )}
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-primary">2. Fase de Contratacao</label>
+                  <label className="text-sm font-medium text-primary">2.1 Departamento</label>
+                  <Select value={departamentoId || "none"} onValueChange={(value) => setDepartamentoId(value === "none" ? "" : value)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o departamento..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem departamento</SelectItem>
+                      {departamentosData.map((departamento) => (
+                        <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-primary">3. Fase de Contratacao</label>
                   <Select disabled={!procId} value={faseId} onValueChange={handleFaseSelect}>
                     <SelectTrigger><SelectValue placeholder="Selecione a fase..." /></SelectTrigger>
                     <SelectContent>
@@ -224,7 +256,7 @@ export default function Contratos() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-primary">3. Fornecedor da Etapa</label>
+                  <label className="text-sm font-medium text-primary">4. Fornecedor da Etapa</label>
                   <Input
                     value={selectedFase?.fornecedor?.nome ?? ""}
                     readOnly

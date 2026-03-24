@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFases, useCreateFase, useUpdateFase, useDeleteFase } from "@/hooks/use-fases";
 import { useFornecedores } from "@/hooks/use-fornecedores";
 import { useProcessos } from "@/hooks/use-processos";
+import { useDepartamentos } from "@/hooks/use-departamentos";
 import { formatDate } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const defaultForm: InsertFaseContratacao = {
   nomeFase: "",
   fornecedorId: "",
   processoDigitalId: "",
+  departamentoId: undefined,
   modalidade: "pregao",
   numeroModalidade: "",
   dataInicio: "",
@@ -38,6 +40,7 @@ export default function Fases() {
   const { data: fases = [], isLoading } = useFases();
   const { data: fornecedores = [] } = useFornecedores();
   const { data: processos = [] } = useProcessos();
+  const { data: departamentos = [] } = useDepartamentos();
   const createFase = useCreateFase();
   const updateFase = useUpdateFase();
   const deleteFase = useDeleteFase();
@@ -47,6 +50,7 @@ export default function Fases() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [faseToDelete, setFaseToDelete] = useState<FaseContratacaoWithRelations | null>(null);
   const [formData, setFormData] = useState<InsertFaseContratacao>(defaultForm);
+  const selectedProcesso = processos.find((processo: ProcessoDigitalWithRelations) => processo.id === formData.processoDigitalId);
 
   const resetForm = () => {
     setFormData(defaultForm);
@@ -79,6 +83,7 @@ export default function Fases() {
       nomeFase: fase.nomeFase,
       fornecedorId: fase.fornecedorId,
       processoDigitalId: fase.processoDigitalId,
+      departamentoId: fase.departamentoId ?? undefined,
       modalidade: fase.modalidade,
       numeroModalidade: fase.numeroModalidade,
       dataInicio: fase.dataInicio,
@@ -129,7 +134,10 @@ export default function Fases() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Processo Digital *</Label>
-                  <Select value={formData.processoDigitalId} onValueChange={(v) => setFormData({ ...formData, processoDigitalId: v })}>
+                  <Select value={formData.processoDigitalId} onValueChange={(v) => {
+                    const processo = processos.find((item: ProcessoDigitalWithRelations) => item.id === v);
+                    setFormData({ ...formData, processoDigitalId: v, departamentoId: processo?.departamentoId ?? formData.departamentoId });
+                  }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
                     <SelectContent>
                       {processos.map((processo: ProcessoDigitalWithRelations) => (
@@ -137,6 +145,21 @@ export default function Fases() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Departamento</Label>
+                  <Select value={formData.departamentoId ?? "none"} onValueChange={(v) => setFormData({ ...formData, departamentoId: v === "none" ? undefined : v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o departamento" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem departamento</SelectItem>
+                      {departamentos.map((departamento) => (
+                        <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedProcesso?.departamento && (
+                    <p className="text-xs text-muted-foreground">Departamento do processo: {selectedProcesso.departamento.nome}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Fornecedor Relacionado *</Label>
@@ -196,6 +219,7 @@ export default function Fases() {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Processo</TableHead>
+                  <TableHead>Departamento</TableHead>
                   <TableHead>Fornecedor</TableHead>
                   <TableHead>Modalidade</TableHead>
                   <TableHead>No Modalidade</TableHead>
@@ -209,6 +233,7 @@ export default function Fases() {
                   <TableRow key={fase.id}>
                     <TableCell className="font-medium">{fase.nomeFase}</TableCell>
                     <TableCell>{fase.processoDigital.numeroProcessoDigital}</TableCell>
+                    <TableCell>{fase.departamento?.nome || "-"}</TableCell>
                     <TableCell>{fase.fornecedor.nome}</TableCell>
                     <TableCell className="capitalize">{fase.modalidade}</TableCell>
                     <TableCell>{fase.numeroModalidade}</TableCell>
@@ -227,11 +252,26 @@ export default function Fases() {
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
                                 <Label>Processo Digital</Label>
-                                <Select value={formData.processoDigitalId} onValueChange={(v) => setFormData({ ...formData, processoDigitalId: v })}>
+                                <Select value={formData.processoDigitalId} onValueChange={(v) => {
+                                  const processo = processos.find((item: ProcessoDigitalWithRelations) => item.id === v);
+                                  setFormData({ ...formData, processoDigitalId: v, departamentoId: processo?.departamentoId ?? formData.departamentoId });
+                                }}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
                                     {processos.map((processo: ProcessoDigitalWithRelations) => (
                                       <SelectItem key={processo.id} value={processo.id}>{processo.numeroProcessoDigital}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Departamento</Label>
+                                <Select value={formData.departamentoId ?? "none"} onValueChange={(v) => setFormData({ ...formData, departamentoId: v === "none" ? undefined : v })}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Sem departamento</SelectItem>
+                                    {departamentos.map((departamento) => (
+                                      <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>

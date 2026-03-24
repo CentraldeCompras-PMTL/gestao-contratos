@@ -16,6 +16,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Fornecedores", href: "/fornecedores", icon: Users },
+    { name: "Fontes de Recurso", href: "/fontes-recurso", icon: FileText },
     { name: "Processos Digitais", href: "/processos", icon: FolderOpen },
     { name: "Fases de Contratacao", href: "/fases", icon: FileText },
     { name: "Contratos", href: "/contratos", icon: FileText },

@@ -77,6 +77,23 @@ create table if not exists fornecedores (
   atualizado_em timestamp default now()
 );
 
+create table if not exists fontes_recurso (
+  id varchar primary key default gen_random_uuid(),
+  nome text not null,
+  codigo text not null unique,
+  criado_em timestamp default now(),
+  atualizado_em timestamp default now()
+);
+
+create table if not exists fichas_orcamentarias (
+  id varchar primary key default gen_random_uuid(),
+  fonte_recurso_id varchar not null references fontes_recurso(id) on delete restrict,
+  codigo text not null,
+  classificacao text not null,
+  criado_em timestamp default now(),
+  constraint fichas_classificacao_chk check (classificacao in ('consumo', 'servico', 'permanente'))
+);
+
 create table if not exists processos_digitais (
   id varchar primary key default gen_random_uuid(),
   numero_processo_digital text not null unique,
@@ -91,6 +108,7 @@ create table if not exists processos_digitais (
 create table if not exists fases_contratacao (
   id varchar primary key default gen_random_uuid(),
   processo_digital_id varchar not null references processos_digitais(id) on delete restrict,
+  departamento_id varchar references departamentos(id) on delete set null,
   nome_fase text not null,
   fornecedor_id varchar not null references fornecedores(id) on delete restrict,
   modalidade text not null,
@@ -105,6 +123,7 @@ create table if not exists contratos (
   id varchar primary key default gen_random_uuid(),
   processo_digital_id varchar not null references processos_digitais(id) on delete restrict,
   fase_contratacao_id varchar not null references fases_contratacao(id) on delete restrict,
+  departamento_id varchar references departamentos(id) on delete set null,
   numero_contrato text not null unique,
   fornecedor_id varchar not null references fornecedores(id) on delete restrict,
   valor_contrato numeric(12, 2) not null,
@@ -123,6 +142,8 @@ create table if not exists contratos (
 create table if not exists empenhos (
   id varchar primary key default gen_random_uuid(),
   contrato_id varchar not null references contratos(id) on delete restrict,
+  fonte_recurso_id varchar not null references fontes_recurso(id) on delete restrict,
+  ficha_id varchar not null references fichas_orcamentarias(id) on delete restrict,
   data_empenho date not null,
   valor_empenho numeric(12, 2) not null,
   status text not null default 'ativo',
@@ -209,8 +230,14 @@ create unique index if not exists idx_user_entes_unique
 create index if not exists idx_fases_contratacao_processo_digital_id
   on fases_contratacao (processo_digital_id);
 
+create index if not exists idx_fases_contratacao_departamento_id
+  on fases_contratacao (departamento_id);
+
 create index if not exists idx_fases_contratacao_fornecedor_id
   on fases_contratacao (fornecedor_id);
+
+create index if not exists idx_fichas_fonte_recurso_id
+  on fichas_orcamentarias (fonte_recurso_id);
 
 create index if not exists idx_contratos_processo_digital_id
   on contratos (processo_digital_id);
@@ -218,11 +245,20 @@ create index if not exists idx_contratos_processo_digital_id
 create index if not exists idx_contratos_fase_contratacao_id
   on contratos (fase_contratacao_id);
 
+create index if not exists idx_contratos_departamento_id
+  on contratos (departamento_id);
+
 create index if not exists idx_contratos_fornecedor_id
   on contratos (fornecedor_id);
 
 create index if not exists idx_empenhos_contrato_id
   on empenhos (contrato_id);
+
+create index if not exists idx_empenhos_fonte_recurso_id
+  on empenhos (fonte_recurso_id);
+
+create index if not exists idx_empenhos_ficha_id
+  on empenhos (ficha_id);
 
 create index if not exists idx_afs_empenho_id
   on afs (empenho_id);
@@ -264,6 +300,12 @@ execute function set_updated_at();
 drop trigger if exists trg_fornecedores_updated_at on fornecedores;
 create trigger trg_fornecedores_updated_at
 before update on fornecedores
+for each row
+execute function set_updated_at();
+
+drop trigger if exists trg_fontes_recurso_updated_at on fontes_recurso;
+create trigger trg_fontes_recurso_updated_at
+before update on fontes_recurso
 for each row
 execute function set_updated_at();
 

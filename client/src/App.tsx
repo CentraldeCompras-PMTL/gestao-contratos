@@ -12,6 +12,7 @@ import ResetPassword from "./pages/reset-password";
 import ChangePassword from "./pages/change-password";
 import Dashboard from "./pages/dashboard";
 import Fornecedores from "./pages/fornecedores";
+import FontesRecursoPage from "./pages/fontes-recurso";
 import Processos from "./pages/processos";
 import Fases from "./pages/fases";
 import Contratos from "./pages/contratos";
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/change-password" component={() => <ProtectedRoute component={ChangePassword} />} />
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/fornecedores" component={() => <ProtectedRoute component={Fornecedores} />} />
+      <Route path="/fontes-recurso" component={() => <ProtectedRoute component={FontesRecursoPage} />} />
       <Route path="/processos" component={() => <ProtectedRoute component={Processos} />} />
       <Route path="/fases" component={() => <ProtectedRoute component={Fases} />} />
       <Route path="/contratos" component={() => <ProtectedRoute component={Contratos} />} />
