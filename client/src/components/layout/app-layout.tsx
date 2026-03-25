@@ -22,6 +22,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { name: "Contratos", href: "/contratos", icon: FileText },
     { name: "Notas Fiscais", href: "/notas-fiscais", icon: FileText },
     { name: "AFs", href: "/afs", icon: FileText },
+    { name: "Relatorios", href: "/relatorios", icon: FileText },
     { name: "Departamentos", href: "/departamentos", icon: Users },
     { name: "Notificacoes", href: "/notificacoes", icon: Bell },
     ...(user?.role === "admin" ? [

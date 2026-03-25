@@ -94,6 +94,14 @@ export function useAuth() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.setQueryData<PublicUser | null>([api.auth.me.path], (currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              forcePasswordChange: false,
+            }
+          : currentUser,
+      );
       queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
     },
   });

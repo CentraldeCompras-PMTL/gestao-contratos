@@ -18,7 +18,12 @@ export default function ChangePassword() {
     e.preventDefault();
     changePassword.mutate({ currentPassword, newPassword }, {
       onSuccess: () => {
-        toast({ title: "Senha alterada com sucesso" });
+        toast({
+          title: "Senha alterada com sucesso!",
+          description: "Voce sera redirecionado para a pagina inicial.",
+        });
+        setCurrentPassword("");
+        setNewPassword("");
         setLocation("/");
       },
       onError: (err) => {

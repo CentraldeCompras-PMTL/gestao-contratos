@@ -24,6 +24,7 @@ import AfsPanel from "./pages/afs";
 import Notificacoes from "./pages/notificacoes";
 import Usuarios from "./pages/usuarios";
 import Auditoria from "./pages/auditoria";
+import Relatorios from "./pages/relatorios";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/notificacoes" component={() => <ProtectedRoute component={Notificacoes} />} />
       <Route path="/usuarios" component={() => <ProtectedRoute component={Usuarios} />} />
       <Route path="/auditoria" component={() => <ProtectedRoute component={Auditoria} />} />
+      <Route path="/relatorios" component={() => <ProtectedRoute component={Relatorios} />} />
       <Route component={NotFound} />
     </Switch>
   );
