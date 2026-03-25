@@ -52,6 +52,14 @@ function aggregateBy<T extends string>(
   return Array.from(map.values());
 }
 
+function getContratoDepartamentoId(contrato: ContratoWithRelations) {
+  return contrato.departamentoId ?? contrato.processoDigital.departamentoId ?? null;
+}
+
+function getContratoDepartamentoNome(contrato: ContratoWithRelations) {
+  return contrato.departamento?.nome ?? contrato.processoDigital.departamento?.nome ?? "Sem departamento";
+}
+
 function aggregateEmpenhos(
   contratos: ContratoWithRelations[],
   getKey: (contrato: ContratoWithRelations, empenho: ContratoWithRelations["empenhos"][number]) => string,
@@ -97,7 +105,7 @@ export default function Dashboard() {
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
-      if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
+      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       if (!matchesFonte || !matchesFicha) return false;
       return true;
     });
@@ -109,7 +117,7 @@ export default function Dashboard() {
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
-      if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
+      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.fornecedor.id, (contrato) => contrato.fornecedor.nome);
@@ -121,7 +129,7 @@ export default function Dashboard() {
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
-      if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
+      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.processoDigital.id, (contrato) => contrato.processoDigital.numeroProcessoDigital);
@@ -151,19 +159,24 @@ export default function Dashboard() {
               (!filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) &&
               (!filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) &&
               contrato.fornecedor.id === filterFornecedor &&
-              contrato.processoDigital.departamentoId === departamento.id,
+              getContratoDepartamentoId(contrato) === departamento.id,
           ),
         )
       : departamentosFiltradosPorEnte;
 
-    return departamentosBase
-      .map((departamento) => ({
-        id: departamento.id,
-        label: departamento.nome,
-        count: 0,
-        value: 0,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return aggregateBy(
+      contratos.filter((contrato) => {
+        if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
+        if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
+        if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
+        if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
+        if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
+        const departamentoId = getContratoDepartamentoId(contrato);
+        return !!departamentoId && departamentosBase.some((departamento) => departamento.id === departamentoId);
+      }),
+      (contrato) => getContratoDepartamentoId(contrato),
+      (contrato) => getContratoDepartamentoNome(contrato),
+    ).sort((a, b) => a.label.localeCompare(b.label));
   }, [contratos, departamentos, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const entesDisponiveis = useMemo(() => {
@@ -177,7 +190,7 @@ export default function Dashboard() {
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
-      if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return;
+      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return;
       contrato.empenhos.forEach((empenho) => {
         map.set(empenho.fonteRecursoId, {
           id: empenho.fonteRecursoId,
@@ -194,7 +207,7 @@ export default function Dashboard() {
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
-      if (filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return;
+      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return;
       contrato.empenhos.forEach((empenho) => {
         if (filterFonteRecurso && empenho.fonteRecursoId !== filterFonteRecurso) return;
         map.set(empenho.fichaId, {
