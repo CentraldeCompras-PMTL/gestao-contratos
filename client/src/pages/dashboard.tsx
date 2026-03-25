@@ -26,6 +26,14 @@ type EmpenhoAggregate = {
   execucao: number;
 };
 
+type MonthlyExecutionPoint = {
+  id: string;
+  label: string;
+  empenhado: number;
+  executado: number;
+  pago: number;
+};
+
 function aggregateBy<T extends string>(
   contratos: ContratoWithRelations[],
   getKey: (contrato: ContratoWithRelations) => T | null,
@@ -78,6 +86,23 @@ function aggregateEmpenhos(
   });
 
   return Array.from(map.values()).sort((a, b) => b.valor - a.valor);
+}
+
+function formatMonthLabel(year: number, month: number) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "short",
+    year: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month, 1)));
+}
+
+function getMonthKey(dateString?: string | null) {
+  if (!dateString) return null;
+  const date = new Date(`${dateString}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
 export default function Dashboard() {
@@ -269,6 +294,52 @@ export default function Dashboard() {
   const fichasResumo = useMemo(
     () => aggregateEmpenhos(filteredContratos, (_contrato, empenho) => empenho.fichaId, (_contrato, empenho) => `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`),
     [filteredContratos],
+  );
+
+  const evolucaoMensal = useMemo<MonthlyExecutionPoint[]>(() => {
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_value, index) => {
+      const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (5 - index), 1));
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth();
+      const id = `${year}-${String(month + 1).padStart(2, "0")}`;
+      return {
+        id,
+        label: formatMonthLabel(year, month),
+        empenhado: 0,
+        executado: 0,
+        pago: 0,
+      };
+    });
+
+    const map = new Map(months.map((month) => [month.id, month]));
+
+    filteredContratos.forEach((contrato) => {
+      contrato.empenhos.forEach((empenho) => {
+        const key = getMonthKey(empenho.dataEmpenho);
+        if (!key || !map.has(key)) return;
+        map.get(key)!.empenhado += parseNumberString(empenho.valorEmpenho) - parseNumberString(empenho.valorAnulado);
+      });
+
+      contrato.notasFiscais.forEach((nota) => {
+        const executionKey = getMonthKey(nota.dataEnvioPagamento ?? nota.dataNota);
+        if ((nota.statusPagamento === "aguardando_pagamento" || nota.statusPagamento === "pago") && executionKey && map.has(executionKey)) {
+          map.get(executionKey)!.executado += parseNumberString(nota.valorNota);
+        }
+
+        const paymentKey = getMonthKey(nota.dataPagamento ?? nota.dataNota);
+        if (nota.statusPagamento === "pago" && paymentKey && map.has(paymentKey)) {
+          map.get(paymentKey)!.pago += parseNumberString(nota.valorNota);
+        }
+      });
+    });
+
+    return months;
+  }, [filteredContratos]);
+
+  const evolucaoMensalMax = useMemo(
+    () => Math.max(1, ...evolucaoMensal.flatMap((item) => [item.empenhado, item.executado, item.pago])),
+    [evolucaoMensal],
   );
 
   if (statsLoading || notifLoading || contratosLoading || departamentosLoading || entesLoading) {
@@ -566,11 +637,54 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/50 shadow-md flex items-center justify-center bg-muted/10 min-h-[300px]">
-          <div className="text-center text-muted-foreground">
-            <TrendingUp size={48} className="mx-auto mb-4 opacity-20" />
-            <p>Graficos de execucao em breve</p>
-          </div>
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20">
+            <CardTitle className="text-lg flex items-center gap-2"><TrendingUp size={20} />Evolucao Mensal</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mb-6">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm bg-blue-500" />
+                Empenhado
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm bg-amber-500" />
+                Executado
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm bg-emerald-500" />
+                Pago
+              </div>
+            </div>
+
+            <div className="grid grid-cols-6 gap-3 items-end min-h-[260px]">
+              {evolucaoMensal.map((item) => (
+                <div key={item.id} className="flex flex-col items-center gap-3">
+                  <div className="w-full h-[180px] flex items-end justify-center gap-2 rounded-lg bg-muted/20 px-2 py-3">
+                    <div
+                      className="w-4 rounded-t bg-blue-500"
+                      style={{ height: `${Math.max((item.empenhado / evolucaoMensalMax) * 100, item.empenhado > 0 ? 6 : 0)}%` }}
+                      title={`Empenhado: ${formatCurrency(item.empenhado)}`}
+                    />
+                    <div
+                      className="w-4 rounded-t bg-amber-500"
+                      style={{ height: `${Math.max((item.executado / evolucaoMensalMax) * 100, item.executado > 0 ? 6 : 0)}%` }}
+                      title={`Executado: ${formatCurrency(item.executado)}`}
+                    />
+                    <div
+                      className="w-4 rounded-t bg-emerald-500"
+                      style={{ height: `${Math.max((item.pago / evolucaoMensalMax) * 100, item.pago > 0 ? 6 : 0)}%` }}
+                      title={`Pago: ${formatCurrency(item.pago)}`}
+                    />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-medium">{item.label}</p>
+                    <p className="text-[11px] text-muted-foreground">Pg. {formatCurrency(item.pago)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>
