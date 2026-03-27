@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { queryClient } from "@/lib/queryClient";
 import { api, buildUrl } from "@shared/routes";
 import type { Ente, InsertEnte } from "@shared/schema";
@@ -37,6 +38,7 @@ export function useCreateEnte() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.entes.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -56,6 +58,7 @@ export function useUpdateEnte() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.entes.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }

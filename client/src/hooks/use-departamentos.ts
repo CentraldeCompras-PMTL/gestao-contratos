@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { api, buildUrl } from "@shared/routes";
 import type { Departamento, InsertDepartamento } from "@shared/schema";
 
@@ -37,6 +38,7 @@ export function useCreateDepartamento() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.departamentos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -56,6 +58,7 @@ export function useUpdateDepartamento() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.departamentos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -74,6 +77,7 @@ export function useDeleteDepartamento() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.departamentos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }

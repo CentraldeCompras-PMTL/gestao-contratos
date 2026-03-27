@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { AtaEmpenhoWithRelations, AtaPrePedidoDisponivel, AtaPrePedidoWithRelations } from "@shared/schema";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 
 async function readErrorMessage(res: Response, fallback: string) {
   try {
@@ -60,6 +61,7 @@ export function useCreateAtaPrePedidos() {
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -93,6 +95,7 @@ export function useUpdateAtaPrePedido() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -112,6 +115,7 @@ export function useDeleteAtaPrePedido() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -145,6 +149,7 @@ export function useCreateAtaPrePedidoEmpenho() {
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }

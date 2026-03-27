@@ -154,20 +154,39 @@ export default function AtasRegistroPrecoPage() {
     }));
   };
 
-  const toggleFornecedor = (fornecedorId: string, checked: boolean) => {
+  const addFornecedorSlot = () => {
     setAtaForm((current) => ({
       ...current,
-      fornecedorIds: checked
-        ? [...current.fornecedorIds, fornecedorId]
-        : current.fornecedorIds.filter((id) => id !== fornecedorId),
+      fornecedorIds: [...current.fornecedorIds, ""],
+    }));
+  };
+
+  const updateFornecedorSlot = (index: number, fornecedorId: string) => {
+    setAtaForm((current) => ({
+      ...current,
+      fornecedorIds: current.fornecedorIds.map((currentId, currentIndex) =>
+        currentIndex === index ? fornecedorId : currentId,
+      ),
+    }));
+  };
+
+  const removeFornecedorSlot = (index: number) => {
+    setAtaForm((current) => ({
+      ...current,
+      fornecedorIds: current.fornecedorIds.filter((_, currentIndex) => currentIndex !== index),
     }));
   };
 
   const handleAtaSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const ataPayload = {
+      ...ataForm,
+      fornecedorIds: ataForm.fornecedorIds.filter((id, index, array) => id && array.indexOf(id) === index),
+    };
+
     if (editingAta) {
       updateAta.mutate(
-        { id: editingAta.id, data: ataForm },
+        { id: editingAta.id, data: ataPayload },
         {
           onSuccess: () => {
             toast({ title: "Registro atualizado com sucesso!" });
@@ -182,7 +201,7 @@ export default function AtasRegistroPrecoPage() {
       return;
     }
 
-    createAta.mutate(ataForm, {
+    createAta.mutate(ataPayload, {
       onSuccess: () => {
         toast({ title: "Cadastro realizado com sucesso!" });
         setAtaDialogOpen(false);
@@ -482,18 +501,47 @@ export default function AtasRegistroPrecoPage() {
 
               <div className="space-y-3">
                 <Label>Fornecedores da Ata (Opcional)</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border p-4 max-h-60 overflow-auto">
+                <div className="space-y-3 rounded-lg border p-4">
                   {fornecedores.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nenhum fornecedor cadastrado.</p>
-                  ) : fornecedores.map((fornecedor) => {
-                    const checked = ataForm.fornecedorIds.includes(fornecedor.id);
-                    return (
-                      <label key={fornecedor.id} className="flex items-center gap-3 text-sm">
-                        <Checkbox checked={checked} onCheckedChange={(value) => toggleFornecedor(fornecedor.id, value === true)} />
-                        <span>{fornecedor.nome}</span>
-                      </label>
-                    );
-                  })}
+                  ) : (
+                    <>
+                      {ataForm.fornecedorIds.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Nenhum fornecedor vinculado ainda. Adicione apenas os fornecedores participantes desta ata.
+                        </p>
+                      ) : (
+                        ataForm.fornecedorIds.map((fornecedorId, index) => {
+                          const selectedIds = ataForm.fornecedorIds.filter((id, currentIndex) => id && currentIndex !== index);
+                          return (
+                            <div key={`${fornecedorId || "novo"}-${index}`} className="flex items-center gap-2">
+                              <Select value={fornecedorId || "none"} onValueChange={(value) => updateFornecedorSlot(index, value === "none" ? "" : value)}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o fornecedor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Selecione o fornecedor</SelectItem>
+                                  {fornecedores
+                                    .filter((fornecedor) => fornecedor.id === fornecedorId || !selectedIds.includes(fornecedor.id))
+                                    .map((fornecedor) => (
+                                      <SelectItem key={fornecedor.id} value={fornecedor.id}>
+                                        {fornecedor.nome}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              <Button type="button" variant="outline" size="icon" onClick={() => removeFornecedorSlot(index)}>
+                                <Trash2 size={16} />
+                              </Button>
+                            </div>
+                          );
+                        })
+                      )}
+                      <Button type="button" variant="outline" onClick={addFornecedorSlot}>
+                        <Plus className="mr-2" size={16} /> Adicionar fornecedor
+                      </Button>
+                    </>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   O fornecedor e opcional no planejamento. Ele so sera exigido ao gerar o contrato da ARP.

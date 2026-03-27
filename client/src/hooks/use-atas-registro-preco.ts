@@ -4,6 +4,7 @@ import type {
   AtaRegistroPrecoWithRelations,
   InsertAtaItem,
 } from "@shared/schema";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 
 async function readErrorMessage(res: Response, fallback: string) {
   try {
@@ -52,6 +53,7 @@ export function useCreateAtaRegistroPreco() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -72,6 +74,7 @@ export function useUpdateAtaRegistroPreco() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -90,6 +93,7 @@ export function useDeleteAtaRegistroPreco() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -110,6 +114,7 @@ export function useCreateAtaItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -130,6 +135,7 @@ export function useImportAtaItems() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -150,6 +156,7 @@ export function useUpdateAtaItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -168,6 +175,7 @@ export function useDeleteAtaItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -188,6 +196,7 @@ export function useSaveAtaQuantidades() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -208,6 +217,7 @@ export function useSaveAtaCotacoes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -234,6 +244,7 @@ export function useSaveAtaResultados() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }

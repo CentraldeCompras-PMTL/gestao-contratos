@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { api, buildUrl } from "@shared/routes";
 import type { Fornecedor, InsertFornecedor } from "@shared/schema";
 
@@ -37,6 +38,7 @@ export function useCreateFornecedor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.fornecedores.list.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }
@@ -57,6 +59,7 @@ export function useUpdateFornecedor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.fornecedores.list.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }
@@ -76,6 +79,7 @@ export function useDeleteFornecedor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.fornecedores.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }

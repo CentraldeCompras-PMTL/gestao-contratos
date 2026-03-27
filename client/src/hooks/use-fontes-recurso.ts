@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { api, buildUrl } from "@shared/routes";
 import type { FonteRecursoWithFichas, InsertFichaOrcamentaria, InsertFonteRecurso } from "@shared/schema";
 
@@ -35,7 +36,10 @@ export function useCreateFonteRecurso() {
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao criar fonte de recurso"));
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
   });
 }
 
@@ -53,7 +57,10 @@ export function useUpdateFonteRecurso() {
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar fonte de recurso"));
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
   });
 }
 
@@ -69,7 +76,10 @@ export function useDeleteFonteRecurso() {
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao excluir fonte de recurso"));
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
   });
 }
 
@@ -87,7 +97,10 @@ export function useCreateFicha() {
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao criar ficha"));
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
   });
 }
 
@@ -105,7 +118,10 @@ export function useUpdateFicha() {
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar ficha"));
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
   });
 }
 
@@ -121,6 +137,9 @@ export function useDeleteFicha() {
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao excluir ficha"));
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
   });
 }

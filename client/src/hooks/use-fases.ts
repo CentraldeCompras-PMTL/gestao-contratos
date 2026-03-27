@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { queryClient } from "@/lib/queryClient";
 import { api, buildUrl } from "@shared/routes";
 import type { FaseContratacaoWithRelations, InsertFaseContratacao } from "@shared/schema";
@@ -51,6 +52,7 @@ export function useCreateFase() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.fases.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -71,6 +73,7 @@ export function useUpdateFase() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.fases.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -89,6 +92,7 @@ export function useDeleteFase() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.fases.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }

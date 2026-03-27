@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { api, buildUrl } from "@shared/routes";
 import type { InsertProcessoDigital, InsertFaseContratacao, ProcessoDigitalWithRelations } from "@shared/schema";
 
@@ -50,6 +51,7 @@ export function useCreateProcesso() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }
@@ -70,6 +72,7 @@ export function useUpdateProcesso() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }
@@ -88,6 +91,7 @@ export function useDeleteProcesso() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -109,6 +113,7 @@ export function useCreateFase() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.processoId] });
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }

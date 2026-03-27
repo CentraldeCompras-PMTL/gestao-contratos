@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { AtaContratoWithRelations, AtaEmpenhoWithRelations } from "@shared/schema";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 
 async function readErrorMessage(res: Response, fallback: string) {
   try {
@@ -47,6 +48,7 @@ export function useCreateAtaContrato() {
       queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -79,6 +81,7 @@ export function useCreateAtaEmpenho() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -110,6 +113,7 @@ export function useCreateAtaAf() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -141,6 +145,7 @@ export function useCreateAtaNotaFiscal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -170,6 +175,7 @@ export function useSendAtaNotaFiscalToPayment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -198,6 +204,7 @@ export function useRegisterAtaNotaFiscalPayment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
