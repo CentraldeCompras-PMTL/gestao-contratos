@@ -92,6 +92,69 @@
       "when": 1770000012000,
       "tag": "0012_fontes_recurso_fichas",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1770000013000,
+      "tag": "0013_atas_registro_preco",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1770000014000,
+      "tag": "0014_ata_pre_pedidos",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1770000015000,
+      "tag": "0015_user_ata_access_flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1770000016000,
+      "tag": "0016_ata_contratos_execucao",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1770000017000,
+      "tag": "0017_ata_pre_pedidos_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1770000018000,
+      "tag": "0018_ata_empenhos_parcial",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1770000019000,
+      "tag": "0019_ata_fornecedores",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1770000020000,
+      "tag": "0020_ata_resultados_fornecedor_notas",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1770000021000,
+      "tag": "0021_arp_execucao_direta_quantidades",
+      "breakpoints": true
     }
   ]
 }

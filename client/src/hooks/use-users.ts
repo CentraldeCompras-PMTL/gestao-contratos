@@ -46,7 +46,7 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; email: string; name: string; role: "admin" | "operacional"; enteIds?: string[] }) => {
+    mutationFn: async ({ id, ...data }: { id: string; email: string; name: string; role: "admin" | "operacional"; enteIds?: string[]; canAccessAtaModule?: boolean }) => {
       const url = buildUrl(api.users.update.path, { id });
       const res = await fetch(url, {
         method: api.users.update.method,

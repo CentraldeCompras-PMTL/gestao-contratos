@@ -8,6 +8,8 @@ const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data invalida");
 const timestampSchema = z.string();
 export const userRoleSchema = z.enum(["admin", "operacional"]);
 export const contractStatusSchema = z.enum(["vigente", "encerrado"]);
+export const ataRegistroPrecoStatusSchema = z.enum(["planejamento", "cotacao", "licitada", "vigente", "encerrada"]);
+export const ataPrePedidoStatusSchema = z.enum(["aberto", "concluido"]);
 export const aditivoTipoSchema = z.enum(["valor", "vigencia", "misto", "apostilamento", "outro"]);
 export const empenhoStatusSchema = z.enum(["ativo", "anulado_parcial", "anulado"]);
 export const notaFiscalStatusSchema = z.enum(["nota_recebida", "aguardando_pagamento", "pago"]);
@@ -22,6 +24,7 @@ export const users = pgTable("users", {
   name: text("name"),
   role: text("role").notNull().default("operacional"),
   enteId: varchar("ente_id"),
+  canAccessAtaModule: boolean("can_access_ata_module").notNull().default(false),
   forcePasswordChange: boolean("force_password_change").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -143,6 +146,136 @@ export const contratos = pgTable("contratos", {
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
+export const atasRegistroPreco = pgTable("atas_registro_preco", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  processoDigitalId: varchar("processo_digital_id").references(() => processosDigitais.id).notNull(),
+  numeroAta: text("numero_ata").notNull().unique(),
+  objeto: text("objeto").notNull(),
+  vigenciaInicial: date("vigencia_inicial", { mode: "string" }).notNull(),
+  vigenciaFinal: date("vigencia_final", { mode: "string" }).notNull(),
+  status: text("status").notNull().default("planejamento"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const ataParticipantes = pgTable("ata_participantes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataId: varchar("ata_id").references(() => atasRegistroPreco.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id).notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const ataFornecedores = pgTable("ata_fornecedores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataId: varchar("ata_id").references(() => atasRegistroPreco.id).notNull(),
+  fornecedorId: varchar("fornecedor_id").references(() => fornecedores.id).notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const ataItens = pgTable("ata_itens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataId: varchar("ata_id").references(() => atasRegistroPreco.id).notNull(),
+  codigoInterno: text("codigo_interno").notNull(),
+  descricao: text("descricao").notNull(),
+  unidadeMedida: text("unidade_medida").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const ataItemQuantidades = pgTable("ata_item_quantidades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").references(() => ataItens.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id).notNull(),
+  quantidade: numeric("quantidade", { precision: 14, scale: 2 }).notNull().default("0"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const ataItemCotacoes = pgTable("ata_item_cotacoes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").references(() => ataItens.id).notNull().unique(),
+  valorUnitarioCotado: numeric("valor_unitario_cotado", { precision: 14, scale: 2 }).notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const ataItemResultados = pgTable("ata_item_resultados", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").references(() => ataItens.id).notNull().unique(),
+  fornecedorId: varchar("fornecedor_id").references(() => fornecedores.id),
+  valorUnitarioLicitado: numeric("valor_unitario_licitado", { precision: 14, scale: 2 }),
+  itemFracassado: boolean("item_fracassado").notNull().default(false),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const ataPrePedidos = pgTable("ata_pre_pedidos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataId: varchar("ata_id").references(() => atasRegistroPreco.id).notNull(),
+  ataContratoId: varchar("ata_contrato_id"),
+  itemId: varchar("item_id").references(() => ataItens.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id).notNull(),
+  fonteRecursoId: varchar("fonte_recurso_id").references(() => fontesRecurso.id).notNull(),
+  fichaId: varchar("ficha_id").references(() => fichasOrcamentarias.id).notNull(),
+  quantidadeSolicitada: numeric("quantidade_solicitada", { precision: 14, scale: 2 }).notNull(),
+  status: text("status").notNull().default("aberto"),
+  observacao: text("observacao"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const ataContratos = pgTable("ata_contratos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataId: varchar("ata_id").references(() => atasRegistroPreco.id).notNull(),
+  fornecedorId: varchar("fornecedor_id").references(() => fornecedores.id).notNull(),
+  numeroContrato: text("numero_contrato").notNull().unique(),
+  objeto: text("objeto").notNull(),
+  vigenciaInicial: date("vigencia_inicial", { mode: "string" }).notNull(),
+  vigenciaFinal: date("vigencia_final", { mode: "string" }).notNull(),
+  status: text("status").notNull().default("vigente"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const ataEmpenhos = pgTable("ata_empenhos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataContratoId: varchar("ata_contrato_id").references(() => ataContratos.id),
+  ataPrePedidoId: varchar("ata_pre_pedido_id").references(() => ataPrePedidos.id).notNull(),
+  dataEmpenho: date("data_empenho", { mode: "string" }).notNull(),
+  numeroEmpenho: text("numero_empenho").notNull(),
+  quantidadeEmpenhada: numeric("quantidade_empenhada", { precision: 14, scale: 2 }).notNull(),
+  valorEmpenho: numeric("valor_empenho", { precision: 14, scale: 2 }).notNull(),
+  status: text("status").notNull().default("ativo"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const ataAfs = pgTable("ata_afs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataEmpenhoId: varchar("ata_empenho_id").references(() => ataEmpenhos.id).notNull(),
+  dataPedidoAf: date("data_pedido_af", { mode: "string" }).notNull(),
+  quantidadeAf: numeric("quantidade_af", { precision: 14, scale: 2 }).notNull(),
+  valorAf: numeric("valor_af", { precision: 14, scale: 2 }).notNull(),
+  dataEstimadaEntrega: date("data_estimada_entrega", { mode: "string" }).notNull(),
+  dataEntregaReal: date("data_entrega_real", { mode: "string" }),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const ataNotasFiscais = pgTable("ata_notas_fiscais", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ataContratoId: varchar("ata_contrato_id").references(() => ataContratos.id),
+  ataAfId: varchar("ata_af_id").references(() => ataAfs.id).notNull(),
+  numeroNota: text("numero_nota").notNull().unique(),
+  quantidadeNota: numeric("quantidade_nota", { precision: 14, scale: 2 }).notNull(),
+  valorNota: numeric("valor_nota", { precision: 14, scale: 2 }).notNull(),
+  dataNota: date("data_nota", { mode: "string" }).notNull(),
+  statusPagamento: text("status_pagamento").notNull().default("nota_recebida"),
+  numeroProcessoPagamento: text("numero_processo_pagamento"),
+  dataEnvioPagamento: date("data_envio_pagamento", { mode: "string" }),
+  dataPagamento: date("data_pagamento", { mode: "string" }),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
 export const empenhos = pgTable("empenhos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   contratoId: varchar("contrato_id").references(() => contratos.id).notNull(),
@@ -214,6 +347,80 @@ export const contratosRelations = relations(contratos, ({ one, many }) => ({
   notasFiscais: many(notasFiscais),
   aditivos: many(contratoAditivos),
   anexos: many(contratoAnexos),
+}));
+
+export const atasRegistroPrecoRelations = relations(atasRegistroPreco, ({ one, many }) => ({
+  processoDigital: one(processosDigitais, { fields: [atasRegistroPreco.processoDigitalId], references: [processosDigitais.id] }),
+  participantes: many(ataParticipantes),
+  fornecedores: many(ataFornecedores),
+  itens: many(ataItens),
+  prePedidos: many(ataPrePedidos),
+  contratos: many(ataContratos),
+}));
+
+export const ataParticipantesRelations = relations(ataParticipantes, ({ one }) => ({
+  ata: one(atasRegistroPreco, { fields: [ataParticipantes.ataId], references: [atasRegistroPreco.id] }),
+  ente: one(entes, { fields: [ataParticipantes.enteId], references: [entes.id] }),
+}));
+
+export const ataFornecedoresRelations = relations(ataFornecedores, ({ one }) => ({
+  ata: one(atasRegistroPreco, { fields: [ataFornecedores.ataId], references: [atasRegistroPreco.id] }),
+  fornecedor: one(fornecedores, { fields: [ataFornecedores.fornecedorId], references: [fornecedores.id] }),
+}));
+
+export const ataItensRelations = relations(ataItens, ({ one, many }) => ({
+  ata: one(atasRegistroPreco, { fields: [ataItens.ataId], references: [atasRegistroPreco.id] }),
+  quantidades: many(ataItemQuantidades),
+  cotacao: one(ataItemCotacoes, { fields: [ataItens.id], references: [ataItemCotacoes.itemId] }),
+  resultado: one(ataItemResultados, { fields: [ataItens.id], references: [ataItemResultados.itemId] }),
+  prePedidos: many(ataPrePedidos),
+}));
+
+export const ataItemQuantidadesRelations = relations(ataItemQuantidades, ({ one }) => ({
+  item: one(ataItens, { fields: [ataItemQuantidades.itemId], references: [ataItens.id] }),
+  ente: one(entes, { fields: [ataItemQuantidades.enteId], references: [entes.id] }),
+}));
+
+export const ataItemCotacoesRelations = relations(ataItemCotacoes, ({ one }) => ({
+  item: one(ataItens, { fields: [ataItemCotacoes.itemId], references: [ataItens.id] }),
+}));
+
+export const ataItemResultadosRelations = relations(ataItemResultados, ({ one }) => ({
+  item: one(ataItens, { fields: [ataItemResultados.itemId], references: [ataItens.id] }),
+  fornecedor: one(fornecedores, { fields: [ataItemResultados.fornecedorId], references: [fornecedores.id] }),
+}));
+
+export const ataPrePedidosRelations = relations(ataPrePedidos, ({ one, many }) => ({
+  ata: one(atasRegistroPreco, { fields: [ataPrePedidos.ataId], references: [atasRegistroPreco.id] }),
+  ataContrato: one(ataContratos, { fields: [ataPrePedidos.ataContratoId], references: [ataContratos.id] }),
+  item: one(ataItens, { fields: [ataPrePedidos.itemId], references: [ataItens.id] }),
+  ente: one(entes, { fields: [ataPrePedidos.enteId], references: [entes.id] }),
+  fonteRecurso: one(fontesRecurso, { fields: [ataPrePedidos.fonteRecursoId], references: [fontesRecurso.id] }),
+  ficha: one(fichasOrcamentarias, { fields: [ataPrePedidos.fichaId], references: [fichasOrcamentarias.id] }),
+  empenhos: many(ataEmpenhos),
+}));
+
+export const ataContratosRelations = relations(ataContratos, ({ one, many }) => ({
+  ata: one(atasRegistroPreco, { fields: [ataContratos.ataId], references: [atasRegistroPreco.id] }),
+  fornecedor: one(fornecedores, { fields: [ataContratos.fornecedorId], references: [fornecedores.id] }),
+  prePedidos: many(ataPrePedidos),
+  empenhos: many(ataEmpenhos),
+}));
+
+export const ataEmpenhosRelations = relations(ataEmpenhos, ({ one, many }) => ({
+  contrato: one(ataContratos, { fields: [ataEmpenhos.ataContratoId], references: [ataContratos.id] }),
+  prePedido: one(ataPrePedidos, { fields: [ataEmpenhos.ataPrePedidoId], references: [ataPrePedidos.id] }),
+  afs: many(ataAfs),
+}));
+
+export const ataAfsRelations = relations(ataAfs, ({ one, many }) => ({
+  empenho: one(ataEmpenhos, { fields: [ataAfs.ataEmpenhoId], references: [ataEmpenhos.id] }),
+  notasFiscais: many(ataNotasFiscais),
+}));
+
+export const ataNotasFiscaisRelations = relations(ataNotasFiscais, ({ one }) => ({
+  contrato: one(ataContratos, { fields: [ataNotasFiscais.ataContratoId], references: [ataContratos.id] }),
+  af: one(ataAfs, { fields: [ataNotasFiscais.ataAfId], references: [ataAfs.id] }),
 }));
 
 export const notasFiscaisRelations = relations(notasFiscais, ({ one }) => ({
@@ -292,6 +499,27 @@ export const insertFichaOrcamentariaSchema = createInsertSchema(fichasOrcamentar
 export const insertProcessoDigitalSchema = createInsertSchema(processosDigitais).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertFaseContratacaoSchema = createInsertSchema(fasesContratacao).omit({ id: true, criadoEm: true });
 export const insertContratoSchema = createInsertSchema(contratos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertAtaRegistroPrecoSchema = createInsertSchema(atasRegistroPreco).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertAtaItemSchema = createInsertSchema(ataItens).omit({ id: true, ataId: true, criadoEm: true, atualizadoEm: true });
+export const insertAtaItemQuantidadeSchema = createInsertSchema(ataItemQuantidades).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertAtaItemCotacaoSchema = createInsertSchema(ataItemCotacoes).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertAtaItemResultadoSchema = createInsertSchema(ataItemResultados).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertAtaPrePedidoSchema = createInsertSchema(ataPrePedidos).omit({ id: true, criadoEm: true, atualizadoEm: true }).extend({
+  status: ataPrePedidoStatusSchema.default("aberto"),
+});
+export const insertAtaContratoSchema = createInsertSchema(ataContratos).omit({ id: true, criadoEm: true, atualizadoEm: true, ataId: true });
+export const insertAtaEmpenhoSchema = createInsertSchema(ataEmpenhos).omit({ id: true, criadoEm: true, ataContratoId: true, status: true });
+export const insertAtaAfSchema = createInsertSchema(ataAfs).omit({ id: true, criadoEm: true, ataEmpenhoId: true, dataEntregaReal: true });
+export const insertAtaNotaFiscalSchema = createInsertSchema(ataNotasFiscais).omit({
+  id: true,
+  criadoEm: true,
+  atualizadoEm: true,
+  ataContratoId: true,
+  statusPagamento: true,
+  numeroProcessoPagamento: true,
+  dataEnvioPagamento: true,
+  dataPagamento: true,
+});
 export const insertEmpenhoSchema = createInsertSchema(empenhos).omit({
   id: true,
   criadoEm: true,
@@ -322,6 +550,7 @@ export const publicUserSchema = z.object({
   role: userRoleSchema,
   enteId: z.string().nullable().optional(),
   accessibleEnteIds: z.array(z.string()).default([]),
+  canAccessAtaModule: z.boolean().default(false),
   forcePasswordChange: z.boolean(),
   createdAt: timestampSchema.nullable().optional(),
 });
@@ -471,6 +700,136 @@ export const contratoResponseSchema = z.object({
   atualizadoEm: timestampSchema.nullable().optional(),
 });
 
+export const ataRegistroPrecoResponseSchema = z.object({
+  id: z.string(),
+  processoDigitalId: z.string(),
+  numeroAta: z.string(),
+  objeto: z.string(),
+  vigenciaInicial: isoDateSchema,
+  vigenciaFinal: isoDateSchema,
+  status: ataRegistroPrecoStatusSchema,
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataParticipanteResponseSchema = z.object({
+  id: z.string(),
+  ataId: z.string(),
+  enteId: z.string(),
+  criadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataFornecedorResponseSchema = z.object({
+  id: z.string(),
+  ataId: z.string(),
+  fornecedorId: z.string(),
+  criadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataItemResponseSchema = z.object({
+  id: z.string(),
+  ataId: z.string(),
+  codigoInterno: z.string(),
+  descricao: z.string(),
+  unidadeMedida: z.string(),
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataItemQuantidadeResponseSchema = z.object({
+  id: z.string(),
+  itemId: z.string(),
+  enteId: z.string(),
+  quantidade: z.union([z.string(), z.number()]),
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataItemCotacaoResponseSchema = z.object({
+  id: z.string(),
+  itemId: z.string(),
+  valorUnitarioCotado: z.union([z.string(), z.number()]),
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataItemResultadoResponseSchema = z.object({
+  id: z.string(),
+  itemId: z.string(),
+  fornecedorId: z.string().nullable(),
+  valorUnitarioLicitado: z.union([z.string(), z.number()]).nullable(),
+  itemFracassado: z.boolean(),
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataPrePedidoResponseSchema = z.object({
+  id: z.string(),
+  ataId: z.string(),
+  ataContratoId: z.string().nullable(),
+  itemId: z.string(),
+  enteId: z.string(),
+  fonteRecursoId: z.string(),
+  fichaId: z.string(),
+  quantidadeSolicitada: z.union([z.string(), z.number()]),
+  status: ataPrePedidoStatusSchema,
+  observacao: z.string().nullable(),
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataContratoResponseSchema = z.object({
+  id: z.string(),
+  ataId: z.string(),
+  fornecedorId: z.string(),
+  numeroContrato: z.string(),
+  objeto: z.string(),
+  vigenciaInicial: isoDateSchema,
+  vigenciaFinal: isoDateSchema,
+  status: contractStatusSchema,
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataEmpenhoResponseSchema = z.object({
+  id: z.string(),
+  ataContratoId: z.string().nullable(),
+  ataPrePedidoId: z.string(),
+  dataEmpenho: isoDateSchema,
+  numeroEmpenho: z.string(),
+  quantidadeEmpenhada: z.union([z.string(), z.number()]),
+  valorEmpenho: z.union([z.string(), z.number()]),
+  status: z.enum(["ativo"]),
+  criadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataAfResponseSchema = z.object({
+  id: z.string(),
+  ataEmpenhoId: z.string(),
+  dataPedidoAf: isoDateSchema,
+  quantidadeAf: z.union([z.string(), z.number()]),
+  valorAf: z.union([z.string(), z.number()]),
+  dataEstimadaEntrega: isoDateSchema,
+  dataEntregaReal: isoDateSchema.nullable(),
+  criadoEm: timestampSchema.nullable().optional(),
+});
+
+export const ataNotaFiscalResponseSchema = z.object({
+  id: z.string(),
+  ataContratoId: z.string().nullable(),
+  ataAfId: z.string(),
+  numeroNota: z.string(),
+  quantidadeNota: z.union([z.string(), z.number()]),
+  valorNota: z.union([z.string(), z.number()]),
+  dataNota: isoDateSchema,
+  statusPagamento: notaFiscalStatusSchema,
+  numeroProcessoPagamento: z.string().nullable(),
+  dataEnvioPagamento: isoDateSchema.nullable(),
+  dataPagamento: isoDateSchema.nullable(),
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
+});
+
 export const notaFiscalResponseSchema = z.object({
   id: z.string(),
   contratoId: z.string(),
@@ -524,6 +883,73 @@ export const processoDigitalWithRelationsSchema = processoDigitalResponseSchema.
 
 export const processoDigitalScopedSchema = processoDigitalResponseSchema.extend({
   departamento: departamentoResponseSchema.extend({ ente: enteResponseSchema.nullable() }).nullable(),
+});
+
+export const ataParticipanteWithEnteSchema = ataParticipanteResponseSchema.extend({
+  ente: enteResponseSchema,
+});
+
+export const ataFornecedorWithFornecedorSchema = ataFornecedorResponseSchema.extend({
+  fornecedor: fornecedorResponseSchema,
+});
+
+export const ataItemQuantidadeWithEnteSchema = ataItemQuantidadeResponseSchema.extend({
+  ente: enteResponseSchema,
+});
+
+export const ataItemWithRelationsSchema = ataItemResponseSchema.extend({
+  quantidades: z.array(ataItemQuantidadeWithEnteSchema),
+  cotacao: ataItemCotacaoResponseSchema.nullable(),
+  resultado: ataItemResultadoResponseSchema.extend({
+    fornecedor: fornecedorResponseSchema.nullable().optional(),
+  }).nullable(),
+});
+
+export const ataRegistroPrecoWithRelationsSchema = ataRegistroPrecoResponseSchema.extend({
+  processoDigital: processoDigitalScopedSchema,
+  participantes: z.array(ataParticipanteWithEnteSchema),
+  fornecedores: z.array(ataFornecedorWithFornecedorSchema),
+  itens: z.array(ataItemWithRelationsSchema),
+});
+
+export const ataPrePedidoWithRelationsSchema = ataPrePedidoResponseSchema.extend({
+  ataContrato: ataContratoResponseSchema.nullable().optional(),
+  ente: enteResponseSchema,
+  fonteRecurso: fonteRecursoResponseSchema,
+  ficha: fichaOrcamentariaResponseSchema,
+  item: ataItemWithRelationsSchema,
+  ata: ataRegistroPrecoWithRelationsSchema,
+  empenhos: z.array(ataEmpenhoResponseSchema.extend({
+    afs: z.array(ataAfResponseSchema.extend({
+      notasFiscais: z.array(ataNotaFiscalResponseSchema).optional(),
+    })).optional(),
+  })).optional(),
+});
+
+export const ataPrePedidoDisponivelItemSchema = ataItemWithRelationsSchema.extend({
+  quantidadeParticipante: z.number(),
+  quantidadePrePedida: z.number(),
+  quantidadeDisponivel: z.number(),
+});
+
+export const ataPrePedidoDisponivelSchema = ataRegistroPrecoResponseSchema.extend({
+  processoDigital: processoDigitalScopedSchema,
+  ente: enteResponseSchema,
+  itens: z.array(ataPrePedidoDisponivelItemSchema),
+});
+
+export const ataEmpenhoWithRelationsSchema = ataEmpenhoResponseSchema.extend({
+  prePedido: ataPrePedidoWithRelationsSchema,
+  afs: z.array(ataAfResponseSchema.extend({
+    notasFiscais: z.array(ataNotaFiscalResponseSchema).optional(),
+  })),
+});
+
+export const ataContratoWithRelationsSchema = ataContratoResponseSchema.extend({
+  ata: ataRegistroPrecoWithRelationsSchema,
+  fornecedor: fornecedorResponseSchema,
+  prePedidos: z.array(ataPrePedidoWithRelationsSchema),
+  empenhos: z.array(ataEmpenhoWithRelationsSchema),
 });
 
 export const empenhoWithRelationsSchema = empenhoResponseSchema.extend({
@@ -584,6 +1010,18 @@ export type Fornecedor = typeof fornecedores.$inferSelect;
 export type ProcessoDigital = typeof processosDigitais.$inferSelect;
 export type FaseContratacao = typeof fasesContratacao.$inferSelect;
 export type Contrato = typeof contratos.$inferSelect;
+export type AtaRegistroPreco = typeof atasRegistroPreco.$inferSelect;
+export type AtaParticipante = typeof ataParticipantes.$inferSelect;
+export type AtaFornecedor = typeof ataFornecedores.$inferSelect;
+export type AtaItem = typeof ataItens.$inferSelect;
+export type AtaItemQuantidade = typeof ataItemQuantidades.$inferSelect;
+export type AtaItemCotacao = typeof ataItemCotacoes.$inferSelect;
+export type AtaItemResultado = typeof ataItemResultados.$inferSelect;
+export type AtaPrePedido = typeof ataPrePedidos.$inferSelect;
+export type AtaContrato = typeof ataContratos.$inferSelect;
+export type AtaEmpenho = typeof ataEmpenhos.$inferSelect;
+export type AtaAf = typeof ataAfs.$inferSelect;
+export type AtaNotaFiscal = typeof ataNotasFiscais.$inferSelect;
 export type Empenho = typeof empenhos.$inferSelect;
 export type Af = typeof afs.$inferSelect;
 
@@ -596,6 +1034,16 @@ export type InsertFichaOrcamentaria = z.infer<typeof insertFichaOrcamentariaSche
 export type InsertProcessoDigital = z.infer<typeof insertProcessoDigitalSchema>;
 export type InsertFaseContratacao = z.infer<typeof insertFaseContratacaoSchema>;
 export type InsertContrato = z.infer<typeof insertContratoSchema>;
+export type InsertAtaRegistroPreco = z.infer<typeof insertAtaRegistroPrecoSchema>;
+export type InsertAtaItem = z.infer<typeof insertAtaItemSchema>;
+export type InsertAtaItemQuantidade = z.infer<typeof insertAtaItemQuantidadeSchema>;
+export type InsertAtaItemCotacao = z.infer<typeof insertAtaItemCotacaoSchema>;
+export type InsertAtaItemResultado = z.infer<typeof insertAtaItemResultadoSchema>;
+export type InsertAtaPrePedido = z.infer<typeof insertAtaPrePedidoSchema>;
+export type InsertAtaContrato = z.infer<typeof insertAtaContratoSchema>;
+export type InsertAtaEmpenho = z.infer<typeof insertAtaEmpenhoSchema>;
+export type InsertAtaAf = z.infer<typeof insertAtaAfSchema>;
+export type InsertAtaNotaFiscal = z.infer<typeof insertAtaNotaFiscalSchema>;
 export type InsertEmpenho = z.infer<typeof insertEmpenhoSchema>;
 export type InsertAf = z.infer<typeof insertAfSchema>;
 export type InsertNotaFiscal = z.infer<typeof insertNotaFiscalSchema>;
@@ -641,6 +1089,49 @@ export type ContratoWithRelations = Contrato & {
   notasFiscais: NotaFiscal[];
   aditivos: ContratoAditivo[];
   anexos: ContratoAnexo[];
+};
+export type AtaParticipanteWithEnte = AtaParticipante & { ente: Ente };
+export type AtaFornecedorWithFornecedor = AtaFornecedor & { fornecedor: Fornecedor };
+export type AtaItemQuantidadeWithEnte = AtaItemQuantidade & { ente: Ente };
+export type AtaItemWithRelations = AtaItem & {
+  quantidades: AtaItemQuantidadeWithEnte[];
+  cotacao: AtaItemCotacao | null;
+  resultado: (AtaItemResultado & { fornecedor?: Fornecedor | null }) | null;
+};
+export type AtaRegistroPrecoWithRelations = AtaRegistroPreco & {
+  processoDigital: ProcessoDigital & { departamento: (Departamento & { ente: Ente | null }) | null };
+  participantes: AtaParticipanteWithEnte[];
+  fornecedores: AtaFornecedorWithFornecedor[];
+  itens: AtaItemWithRelations[];
+};
+export type AtaPrePedidoWithRelations = AtaPrePedido & {
+  ataContrato?: AtaContrato | null;
+  ente: Ente;
+  fonteRecurso: FonteRecurso;
+  ficha: FichaOrcamentaria;
+  item: AtaItemWithRelations;
+  ata: AtaRegistroPrecoWithRelations;
+  empenhos?: Array<AtaEmpenho & { afs?: Array<AtaAf & { notasFiscais?: AtaNotaFiscal[] }> }>;
+};
+export type AtaPrePedidoDisponivelItem = AtaItemWithRelations & {
+  quantidadeParticipante: number;
+  quantidadePrePedida: number;
+  quantidadeDisponivel: number;
+};
+export type AtaPrePedidoDisponivel = AtaRegistroPreco & {
+  processoDigital: ProcessoDigital & { departamento: (Departamento & { ente: Ente | null }) | null };
+  ente: Ente;
+  itens: AtaPrePedidoDisponivelItem[];
+};
+export type AtaEmpenhoWithRelations = AtaEmpenho & {
+  prePedido: AtaPrePedidoWithRelations;
+  afs: Array<AtaAf & { notasFiscais?: AtaNotaFiscal[] }>;
+};
+export type AtaContratoWithRelations = AtaContrato & {
+  ata: AtaRegistroPrecoWithRelations;
+  fornecedor: Fornecedor;
+  prePedidos: AtaPrePedidoWithRelations[];
+  empenhos: AtaEmpenhoWithRelations[];
 };
 export type Notificacao = z.infer<typeof notificacaoResponseSchema>;
 export type DashboardStats = z.infer<typeof dashboardStatsResponseSchema>;

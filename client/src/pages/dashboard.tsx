@@ -5,12 +5,14 @@ import { useNotificacoes } from "@/hooks/use-notificacoes";
 import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useEntes } from "@/hooks/use-entes";
 import { useAuth } from "@/hooks/use-auth";
+import { useAtasRegistroPreco } from "@/hooks/use-atas-registro-preco";
+import { useAtaContratos } from "@/hooks/use-ata-contratos";
 import { formatCurrency, parseNumberString } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, AlertTriangle, CheckCircle2, TrendingUp, AlertCircle, Building2, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ContratoWithRelations, DashboardStats as DashboardStatsType, Notificacao } from "@shared/schema";
+import type { AtaContratoWithRelations, AtaRegistroPrecoWithRelations, ContratoWithRelations, DashboardStats as DashboardStatsType, Notificacao } from "@shared/schema";
 
 type FilteredAggregate = {
   id: string;
@@ -32,6 +34,13 @@ type MonthlyExecutionPoint = {
   empenhado: number;
   executado: number;
   pago: number;
+};
+
+type ArpDepartmentAggregate = {
+  id: string;
+  label: string;
+  previsto: number;
+  contratado: number;
 };
 
 function aggregateBy<T extends string>(
@@ -105,6 +114,18 @@ function getMonthKey(dateString?: string | null) {
   return `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
+function getAtaItemTotalLicitado(item: AtaRegistroPrecoWithRelations["itens"][number]) {
+  if (!item.resultado || item.resultado.itemFracassado || item.resultado.valorUnitarioLicitado == null) return 0;
+  const quantidadeTotal = item.quantidades.reduce((sum, quantidade) => sum + parseNumberString(quantidade.quantidade), 0);
+  return quantidadeTotal * parseNumberString(item.resultado.valorUnitarioLicitado);
+}
+
+function getAtaItemTotalCotado(item: AtaRegistroPrecoWithRelations["itens"][number]) {
+  if (!item.cotacao?.valorUnitarioCotado) return 0;
+  const quantidadeTotal = item.quantidades.reduce((sum, quantidade) => sum + parseNumberString(quantidade.quantidade), 0);
+  return quantidadeTotal * parseNumberString(item.cotacao.valorUnitarioCotado);
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
@@ -122,6 +143,19 @@ export default function Dashboard() {
 
   const accessibleEnteIds = user?.accessibleEnteIds ?? (user?.enteId ? [user.enteId] : []);
   const showEnteFilter = user?.role === "operacional" && accessibleEnteIds.length > 1;
+  const canManageArp = useMemo(() => {
+    if (user?.role === "admin") return true;
+    if (!user?.canAccessAtaModule) return false;
+    return entes.some((ente) => {
+      if (!accessibleEnteIds.includes(ente.id)) return false;
+      const nome = ente.nome.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const sigla = ente.sigla.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return nome.includes("fazenda") || sigla.includes("fazenda") || sigla === "sefaz";
+    });
+  }, [accessibleEnteIds, entes, user?.canAccessAtaModule, user?.role]);
+
+  const { data: atasRegistroPreco = [], isLoading: atasLoading } = useAtasRegistroPreco({ enabled: canManageArp });
+  const { data: ataContratos = [], isLoading: ataContratosLoading } = useAtaContratos({ enabled: canManageArp });
 
   const filteredContratos = useMemo(() => {
     return contratos.filter((contrato) => {
@@ -342,7 +376,118 @@ export default function Dashboard() {
     [evolucaoMensal],
   );
 
-  if (statsLoading || notifLoading || contratosLoading || departamentosLoading || entesLoading) {
+  const arpMetrics = useMemo(() => {
+    const previstoCotado = atasRegistroPreco.reduce(
+      (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalCotado(item), 0),
+      0,
+    );
+    const previstoLicitado = atasRegistroPreco.reduce(
+      (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalLicitado(item), 0),
+      0,
+    );
+    const contratado = ataContratos.reduce(
+      (sum, contrato) =>
+        sum +
+        contrato.prePedidos.reduce((prePedidoSum, prePedido) => {
+          const valorUnitario = parseNumberString(prePedido.item.resultado?.valorUnitarioLicitado ?? 0);
+          return prePedidoSum + parseNumberString(prePedido.quantidadeSolicitada) * valorUnitario;
+        }, 0),
+      0,
+    );
+    const empenhado = ataContratos.reduce(
+      (sum, contrato) => sum + contrato.empenhos.reduce((empenhoSum, empenho) => empenhoSum + parseNumberString(empenho.valorEmpenho), 0),
+      0,
+    );
+    const emAf = ataContratos.reduce(
+      (sum, contrato) => sum + contrato.empenhos.reduce((empenhoSum, empenho) => empenhoSum + empenho.afs.reduce((afSum, af) => afSum + parseNumberString(af.valorAf), 0), 0),
+      0,
+    );
+    const faturado = ataContratos.reduce(
+      (sum, contrato) =>
+        sum +
+        contrato.empenhos.reduce(
+          (empenhoSum, empenho) => empenhoSum + empenho.afs.reduce((afSum, af) => afSum + (af.notasFiscais?.reduce((notaSum, nota) => notaSum + parseNumberString(nota.valorNota), 0) ?? 0), 0),
+          0,
+        ),
+      0,
+    );
+    const pago = ataContratos.reduce(
+      (sum, contrato) =>
+        sum +
+        contrato.empenhos.reduce(
+          (empenhoSum, empenho) =>
+            empenhoSum +
+            empenho.afs.reduce(
+              (afSum, af) =>
+                afSum +
+                (af.notasFiscais?.reduce((notaSum, nota) => {
+                  if (nota.statusPagamento !== "pago") return notaSum;
+                  return notaSum + parseNumberString(nota.valorNota);
+                }, 0) ?? 0),
+              0,
+            ),
+          0,
+        ),
+      0,
+    );
+    return { previstoCotado, previstoLicitado, contratado, empenhado, emAf, faturado, pago };
+  }, [ataContratos, atasRegistroPreco]);
+
+  const arpResumoDepartamentos = useMemo<ArpDepartmentAggregate[]>(() => {
+    const map = new Map<string, ArpDepartmentAggregate>();
+
+    atasRegistroPreco.forEach((ata) => {
+      const departamento = ata.processoDigital.departamento;
+      if (!departamento) return;
+      const current = map.get(departamento.id) ?? {
+        id: departamento.id,
+        label: departamento.nome,
+        previsto: 0,
+        contratado: 0,
+      };
+      current.previsto += ata.itens.reduce((sum, item) => sum + getAtaItemTotalLicitado(item), 0);
+      map.set(departamento.id, current);
+    });
+
+    ataContratos.forEach((contrato: AtaContratoWithRelations) => {
+      const departamento = contrato.ata.processoDigital.departamento;
+      if (!departamento) return;
+      const current = map.get(departamento.id) ?? {
+        id: departamento.id,
+        label: departamento.nome,
+        previsto: 0,
+        contratado: 0,
+      };
+      current.contratado += contrato.prePedidos.reduce((sum, prePedido) => {
+        const valorUnitario = parseNumberString(prePedido.item.resultado?.valorUnitarioLicitado ?? 0);
+        return sum + parseNumberString(prePedido.quantidadeSolicitada) * valorUnitario;
+      }, 0);
+      map.set(departamento.id, current);
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.contratado - a.contratado);
+  }, [ataContratos, atasRegistroPreco]);
+
+  const arpResumoFornecedores = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; value: number; count: number }>();
+    ataContratos.forEach((contrato) => {
+      const current = map.get(contrato.fornecedor.id) ?? {
+        id: contrato.fornecedor.id,
+        label: contrato.fornecedor.nome,
+        value: 0,
+        count: 0,
+      };
+      current.count += 1;
+      current.value += contrato.prePedidos.reduce((sum, prePedido) => {
+        const valorUnitario = parseNumberString(prePedido.item.resultado?.valorUnitarioLicitado ?? 0);
+        return sum + parseNumberString(prePedido.quantidadeSolicitada) * valorUnitario;
+      }, 0);
+      map.set(contrato.fornecedor.id, current);
+    });
+    return Array.from(map.values()).sort((a, b) => b.value - a.value);
+  }, [ataContratos]);
+
+  if (statsLoading || notifLoading || contratosLoading || departamentosLoading || entesLoading || (canManageArp && (atasLoading || ataContratosLoading))) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -537,6 +682,91 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {canManageArp && (
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Execucao da ARP</h2>
+          <p className="text-sm text-muted-foreground">Acompanhe previsto, contratado, empenhado, faturado e pago das atas de registro de preco.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          <Card className="border-border/50 shadow-md">
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">Previsto Cotado</p>
+              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.previstoCotado)}</h3>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 shadow-md">
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">Previsto Licitado</p>
+              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.previstoLicitado)}</h3>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 shadow-md">
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">Contratado / Empenhado</p>
+              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.contratado)}</h3>
+              <p className="text-xs text-muted-foreground mt-2">Empenhado: {formatCurrency(arpMetrics.empenhado)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 shadow-md">
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">Em AF / Faturado / Pago</p>
+              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.emAf)}</h3>
+              <p className="text-xs text-muted-foreground mt-2">Faturado: {formatCurrency(arpMetrics.faturado)} | Pago: {formatCurrency(arpMetrics.pago)}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="border-border/50 shadow-md">
+            <CardHeader className="border-b border-border/50 bg-muted/20">
+              <CardTitle className="text-lg">ARP por Departamento</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border/50 max-h-[320px] overflow-auto">
+                {arpResumoDepartamentos.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">Nenhuma ARP cadastrada</div>
+                ) : (
+                  arpResumoDepartamentos.map((departamento) => (
+                    <div key={departamento.id} className="p-4 flex justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-sm">{departamento.label}</p>
+                        <p className="text-xs text-muted-foreground">Previsto: {formatCurrency(departamento.previsto)}</p>
+                      </div>
+                      <p className="font-semibold text-sm">{formatCurrency(departamento.contratado)}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50 shadow-md">
+            <CardHeader className="border-b border-border/50 bg-muted/20">
+              <CardTitle className="text-lg">Contratos ARP por Fornecedor</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border/50 max-h-[320px] overflow-auto">
+                {arpResumoFornecedores.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">Nenhum contrato ARP cadastrado</div>
+                ) : (
+                  arpResumoFornecedores.map((fornecedor) => (
+                    <div key={fornecedor.id} className="p-4 flex justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-sm">{fornecedor.label}</p>
+                        <p className="text-xs text-muted-foreground">{fornecedor.count} contrato(s) ARP</p>
+                      </div>
+                      <p className="font-semibold text-sm">{formatCurrency(fornecedor.value)}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="border-border/50 shadow-md">

@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useEntes } from "@/hooks/use-entes";
 import { LayoutDashboard, Users, FolderOpen, FileText, Bell, LogOut, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -11,12 +12,26 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, logout } = useAuth();
+  const { data: entes = [] } = useEntes();
   const [location] = useLocation();
+
+  const normalizeEnteName = (value: string | null | undefined) =>
+    (value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const canAccessAtaModule = user?.role === "admin" || (user?.canAccessAtaModule && entes.some((ente) => {
+    if (!(user?.accessibleEnteIds ?? []).includes(ente.id)) return false;
+    const nome = normalizeEnteName(ente.nome);
+    const sigla = normalizeEnteName(ente.sigla);
+    return nome.includes("fazenda") || sigla.includes("fazenda") || sigla === "sefaz";
+  }));
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Fornecedores", href: "/fornecedores", icon: Users },
     { name: "Fontes de Recurso", href: "/fontes-recurso", icon: FileText },
+    ...(canAccessAtaModule ? [{ name: "Atas de RP", href: "/atas-registro-preco", icon: FileText }] : []),
+    { name: "Pre-pedidos ARP", href: "/pre-pedidos-arp", icon: FileText },
+    ...(canAccessAtaModule ? [{ name: "Contratos ARP", href: "/contratos-arp", icon: FileText }] : []),
     { name: "Processos Digitais", href: "/processos", icon: FolderOpen },
     { name: "Fases de Contratacao", href: "/fases", icon: FileText },
     { name: "Contratos", href: "/contratos", icon: FileText },

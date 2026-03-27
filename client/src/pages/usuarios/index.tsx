@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCreateUser, useResetUserPassword, useUpdateUser, useUsers } from "@/hooks/use-users";
 import { useEntes } from "@/hooks/use-entes";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,6 +42,7 @@ export default function Usuarios() {
     password: "",
     role: "operacional" as "admin" | "operacional",
     enteIds: [] as string[],
+    canAccessAtaModule: false,
   });
   const [resetTarget, setResetTarget] = useState<PublicUser | null>(null);
   const [resetPassword, setResetPassword] = useState("");
@@ -57,8 +59,19 @@ export default function Usuarios() {
       password: "",
       role: "operacional",
       enteIds: [],
+      canAccessAtaModule: false,
     });
   };
+
+  const normalizeEnteName = (value: string | null | undefined) =>
+    (value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const selectedEntes = entes.filter((ente) => form.enteIds.includes(ente.id));
+  const selectedHasFazenda = selectedEntes.some((ente) => {
+    const nome = normalizeEnteName(ente.nome);
+    const sigla = normalizeEnteName(ente.sigla);
+    return nome.includes("fazenda") || sigla.includes("fazenda") || sigla === "sefaz";
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +125,7 @@ export default function Usuarios() {
       password: "",
       role: target.role === "admin" ? "admin" : "operacional",
       enteIds: target.role === "admin" ? [] : (target.accessibleEnteIds?.length ? target.accessibleEnteIds : target.enteId ? [target.enteId] : []),
+      canAccessAtaModule: Boolean(target.canAccessAtaModule),
     });
     setDialogOpen(true);
   };
@@ -186,6 +200,7 @@ export default function Usuarios() {
                     ...current,
                     role: value,
                     enteIds: value === "admin" ? [] : current.enteIds,
+                    canAccessAtaModule: value === "admin" ? true : current.canAccessAtaModule,
                   }))}
                 >
                   <SelectTrigger>
@@ -211,7 +226,22 @@ export default function Usuarios() {
                           type="checkbox"
                           className="h-4 w-4"
                           checked={form.enteIds.includes(ente.id)}
-                          onChange={(event) => toggleEnte(ente.id, event.target.checked)}
+                          onChange={(event) => {
+                            toggleEnte(ente.id, event.target.checked);
+                            if (!event.target.checked) {
+                              const nextIds = form.enteIds.filter((id) => id !== ente.id);
+                              const nextHasFazenda = entes
+                                .filter((entry) => nextIds.includes(entry.id))
+                                .some((entry) => {
+                                  const nome = normalizeEnteName(entry.nome);
+                                  const sigla = normalizeEnteName(entry.sigla);
+                                  return nome.includes("fazenda") || sigla.includes("fazenda") || sigla === "sefaz";
+                                });
+                              if (!nextHasFazenda) {
+                                setForm((current) => ({ ...current, canAccessAtaModule: false }));
+                              }
+                            }
+                          }}
                         />
                         <span>{ente.sigla} - {ente.nome}</span>
                       </label>
@@ -222,6 +252,18 @@ export default function Usuarios() {
                   <p className="text-xs text-muted-foreground">Usuarios operacionais podem ser vinculados a um ou mais entes.</p>
                 )}
               </div>
+              {form.role === "operacional" && selectedHasFazenda && (
+                <div className="space-y-2 rounded-md border p-3">
+                  <Label>Acesso ao modulo de atas</Label>
+                  <label className="flex items-center gap-3 text-sm">
+                    <Checkbox
+                      checked={form.canAccessAtaModule}
+                      onCheckedChange={(value) => setForm((current) => ({ ...current, canAccessAtaModule: value === true }))}
+                    />
+                    <span>Permitir acesso ao modulo de atas e visao geral dos pre-pedidos da Fazenda.</span>
+                  </label>
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={createUser.isPending || updateUser.isPending}>
                 {createUser.isPending || updateUser.isPending ? "Salvando..." : "Salvar Usuario"}
               </Button>
@@ -259,15 +301,16 @@ export default function Usuarios() {
               <TableHead>E-mail</TableHead>
               <TableHead>Perfil</TableHead>
               <TableHead>Ente</TableHead>
+              <TableHead>Modulo ARP</TableHead>
               <TableHead>Criado Em</TableHead>
               <TableHead className="text-right">Acao</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8">Carregando...</TableCell></TableRow>
             ) : users.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum usuario encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum usuario encontrado.</TableCell></TableRow>
             ) : (
               users.map((item) => (
                 <TableRow key={item.id}>
@@ -282,6 +325,7 @@ export default function Usuarios() {
                           .map((ente) => ente.sigla)
                           .join(", ") || "-"}
                   </TableCell>
+                  <TableCell>{item.role === "admin" || item.canAccessAtaModule ? "Sim" : "Nao"}</TableCell>
                   <TableCell>{formatDate(item.createdAt ? String(item.createdAt) : "")}</TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>

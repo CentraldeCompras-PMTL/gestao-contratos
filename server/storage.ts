@@ -17,7 +17,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUserEnteIds(userId: string): Promise<string[]>;
   setUserEntes(userId: string, enteIds: string[]): Promise<void>;
-  updateUser(id: string, user: { email: string; name: string; role: string; enteId?: string | null }): Promise<User | undefined>;
+  updateUser(id: string, user: { email: string; name: string; role: string; enteId?: string | null; canAccessAtaModule?: boolean }): Promise<User | undefined>;
   updateUserPassword(id: string, password: string, forcePasswordChange?: boolean): Promise<User | undefined>;
   createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
   getValidPasswordResetToken(tokenHash: string): Promise<{ id: string; userId: string } | undefined>;
@@ -152,7 +152,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async updateUser(id: string, user: { email: string; name: string; role: string; enteId?: string | null }): Promise<User | undefined> {
+  async updateUser(id: string, user: { email: string; name: string; role: string; enteId?: string | null; canAccessAtaModule?: boolean }): Promise<User | undefined> {
     const [updated] = await db.update(users).set(user).where(eq(users.id, id)).returning();
     return updated;
   }

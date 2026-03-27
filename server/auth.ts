@@ -35,6 +35,7 @@ function toPublicUser(user: AuthenticatedUser): PublicUser {
     role: user.role === "admin" ? "admin" : "operacional",
     enteId: user.enteId ?? null,
     accessibleEnteIds: user.accessibleEnteIds ?? (user.enteId ? [user.enteId] : []),
+    canAccessAtaModule: Boolean(user.canAccessAtaModule),
     forcePasswordChange: Boolean(user.forcePasswordChange),
     createdAt: user.createdAt ?? null,
   };

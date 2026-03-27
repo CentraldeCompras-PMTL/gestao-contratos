@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { HttpError, ensureDateOrder, parseDateOnly, parseMoney, startOfTodayUtc } from "./validation";
 import { sendMail } from "./mail";
 import { createResetToken, hashToken } from "./security";
+import { registerAtaRegistroPrecoRoutes } from "./routes-arp";
 
 function getErrorStatus(error: unknown): number {
   if (error instanceof HttpError) return error.status;
@@ -208,6 +209,19 @@ export async function registerRoutes(
       throw new HttpError(403, "Acesso restrito ao ente do usuario");
     }
   };
+  const normalizeEnteName = (value: string | null | undefined) =>
+    (value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const hasFazendaEnte = async (enteIds: string[]) => {
+    if (enteIds.length === 0) return false;
+    const allEntes = await storage.getEntes();
+    return allEntes
+      .filter((ente) => enteIds.includes(ente.id))
+      .some((ente) => {
+        const nome = normalizeEnteName(ente.nome);
+        const sigla = normalizeEnteName(ente.sigla);
+        return nome.includes("fazenda") || sigla.includes("fazenda") || sigla === "sefaz";
+      });
+  };
 
   const toPublicUser = async (user: any) => {
     const accessibleEnteIds = await storage.getUserEnteIds(user.id);
@@ -218,6 +232,7 @@ export async function registerRoutes(
       role: user.role === "admin" ? "admin" : "operacional",
       enteId: user.enteId ?? null,
       accessibleEnteIds,
+      canAccessAtaModule: Boolean(user.canAccessAtaModule),
       forcePasswordChange: Boolean(user.forcePasswordChange),
       createdAt: user.createdAt ?? null,
     };
@@ -234,6 +249,9 @@ export async function registerRoutes(
       if (data.role === "operacional" && (!data.enteIds || data.enteIds.length === 0)) {
         throw new HttpError(400, "Usuario operacional deve ser vinculado a um ente");
       }
+      if (data.canAccessAtaModule && data.role !== "admin" && !await hasFazendaEnte(data.enteIds ?? [])) {
+        throw new HttpError(400, "O acesso ao modulo de atas exige vinculo com a Secretaria de Fazenda");
+      }
       const existingUser = await storage.getUserByEmail(data.email);
       if (existingUser) {
         throw new HttpError(400, "Email ja cadastrado");
@@ -241,6 +259,7 @@ export async function registerRoutes(
       const user = await storage.createUser({
         ...data,
         enteId: data.role === "admin" ? null : data.enteIds?.[0] ?? null,
+        canAccessAtaModule: Boolean(data.canAccessAtaModule),
         password: await hashPassword(data.password),
         forcePasswordChange: true,
       });
@@ -258,6 +277,9 @@ export async function registerRoutes(
       if (data.role === "operacional" && (!data.enteIds || data.enteIds.length === 0)) {
         throw new HttpError(400, "Usuario operacional deve ser vinculado a um ente");
       }
+      if (data.canAccessAtaModule && data.role !== "admin" && !await hasFazendaEnte(data.enteIds ?? [])) {
+        throw new HttpError(400, "O acesso ao modulo de atas exige vinculo com a Secretaria de Fazenda");
+      }
 
       const targetUser = await storage.getUser(req.params.id);
       if (!targetUser) {
@@ -274,6 +296,7 @@ export async function registerRoutes(
         name: data.name,
         role: data.role,
         enteId: data.role === "admin" ? null : data.enteIds?.[0] ?? null,
+        canAccessAtaModule: Boolean(data.canAccessAtaModule),
       });
 
       await storage.setUserEntes(targetUser.id, data.role === "admin" ? [] : data.enteIds ?? []);
@@ -426,6 +449,16 @@ export async function registerRoutes(
       return res.json(d.filter((item) => hasEnteAccess(req, item.enteId)));
     }
     res.json(d);
+  });
+
+  registerAtaRegistroPrecoRoutes(app, {
+    requireAuth,
+    isAdmin,
+    getUserEnteIds,
+    ensureEnteAccess,
+    audit,
+    getErrorStatus,
+    getErrorMessage,
   });
 
   app.post(api.departamentos.create.path, requireAuth, async (req, res) => {
