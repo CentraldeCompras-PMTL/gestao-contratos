@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { api, buildUrl } from "@shared/routes";
-import type { FonteRecursoWithFichas, InsertFichaOrcamentaria, InsertFonteRecurso } from "@shared/schema";
+import type { FonteRecursoWithFichas, InsertFichaOrcamentaria, InsertFonteRecurso, InsertProjetoAtividade } from "@shared/schema";
 
 async function readErrorMessage(res: Response, fallback: string) {
   try {
@@ -135,6 +135,67 @@ export function useDeleteFicha() {
         credentials: "include",
       });
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao excluir ficha"));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
+  });
+}
+
+export function useCreateProjetoAtividade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ fonteRecursoId, data }: { fonteRecursoId: string; data: Omit<InsertProjetoAtividade, "fonteRecursoId"> }) => {
+      const url = buildUrl(api.fontesRecurso.createProjetoAtividade.path, { fonteRecursoId });
+      const res = await fetch(url, {
+        method: api.fontesRecurso.createProjetoAtividade.method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao criar projeto/atividade"));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
+  });
+}
+
+export function useUpdateProjetoAtividade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Omit<InsertProjetoAtividade, "fonteRecursoId">> }) => {
+      const url = buildUrl(api.fontesRecurso.updateProjetoAtividade.path, { id });
+      const res = await fetch(url, {
+        method: api.fontesRecurso.updateProjetoAtividade.method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar projeto/atividade"));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
+    },
+  });
+}
+
+export function useDeleteProjetoAtividade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const url = buildUrl(api.fontesRecurso.deleteProjetoAtividade.path, { id });
+      const res = await fetch(url, {
+        method: api.fontesRecurso.deleteProjetoAtividade.method,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao excluir projeto/atividade"));
       return res.json();
     },
     onSuccess: () => {

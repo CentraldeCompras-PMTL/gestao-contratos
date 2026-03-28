@@ -2,8 +2,9 @@ import { db } from "./db";
 import { count, desc, eq } from "drizzle-orm";
 import { 
   users, userEntes, entes, departamentos, fornecedores, fontesRecurso, fichasOrcamentarias, processosDigitais, fasesContratacao, contratos, empenhos, afs, notasFiscais, contratoAditivos, contratoAnexos, passwordResetTokens, auditLogs,
+  projetosAtividade,
   type User, type InsertUser, type Ente, type InsertEnte, type Departamento, type InsertDepartamento, type Fornecedor, type InsertFornecedor,
-  type FonteRecurso, type InsertFonteRecurso, type FichaOrcamentaria, type InsertFichaOrcamentaria,
+  type FonteRecurso, type InsertFonteRecurso, type FichaOrcamentaria, type InsertFichaOrcamentaria, type ProjetoAtividade, type InsertProjetoAtividade,
   type ProcessoDigital, type InsertProcessoDigital, type FaseContratacao, type InsertFaseContratacao,
   type Contrato, type InsertContrato, type Empenho, type InsertEmpenho, type Af, type InsertAf, type NotaFiscal, type InsertNotaFiscal,
   type ContratoAditivo, type InsertContratoAditivo, type ContratoAnexo, type InsertContratoAnexo, type FonteRecursoWithFichas,
@@ -53,6 +54,10 @@ export interface IStorage {
   createFicha(data: InsertFichaOrcamentaria): Promise<FichaOrcamentaria>;
   updateFicha(id: string, data: Partial<InsertFichaOrcamentaria>): Promise<FichaOrcamentaria | undefined>;
   deleteFicha(id: string): Promise<FichaOrcamentaria | undefined>;
+  getProjetoAtividade(id: string): Promise<ProjetoAtividade | undefined>;
+  createProjetoAtividade(data: InsertProjetoAtividade): Promise<ProjetoAtividade>;
+  updateProjetoAtividade(id: string, data: Partial<InsertProjetoAtividade>): Promise<ProjetoAtividade | undefined>;
+  deleteProjetoAtividade(id: string): Promise<ProjetoAtividade | undefined>;
 
   getProcessosDigitais(): Promise<ProcessoDigitalWithRelations[]>;
   getProcessoDigital(id: string): Promise<ProcessoDigitalWithRelations | undefined>;
@@ -275,6 +280,7 @@ export class DatabaseStorage implements IStorage {
     return await db.query.fontesRecurso.findMany({
       with: {
         fichas: true,
+        projetosAtividade: true,
       },
     }) as FonteRecursoWithFichas[];
   }
@@ -284,6 +290,7 @@ export class DatabaseStorage implements IStorage {
       where: eq(fontesRecurso.id, id),
       with: {
         fichas: true,
+        projetosAtividade: true,
       },
     }) as FonteRecursoWithFichas | undefined;
   }
@@ -320,6 +327,26 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFicha(id: string): Promise<FichaOrcamentaria | undefined> {
     const [deleted] = await db.delete(fichasOrcamentarias).where(eq(fichasOrcamentarias.id, id)).returning();
+    return deleted;
+  }
+
+  async getProjetoAtividade(id: string): Promise<ProjetoAtividade | undefined> {
+    const [projetoAtividade] = await db.select().from(projetosAtividade).where(eq(projetosAtividade.id, id));
+    return projetoAtividade;
+  }
+
+  async createProjetoAtividade(data: InsertProjetoAtividade): Promise<ProjetoAtividade> {
+    const [created] = await db.insert(projetosAtividade).values(data).returning();
+    return created;
+  }
+
+  async updateProjetoAtividade(id: string, data: Partial<InsertProjetoAtividade>): Promise<ProjetoAtividade | undefined> {
+    const [updated] = await db.update(projetosAtividade).set(data).where(eq(projetosAtividade.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProjetoAtividade(id: string): Promise<ProjetoAtividade | undefined> {
+    const [deleted] = await db.delete(projetosAtividade).where(eq(projetosAtividade.id, id)).returning();
     return deleted;
   }
 

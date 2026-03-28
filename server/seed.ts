@@ -1,7 +1,7 @@
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { db } from "./db";
-import { users, fornecedores, fontesRecurso, fichasOrcamentarias, processosDigitais, fasesContratacao, contratos, empenhos, afs } from "@shared/schema";
+import { users, fornecedores, fontesRecurso, fichasOrcamentarias, projetosAtividade, processosDigitais, fasesContratacao, contratos, empenhos, afs } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
@@ -72,11 +72,20 @@ async function seed() {
 
   const existingFichas = await db.select().from(fichasOrcamentarias);
   let fichas = existingFichas;
+  const existingProjetosAtividade = await db.select().from(projetosAtividade);
+  let projetos = existingProjetosAtividade;
+  if (existingProjetosAtividade.length === 0) {
+    projetos = await db.insert(projetosAtividade).values([
+      { fonteRecursoId: fontes[0].id, codigo: "2001", descricao: "Manutencao administrativa" },
+      { fonteRecursoId: fontes[0].id, codigo: "2002", descricao: "Prestacao de servicos continuados" },
+      { fonteRecursoId: fontes[1].id, codigo: "3001", descricao: "Atencao basica em saude" },
+    ]).returning();
+  }
   if (existingFichas.length === 0) {
     fichas = await db.insert(fichasOrcamentarias).values([
-      { fonteRecursoId: fontes[0].id, codigo: "001", classificacao: "consumo" },
-      { fonteRecursoId: fontes[0].id, codigo: "002", classificacao: "servico" },
-      { fonteRecursoId: fontes[1].id, codigo: "003", classificacao: "permanente" },
+      { fonteRecursoId: fontes[0].id, projetoAtividadeId: projetos[0].id, codigo: "001", classificacao: "consumo" },
+      { fonteRecursoId: fontes[0].id, projetoAtividadeId: projetos[1].id, codigo: "002", classificacao: "servico" },
+      { fonteRecursoId: fontes[1].id, projetoAtividadeId: projetos[2].id, codigo: "003", classificacao: "permanente" },
     ]).returning();
   }
 

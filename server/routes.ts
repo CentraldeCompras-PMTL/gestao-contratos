@@ -622,8 +622,8 @@ export async function registerRoutes(
       if (!fonte) return res.status(404).json({ message: "Fonte de recurso nao encontrada" });
       const contratos = await storage.getContratos();
       const hasEmpenhos = contratos.some((contrato) => contrato.empenhos.some((empenho) => empenho.fonteRecursoId === fonte.id));
-      if (fonte.fichas.length > 0 || hasEmpenhos) {
-        throw new HttpError(400, "Nao e possivel excluir fonte com fichas ou empenhos vinculados");
+      if (fonte.fichas.length > 0 || fonte.projetosAtividade.length > 0 || hasEmpenhos) {
+        throw new HttpError(400, "Nao e possivel excluir fonte com fichas, projetos/atividade ou empenhos vinculados");
       }
       const deleted = await storage.deleteFonteRecurso(fonte.id);
       await audit(req, "delete", "fonte_recurso", deleted?.id, deleted ? `${deleted.codigo} - ${deleted.nome}` : null);
@@ -638,8 +638,18 @@ export async function registerRoutes(
       const fonte = await storage.getFonteRecurso(req.params.fonteRecursoId);
       if (!fonte) return res.status(404).json({ message: "Fonte de recurso nao encontrada" });
       const data = api.fontesRecurso.createFicha.input.parse(req.body);
+      const projetoAtividade = await storage.getProjetoAtividade(data.projetoAtividadeId);
+      if (!projetoAtividade || projetoAtividade.fonteRecursoId !== fonte.id) {
+        throw new HttpError(400, "O projeto/atividade informado nao pertence a fonte selecionada");
+      }
       const ficha = await storage.createFicha({ ...data, fonteRecursoId: fonte.id });
-      await audit(req, "create", "ficha_orcamentaria", ficha.id, `Fonte ${fonte.codigo} - Ficha ${ficha.codigo}`);
+      await audit(
+        req,
+        "create",
+        "ficha_orcamentaria",
+        ficha.id,
+        `Fonte ${fonte.codigo} - Projeto/Atividade ${projetoAtividade.codigo} - Ficha ${ficha.codigo}`,
+      );
       res.status(201).json(ficha);
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao criar ficha") });
@@ -651,8 +661,19 @@ export async function registerRoutes(
       const current = await storage.getFicha(req.params.id);
       if (!current) return res.status(404).json({ message: "Ficha nao encontrada" });
       const data = api.fontesRecurso.updateFicha.input.parse(req.body);
+      const projetoAtividadeId = data.projetoAtividadeId ?? current.projetoAtividadeId;
+      const projetoAtividade = await storage.getProjetoAtividade(projetoAtividadeId);
+      if (!projetoAtividade || projetoAtividade.fonteRecursoId !== current.fonteRecursoId) {
+        throw new HttpError(400, "O projeto/atividade informado nao pertence a fonte da ficha");
+      }
       const updated = await storage.updateFicha(req.params.id, data);
-      await audit(req, "update", "ficha_orcamentaria", updated?.id, updated ? `Ficha ${updated.codigo}` : null);
+      await audit(
+        req,
+        "update",
+        "ficha_orcamentaria",
+        updated?.id,
+        updated ? `Projeto/Atividade ${projetoAtividade.codigo} - Ficha ${updated.codigo}` : null,
+      );
       res.json(updated);
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar ficha") });
@@ -673,6 +694,67 @@ export async function registerRoutes(
       res.json({ message: "Ficha excluida com sucesso" });
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir ficha") });
+    }
+  });
+
+  app.post(api.fontesRecurso.createProjetoAtividade.path, requireAuth, async (req, res) => {
+    try {
+      const fonte = await storage.getFonteRecurso(req.params.fonteRecursoId);
+      if (!fonte) return res.status(404).json({ message: "Fonte de recurso nao encontrada" });
+      const data = api.fontesRecurso.createProjetoAtividade.input.parse(req.body);
+      const projetoAtividade = await storage.createProjetoAtividade({ ...data, fonteRecursoId: fonte.id });
+      await audit(
+        req,
+        "create",
+        "projeto_atividade",
+        projetoAtividade.id,
+        `Fonte ${fonte.codigo} - Projeto/Atividade ${projetoAtividade.codigo}`,
+      );
+      res.status(201).json(projetoAtividade);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao criar projeto/atividade") });
+    }
+  });
+
+  app.put(api.fontesRecurso.updateProjetoAtividade.path, requireAuth, async (req, res) => {
+    try {
+      const current = await storage.getProjetoAtividade(req.params.id);
+      if (!current) return res.status(404).json({ message: "Projeto/atividade nao encontrado" });
+      const data = api.fontesRecurso.updateProjetoAtividade.input.parse(req.body);
+      const updated = await storage.updateProjetoAtividade(req.params.id, data);
+      await audit(
+        req,
+        "update",
+        "projeto_atividade",
+        updated?.id,
+        updated ? `Projeto/Atividade ${updated.codigo}` : null,
+      );
+      res.json(updated);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar projeto/atividade") });
+    }
+  });
+
+  app.delete(api.fontesRecurso.deleteProjetoAtividade.path, requireAuth, async (req, res) => {
+    try {
+      const projetoAtividade = await storage.getProjetoAtividade(req.params.id);
+      if (!projetoAtividade) return res.status(404).json({ message: "Projeto/atividade nao encontrado" });
+      const fonte = await storage.getFonteRecurso(projetoAtividade.fonteRecursoId);
+      const hasFichas = fonte?.fichas.some((ficha) => ficha.projetoAtividadeId === projetoAtividade.id) ?? false;
+      if (hasFichas) {
+        throw new HttpError(400, "Nao e possivel excluir projeto/atividade com fichas vinculadas");
+      }
+      const deleted = await storage.deleteProjetoAtividade(projetoAtividade.id);
+      await audit(
+        req,
+        "delete",
+        "projeto_atividade",
+        deleted?.id,
+        deleted ? `Projeto/Atividade ${deleted.codigo}` : null,
+      );
+      res.json({ message: "Projeto/atividade excluido com sucesso" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir projeto/atividade") });
     }
   });
 

@@ -16,6 +16,7 @@ export const notaFiscalStatusSchema = z.enum(["nota_recebida", "aguardando_pagam
 export const fichaClassificacaoSchema = z.enum(["consumo", "servico", "permanente"]);
 export const fonteRecursoCodigoSchema = z.string().regex(/^\d\.\d{3}\.\d{4}$/, "Codigo da fonte invalido");
 export const fichaCodigoSchema = z.string().regex(/^\d{3}$/, "Ficha invalida");
+export const projetoAtividadeCodigoSchema = z.string().min(1, "Codigo do projeto/atividade obrigatorio");
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -100,9 +101,19 @@ export const fontesRecurso = pgTable("fontes_recurso", {
 export const fichasOrcamentarias = pgTable("fichas_orcamentarias", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   fonteRecursoId: varchar("fonte_recurso_id").references(() => fontesRecurso.id).notNull(),
+  projetoAtividadeId: varchar("projeto_atividade_id").references(() => projetosAtividade.id).notNull(),
   codigo: text("codigo").notNull(),
   classificacao: text("classificacao").notNull(),
   criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const projetosAtividade = pgTable("projetos_atividade", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fonteRecursoId: varchar("fonte_recurso_id").references(() => fontesRecurso.id).notNull(),
+  codigo: text("codigo").notNull(),
+  descricao: text("descricao").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
 export const processosDigitais = pgTable("processos_digitais", {
@@ -467,12 +478,19 @@ export const fornecedoresRelations = relations(fornecedores, ({ many }) => ({
 
 export const fontesRecursoRelations = relations(fontesRecurso, ({ many }) => ({
   fichas: many(fichasOrcamentarias),
+  projetosAtividade: many(projetosAtividade),
   empenhos: many(empenhos),
 }));
 
 export const fichasOrcamentariasRelations = relations(fichasOrcamentarias, ({ one, many }) => ({
   fonteRecurso: one(fontesRecurso, { fields: [fichasOrcamentarias.fonteRecursoId], references: [fontesRecurso.id] }),
+  projetoAtividade: one(projetosAtividade, { fields: [fichasOrcamentarias.projetoAtividadeId], references: [projetosAtividade.id] }),
   empenhos: many(empenhos),
+}));
+
+export const projetosAtividadeRelations = relations(projetosAtividade, ({ one, many }) => ({
+  fonteRecurso: one(fontesRecurso, { fields: [projetosAtividade.fonteRecursoId], references: [fontesRecurso.id] }),
+  fichas: many(fichasOrcamentarias),
 }));
 
 export const contratoAditivosRelations = relations(contratoAditivos, ({ one }) => ({
@@ -495,6 +513,11 @@ export const insertFonteRecursoSchema = createInsertSchema(fontesRecurso).omit({
 export const insertFichaOrcamentariaSchema = createInsertSchema(fichasOrcamentarias).omit({ id: true, criadoEm: true }).extend({
   codigo: fichaCodigoSchema,
   classificacao: fichaClassificacaoSchema,
+  projetoAtividadeId: z.string().min(1, "Projeto/atividade obrigatorio"),
+});
+export const insertProjetoAtividadeSchema = createInsertSchema(projetosAtividade).omit({ id: true, criadoEm: true, atualizadoEm: true }).extend({
+  codigo: projetoAtividadeCodigoSchema,
+  descricao: z.string().min(1, "Descricao obrigatoria"),
 });
 export const insertProcessoDigitalSchema = createInsertSchema(processosDigitais).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertFaseContratacaoSchema = createInsertSchema(fasesContratacao).omit({ id: true, criadoEm: true });
@@ -566,9 +589,19 @@ export const enteResponseSchema = z.object({
 export const fichaOrcamentariaResponseSchema = z.object({
   id: z.string(),
   fonteRecursoId: z.string(),
+  projetoAtividadeId: z.string(),
   codigo: fichaCodigoSchema,
   classificacao: fichaClassificacaoSchema,
   criadoEm: timestampSchema.nullable().optional(),
+});
+
+export const projetoAtividadeResponseSchema = z.object({
+  id: z.string(),
+  fonteRecursoId: z.string(),
+  codigo: projetoAtividadeCodigoSchema,
+  descricao: z.string(),
+  criadoEm: timestampSchema.nullable().optional(),
+  atualizadoEm: timestampSchema.nullable().optional(),
 });
 
 export const fonteRecursoResponseSchema = z.object({
@@ -581,6 +614,7 @@ export const fonteRecursoResponseSchema = z.object({
 
 export const fonteRecursoWithFichasSchema = fonteRecursoResponseSchema.extend({
   fichas: z.array(fichaOrcamentariaResponseSchema),
+  projetosAtividade: z.array(projetoAtividadeResponseSchema),
 });
 
 export const auditLogResponseSchema = z.object({
@@ -1033,6 +1067,7 @@ export type InsertDepartamento = z.infer<typeof insertDepartamentoSchema>;
 export type InsertFornecedor = z.infer<typeof insertFornecedorSchema>;
 export type InsertFonteRecurso = z.infer<typeof insertFonteRecursoSchema>;
 export type InsertFichaOrcamentaria = z.infer<typeof insertFichaOrcamentariaSchema>;
+export type InsertProjetoAtividade = z.infer<typeof insertProjetoAtividadeSchema>;
 export type InsertProcessoDigital = z.infer<typeof insertProcessoDigitalSchema>;
 export type InsertFaseContratacao = z.infer<typeof insertFaseContratacaoSchema>;
 export type InsertContrato = z.infer<typeof insertContratoSchema>;
@@ -1056,6 +1091,7 @@ export type Ente = typeof entes.$inferSelect;
 export type UserEnte = typeof userEntes.$inferSelect;
 export type FonteRecurso = typeof fontesRecurso.$inferSelect;
 export type FichaOrcamentaria = typeof fichasOrcamentarias.$inferSelect;
+export type ProjetoAtividade = typeof projetosAtividade.$inferSelect;
 export type NotaFiscal = typeof notasFiscais.$inferSelect;
 export type ContratoAditivo = typeof contratoAditivos.$inferSelect;
 export type ContratoAnexo = typeof contratoAnexos.$inferSelect;
@@ -1080,7 +1116,7 @@ export type AfWithRelations = Af & {
     }
   }
 };
-export type FonteRecursoWithFichas = FonteRecurso & { fichas: FichaOrcamentaria[] };
+export type FonteRecursoWithFichas = FonteRecurso & { fichas: FichaOrcamentaria[]; projetosAtividade: ProjetoAtividade[] };
 export type EmpenhoWithRelations = Empenho & { afs: Af[]; fonteRecurso: FonteRecurso; ficha: FichaOrcamentaria };
 export type ContratoWithRelations = Contrato & { 
   empenhos: EmpenhoWithRelations[];
