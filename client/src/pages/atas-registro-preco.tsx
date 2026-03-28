@@ -424,7 +424,7 @@ export default function AtasRegistroPrecoPage() {
           <DialogTrigger asChild>
             <Button><Plus className="mr-2" size={18} /> Nova Ata</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingAta ? "Editar Ata de Registro de Preco" : "Cadastrar Ata de Registro de Preco"}</DialogTitle>
             </DialogHeader>
@@ -642,7 +642,7 @@ export default function AtasRegistroPrecoPage() {
       )}
 
       <Dialog open={!!itemsAta} onOpenChange={(open) => { if (!open) { setItemsAta(null); setItemFormOpen(false); setEditingItem(null); setItemForm(defaultItemForm); } }}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Itens da Ata {itemsAta?.numeroAta}</DialogTitle></DialogHeader>
           {itemsAta && (
             <div className="space-y-4">
@@ -719,7 +719,7 @@ export default function AtasRegistroPrecoPage() {
       </Dialog>
 
       <Dialog open={itemFormOpen} onOpenChange={(open) => { setItemFormOpen(open); if (!open) { setEditingItem(null); setItemForm(defaultItemForm); } }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingItem ? "Editar Item" : "Cadastrar Item"}</DialogTitle></DialogHeader>
           <form onSubmit={handleItemSubmit} className="space-y-4 pt-4">
             <div className="space-y-2">
@@ -742,7 +742,7 @@ export default function AtasRegistroPrecoPage() {
       </Dialog>
 
       <Dialog open={!!quantidadesAta} onOpenChange={(open) => { if (!open) setQuantidadesAta(null); }}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Quantidades por Participante</DialogTitle></DialogHeader>
           {quantidadesAta && (
             <div className="space-y-4">
@@ -783,7 +783,7 @@ export default function AtasRegistroPrecoPage() {
       </Dialog>
 
       <Dialog open={!!cotacoesAta} onOpenChange={(open) => { if (!open) setCotacoesAta(null); }}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Cotacao dos Itens</DialogTitle></DialogHeader>
           {cotacoesAta && (
             <div className="space-y-4">
@@ -828,7 +828,7 @@ export default function AtasRegistroPrecoPage() {
       </Dialog>
 
       <Dialog open={!!resultadosAta} onOpenChange={(open) => { if (!open) setResultadosAta(null); }}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Resultado Licitado</DialogTitle></DialogHeader>
           {resultadosAta && (
             <div className="space-y-4">
