@@ -154,6 +154,29 @@ export default function AtasRegistroPrecoPage() {
     }));
   };
 
+  const addParticipanteSlot = () => {
+    setAtaForm((current) => ({
+      ...current,
+      participanteEnteIds: [...current.participanteEnteIds, ""],
+    }));
+  };
+
+  const updateParticipanteSlot = (index: number, enteId: string) => {
+    setAtaForm((current) => ({
+      ...current,
+      participanteEnteIds: current.participanteEnteIds.map((currentId, currentIndex) =>
+        currentIndex === index ? enteId : currentId,
+      ),
+    }));
+  };
+
+  const removeParticipanteSlot = (index: number) => {
+    setAtaForm((current) => ({
+      ...current,
+      participanteEnteIds: current.participanteEnteIds.filter((_, currentIndex) => currentIndex !== index),
+    }));
+  };
+
   const addFornecedorSlot = () => {
     setAtaForm((current) => ({
       ...current,
@@ -181,6 +204,7 @@ export default function AtasRegistroPrecoPage() {
     e.preventDefault();
     const ataPayload = {
       ...ataForm,
+      participanteEnteIds: ataForm.participanteEnteIds.filter((id, index, array) => id && array.indexOf(id) === index),
       fornecedorIds: ataForm.fornecedorIds.filter((id, index, array) => id && array.indexOf(id) === index),
     };
 
@@ -485,17 +509,48 @@ export default function AtasRegistroPrecoPage() {
               </div>
 
               <div className="space-y-3">
-                  <Label>Secretarias Participantes</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border p-4 max-h-60 overflow-auto">
-                  {entes.map((ente) => {
-                    const checked = ataForm.participanteEnteIds.includes(ente.id);
-                    return (
-                      <label key={ente.id} className="flex items-center gap-3 text-sm">
-                        <Checkbox checked={checked} onCheckedChange={(value) => toggleParticipante(ente.id, value === true)} />
-                        <span>{ente.sigla} - {ente.nome}</span>
-                      </label>
-                    );
-                  })}
+                <Label>Secretarias Participantes</Label>
+                <div className="space-y-3 rounded-lg border p-4">
+                  {entes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum ente cadastrado.</p>
+                  ) : (
+                    <>
+                      {ataForm.participanteEnteIds.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Nenhum participante vinculado ainda. Adicione os entes participantes desta ata.
+                        </p>
+                      ) : (
+                        ataForm.participanteEnteIds.map((enteId, index) => {
+                          const selectedIds = ataForm.participanteEnteIds.filter((id, currentIndex) => id && currentIndex !== index);
+                          return (
+                            <div key={`${enteId || "novo"}-${index}`} className="flex items-center gap-2">
+                              <Select value={enteId || "none"} onValueChange={(value) => updateParticipanteSlot(index, value === "none" ? "" : value)}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione a secretaria participante" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Selecione a secretaria participante</SelectItem>
+                                  {entes
+                                    .filter((ente) => ente.id === enteId || !selectedIds.includes(ente.id))
+                                    .map((ente) => (
+                                      <SelectItem key={ente.id} value={ente.id}>
+                                        {ente.sigla} - {ente.nome}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              <Button type="button" variant="outline" size="icon" onClick={() => removeParticipanteSlot(index)}>
+                                <Trash2 size={16} />
+                              </Button>
+                            </div>
+                          );
+                        })
+                      )}
+                      <Button type="button" variant="outline" onClick={addParticipanteSlot}>
+                        <Plus className="mr-2" size={16} /> Adicionar participante
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
