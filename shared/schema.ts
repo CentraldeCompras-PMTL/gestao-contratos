@@ -586,6 +586,8 @@ export const fonteRecursoWithFichasSchema = fonteRecursoResponseSchema.extend({
 export const auditLogResponseSchema = z.object({
   id: z.string(),
   userId: z.string().nullable(),
+  userName: z.string().nullable(),
+  userEmail: z.string().nullable(),
   action: z.string(),
   entity: z.string(),
   entityId: z.string().nullable(),
@@ -1136,3 +1138,4 @@ export type AtaContratoWithRelations = AtaContrato & {
 export type Notificacao = z.infer<typeof notificacaoResponseSchema>;
 export type DashboardStats = z.infer<typeof dashboardStatsResponseSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type AuditLogResponse = z.infer<typeof auditLogResponseSchema>;

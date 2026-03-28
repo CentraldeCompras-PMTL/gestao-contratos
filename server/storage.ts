@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { count, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { 
   users, userEntes, entes, departamentos, fornecedores, fontesRecurso, fichasOrcamentarias, processosDigitais, fasesContratacao, contratos, empenhos, afs, notasFiscais, contratoAditivos, contratoAnexos, passwordResetTokens, auditLogs,
   type User, type InsertUser, type Ente, type InsertEnte, type Departamento, type InsertDepartamento, type Fornecedor, type InsertFornecedor,
@@ -7,7 +7,7 @@ import {
   type ProcessoDigital, type InsertProcessoDigital, type FaseContratacao, type InsertFaseContratacao,
   type Contrato, type InsertContrato, type Empenho, type InsertEmpenho, type Af, type InsertAf, type NotaFiscal, type InsertNotaFiscal,
   type ContratoAditivo, type InsertContratoAditivo, type ContratoAnexo, type InsertContratoAnexo, type FonteRecursoWithFichas,
-  type ContratoWithRelations, type ProcessoDigitalWithRelations, type AfWithRelations, type NotaFiscalWithRelations, type AuditLog
+  type ContratoWithRelations, type ProcessoDigitalWithRelations, type AfWithRelations, type NotaFiscalWithRelations, type AuditLogResponse
 } from "@shared/schema";
 
 export interface IStorage {
@@ -24,7 +24,7 @@ export interface IStorage {
   markPasswordResetTokenUsed(id: string): Promise<void>;
   invalidatePasswordResetTokensForUser(userId: string): Promise<void>;
   createAuditLog(log: { userId?: string | null; action: string; entity: string; entityId?: string | null; details?: string | null }): Promise<void>;
-  getAuditLogs(): Promise<AuditLog[]>;
+  getAuditLogs(): Promise<AuditLogResponse[]>;
 
   getEntes(): Promise<Ente[]>;
   createEnte(ente: InsertEnte): Promise<Ente>;
@@ -206,8 +206,29 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getAuditLogs(): Promise<AuditLog[]> {
-    return await db.select().from(auditLogs);
+  async getAuditLogs(): Promise<AuditLogResponse[]> {
+    const rows = await db
+      .select({
+        id: auditLogs.id,
+        userId: auditLogs.userId,
+        userName: users.name,
+        userEmail: users.email,
+        action: auditLogs.action,
+        entity: auditLogs.entity,
+        entityId: auditLogs.entityId,
+        details: auditLogs.details,
+        createdAt: auditLogs.createdAt,
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .orderBy(desc(auditLogs.createdAt));
+
+    return rows.map((row) => ({
+      ...row,
+      userName: row.userName ?? null,
+      userEmail: row.userEmail ?? null,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+    }));
   }
 
   async getFornecedores(): Promise<Fornecedor[]> {

@@ -23,6 +23,7 @@ export default function Auditoria() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Usuario</TableHead>
               <TableHead>Acao</TableHead>
               <TableHead>Entidade</TableHead>
               <TableHead>Registro</TableHead>
@@ -32,12 +33,24 @@ export default function Auditoria() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8">Carregando...</TableCell></TableRow>
             ) : logs.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum evento registrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum evento registrado.</TableCell></TableRow>
             ) : (
               logs.map((log) => (
                 <TableRow key={log.id}>
+                  <TableCell>
+                    {log.userName || log.userEmail ? (
+                      <div className="leading-tight">
+                        <div className="font-medium">{log.userName || log.userEmail}</div>
+                        {log.userName && log.userEmail ? (
+                          <div className="text-xs text-muted-foreground">{log.userEmail}</div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      "-"
+                    )}
+                  </TableCell>
                   <TableCell>{log.action}</TableCell>
                   <TableCell>{log.entity}</TableCell>
                   <TableCell>{log.entityId || "-"}</TableCell>
