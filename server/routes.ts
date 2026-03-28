@@ -1677,12 +1677,13 @@ export async function registerRoutes(
     for (const c of contratos) {
       const vc = parseMoney(c.valorContrato, "Valor do contrato");
       valorTotal += vc;
-
-      const empenhado = c.empenhos.reduce(
-        (acc, emp) => acc + getEmpenhoMetrics(emp).valorComprometido,
-        0,
-      );
-      saldoTotal += vc - empenhado;
+      const utilizado = c.notasFiscais.reduce((acc, nota) => {
+        if (nota.statusPagamento === "aguardando_pagamento" || nota.statusPagamento === "pago") {
+          return acc + parseMoney(nota.valorNota, "Valor da nota fiscal");
+        }
+        return acc;
+      }, 0);
+      saldoTotal += vc - utilizado;
     }
 
     res.json({
