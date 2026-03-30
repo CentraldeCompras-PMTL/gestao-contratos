@@ -73,6 +73,19 @@ function normalizeHeader(value: string) {
     .replace(/\s+/g, "_");
 }
 
+function normalizeDecimalInput(value: string) {
+  return value.replace(/[^\d.,]/g, "").replace(/\./g, ",");
+}
+
+function toStorageDecimal(value: string) {
+  return normalizeDecimalInput(value).replace(",", ".");
+}
+
+function toDisplayDecimal(value: string | number | null | undefined) {
+  if (value == null) return "";
+  return String(value).replace(".", ",");
+}
+
 export default function AtasRegistroPrecoPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { data: atas = [], isLoading } = useAtasRegistroPreco();
@@ -336,7 +349,7 @@ export default function AtasRegistroPrecoPage() {
     const form: Record<string, string> = {};
     ata.itens.forEach((item) => {
       item.quantidades.forEach((quantidade) => {
-        form[`${item.id}:${quantidade.enteId}`] = String(quantidade.quantidade);
+        form[`${item.id}:${quantidade.enteId}`] = toDisplayDecimal(quantidade.quantidade);
       });
     });
     setQuantidadesForm(form);
@@ -346,7 +359,7 @@ export default function AtasRegistroPrecoPage() {
   const openCotacoes = (ata: AtaRegistroPrecoWithRelations) => {
     const form: Record<string, string> = {};
     ata.itens.forEach((item) => {
-      form[item.id] = item.cotacao?.valorUnitarioCotado != null ? String(item.cotacao.valorUnitarioCotado) : "";
+      form[item.id] = toDisplayDecimal(item.cotacao?.valorUnitarioCotado);
     });
     setCotacoesForm(form);
     setCotacoesAta(ata);
@@ -356,7 +369,7 @@ export default function AtasRegistroPrecoPage() {
     const form: Record<string, { valor: string; fracassado: boolean; fornecedorId: string }> = {};
     ata.itens.forEach((item) => {
       form[item.id] = {
-        valor: item.resultado?.valorUnitarioLicitado != null ? String(item.resultado.valorUnitarioLicitado) : "",
+        valor: toDisplayDecimal(item.resultado?.valorUnitarioLicitado),
         fracassado: item.resultado?.itemFracassado ?? false,
         fornecedorId: item.resultado?.fornecedorId ?? "",
       };
@@ -371,7 +384,7 @@ export default function AtasRegistroPrecoPage() {
       quantidadesAta.participantes.map((participante) => ({
         itemId: item.id,
         enteId: participante.enteId,
-        quantidade: quantidadesForm[`${item.id}:${participante.enteId}`] ?? "0",
+        quantidade: toStorageDecimal(quantidadesForm[`${item.id}:${participante.enteId}`] ?? "0"),
       })),
     );
 
@@ -393,7 +406,7 @@ export default function AtasRegistroPrecoPage() {
     if (!cotacoesAta) return;
     const cotacoes = cotacoesAta.itens.map((item) => ({
       itemId: item.id,
-      valorUnitarioCotado: cotacoesForm[item.id] ?? "0",
+      valorUnitarioCotado: toStorageDecimal(cotacoesForm[item.id] ?? "0"),
     }));
 
     saveCotacoes.mutate(
@@ -415,7 +428,7 @@ export default function AtasRegistroPrecoPage() {
     const resultados = resultadosAta.itens.map((item) => ({
       itemId: item.id,
       fornecedorId: resultadosForm[item.id]?.fornecedorId || null,
-      valorUnitarioLicitado: resultadosForm[item.id]?.valor || null,
+      valorUnitarioLicitado: resultadosForm[item.id]?.valor ? toStorageDecimal(resultadosForm[item.id]!.valor) : null,
       itemFracassado: resultadosForm[item.id]?.fracassado ?? false,
     }));
 
@@ -801,34 +814,38 @@ export default function AtasRegistroPrecoPage() {
           <DialogHeader><DialogTitle>Quantidades por Participante</DialogTitle></DialogHeader>
           {quantidadesAta && (
             <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Codigo</TableHead>
-                    <TableHead>Descricao</TableHead>
-                    {quantidadesAta.participantes.map((participante) => (
-                      <TableHead key={participante.id}>{participante.ente.sigla}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quantidadesAta.itens.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.codigoInterno}</TableCell>
-                      <TableCell>{item.descricao}</TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[920px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[120px]">Codigo</TableHead>
+                      <TableHead className="min-w-[280px]">Descricao</TableHead>
                       {quantidadesAta.participantes.map((participante) => (
-                        <TableCell key={participante.id}>
-                          <Input
-                            value={quantidadesForm[`${item.id}:${participante.enteId}`] ?? ""}
-                            onChange={(e) => setQuantidadesForm((current) => ({ ...current, [`${item.id}:${participante.enteId}`]: e.target.value }))}
-                            placeholder="0,00"
-                          />
-                        </TableCell>
+                        <TableHead key={participante.id} className="min-w-[180px]">{participante.ente.sigla}</TableHead>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {quantidadesAta.itens.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="align-top">{item.codigoInterno}</TableCell>
+                        <TableCell className="align-top whitespace-normal break-words">{item.descricao}</TableCell>
+                        {quantidadesAta.participantes.map((participante) => (
+                          <TableCell key={participante.id} className="align-top">
+                            <Input
+                              className="min-w-[140px]"
+                              value={quantidadesForm[`${item.id}:${participante.enteId}`] ?? ""}
+                              onChange={(e) => setQuantidadesForm((current) => ({ ...current, [`${item.id}:${participante.enteId}`]: normalizeDecimalInput(e.target.value) }))}
+                              placeholder="0,00"
+                              inputMode="decimal"
+                            />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
               <Button className="w-full" onClick={handleSaveQuantidades} disabled={saveQuantidades.isPending}>
                 {saveQuantidades.isPending ? "Salvando..." : "Salvar Quantidades"}
               </Button>
@@ -842,38 +859,42 @@ export default function AtasRegistroPrecoPage() {
           <DialogHeader><DialogTitle>Cotacao dos Itens</DialogTitle></DialogHeader>
           {cotacoesAta && (
             <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Codigo</TableHead>
-                    <TableHead>Descricao</TableHead>
-                    <TableHead>Qtd. Total</TableHead>
-                    <TableHead>Valor Unitario</TableHead>
-                    <TableHead>Total Cotado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cotacoesAta.itens.map((item) => {
-                    const quantidadeTotal = getItemQuantidadeTotal(item);
-                    const valorUnitario = parseNumberString(cotacoesForm[item.id] || "0");
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.codigoInterno}</TableCell>
-                        <TableCell>{item.descricao}</TableCell>
-                        <TableCell>{quantidadeTotal}</TableCell>
-                        <TableCell>
-                          <Input
-                            value={cotacoesForm[item.id] ?? ""}
-                            onChange={(e) => setCotacoesForm((current) => ({ ...current, [item.id]: e.target.value }))}
-                            placeholder="0,00"
-                          />
-                        </TableCell>
-                        <TableCell>{formatCurrency(valorUnitario * quantidadeTotal)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[120px]">Codigo</TableHead>
+                      <TableHead className="min-w-[320px]">Descricao</TableHead>
+                      <TableHead className="w-[120px]">Qtd. Total</TableHead>
+                      <TableHead className="min-w-[180px]">Valor Unitario</TableHead>
+                      <TableHead className="min-w-[180px]">Total Cotado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cotacoesAta.itens.map((item) => {
+                      const quantidadeTotal = getItemQuantidadeTotal(item);
+                      const valorUnitario = parseNumberString(cotacoesForm[item.id] || "0");
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell className="align-top">{item.codigoInterno}</TableCell>
+                          <TableCell className="align-top whitespace-normal break-words">{item.descricao}</TableCell>
+                          <TableCell className="align-top">{quantidadeTotal}</TableCell>
+                          <TableCell className="align-top">
+                            <Input
+                              className="min-w-[150px]"
+                              value={cotacoesForm[item.id] ?? ""}
+                              onChange={(e) => setCotacoesForm((current) => ({ ...current, [item.id]: normalizeDecimalInput(e.target.value) }))}
+                              placeholder="0,00"
+                              inputMode="decimal"
+                            />
+                          </TableCell>
+                          <TableCell className="align-top">{formatCurrency(valorUnitario * quantidadeTotal)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
               <Button className="w-full" onClick={handleSaveCotacoes} disabled={saveCotacoes.isPending}>
                 {saveCotacoes.isPending ? "Salvando..." : "Salvar Cotacoes"}
               </Button>
@@ -887,71 +908,75 @@ export default function AtasRegistroPrecoPage() {
           <DialogHeader><DialogTitle>Resultado Licitado</DialogTitle></DialogHeader>
           {resultadosAta && (
             <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Codigo</TableHead>
-                    <TableHead>Descricao</TableHead>
-                    <TableHead>Qtd. Total</TableHead>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead>Valor Cotado</TableHead>
-                    <TableHead>Valor Licitado</TableHead>
-                    <TableHead>Fracassado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {resultadosAta.itens.map((item) => {
-                    const state = resultadosForm[item.id] ?? { valor: "", fracassado: false, fornecedorId: "" };
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.codigoInterno}</TableCell>
-                        <TableCell>{item.descricao}</TableCell>
-                        <TableCell>{getItemQuantidadeTotal(item)}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={state.fornecedorId || "none"}
-                            onValueChange={(value) => setResultadosForm((current) => ({ ...current, [item.id]: { ...state, fornecedorId: value === "none" ? "" : value } }))}
-                            disabled={state.fracassado}
-                          >
-                            <SelectTrigger><SelectValue placeholder="Selecione o fornecedor" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Sem fornecedor</SelectItem>
-                              {resultadosAta.fornecedores.map((entry) => (
-                                <SelectItem key={entry.fornecedorId} value={entry.fornecedorId}>{entry.fornecedor.nome}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>{item.cotacao ? formatCurrency(item.cotacao.valorUnitarioCotado) : "-"}</TableCell>
-                        <TableCell>
-                          <Input
-                            value={state.valor}
-                            onChange={(e) => setResultadosForm((current) => ({ ...current, [item.id]: { ...state, valor: e.target.value } }))}
-                            placeholder="0,00"
-                            disabled={state.fracassado}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              checked={state.fracassado}
-                              onCheckedChange={(checked) => setResultadosForm((current) => ({
-                                ...current,
-                                [item.id]: {
-                                  valor: checked === true ? "" : state.valor,
-                                  fracassado: checked === true,
-                                  fornecedorId: checked === true ? "" : state.fornecedorId,
-                                },
-                              }))}
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1100px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[120px]">Codigo</TableHead>
+                      <TableHead className="min-w-[280px]">Descricao</TableHead>
+                      <TableHead className="w-[120px]">Qtd. Total</TableHead>
+                      <TableHead className="min-w-[240px]">Fornecedor</TableHead>
+                      <TableHead className="w-[160px]">Valor Cotado</TableHead>
+                      <TableHead className="min-w-[180px]">Valor Licitado</TableHead>
+                      <TableHead className="w-[140px]">Fracassado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {resultadosAta.itens.map((item) => {
+                      const state = resultadosForm[item.id] ?? { valor: "", fracassado: false, fornecedorId: "" };
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell className="align-top">{item.codigoInterno}</TableCell>
+                          <TableCell className="align-top whitespace-normal break-words">{item.descricao}</TableCell>
+                          <TableCell className="align-top">{getItemQuantidadeTotal(item)}</TableCell>
+                          <TableCell className="align-top">
+                            <Select
+                              value={state.fornecedorId || "none"}
+                              onValueChange={(value) => setResultadosForm((current) => ({ ...current, [item.id]: { ...state, fornecedorId: value === "none" ? "" : value } }))}
+                              disabled={state.fracassado}
+                            >
+                              <SelectTrigger className="min-w-[220px]"><SelectValue placeholder="Selecione o fornecedor" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sem fornecedor</SelectItem>
+                                {resultadosAta.fornecedores.map((entry) => (
+                                  <SelectItem key={entry.fornecedorId} value={entry.fornecedorId}>{entry.fornecedor.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="align-top">{item.cotacao ? formatCurrency(item.cotacao.valorUnitarioCotado) : "-"}</TableCell>
+                          <TableCell className="align-top">
+                            <Input
+                              className="min-w-[150px]"
+                              value={state.valor}
+                              onChange={(e) => setResultadosForm((current) => ({ ...current, [item.id]: { ...state, valor: normalizeDecimalInput(e.target.value) } }))}
+                              placeholder="0,00"
+                              disabled={state.fracassado}
+                              inputMode="decimal"
                             />
-                            <span className="text-sm">Sim</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={state.fracassado}
+                                onCheckedChange={(checked) => setResultadosForm((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    valor: checked === true ? "" : state.valor,
+                                    fracassado: checked === true,
+                                    fornecedorId: checked === true ? "" : state.fornecedorId,
+                                  },
+                                }))}
+                              />
+                              <span className="text-sm">Sim</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
               <Button className="w-full" onClick={handleSaveResultados} disabled={saveResultados.isPending}>
                 {saveResultados.isPending ? "Salvando..." : "Salvar Resultados"}
               </Button>
