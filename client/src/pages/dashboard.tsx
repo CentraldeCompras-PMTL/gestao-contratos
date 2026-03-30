@@ -114,15 +114,22 @@ function getMonthKey(dateString?: string | null) {
   return `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
-function getAtaItemTotalLicitado(item: AtaRegistroPrecoWithRelations["itens"][number]) {
+function getAtaItemQuantidadeTotal(item: AtaRegistroPrecoWithRelations["itens"][number], participanteId?: string) {
+  return item.quantidades.reduce((sum, quantidade) => {
+    if (participanteId && quantidade.enteId !== participanteId) return sum;
+    return sum + parseNumberString(quantidade.quantidade);
+  }, 0);
+}
+
+function getAtaItemTotalLicitado(item: AtaRegistroPrecoWithRelations["itens"][number], participanteId?: string) {
   if (!item.resultado || item.resultado.itemFracassado || item.resultado.valorUnitarioLicitado == null) return 0;
-  const quantidadeTotal = item.quantidades.reduce((sum, quantidade) => sum + parseNumberString(quantidade.quantidade), 0);
+  const quantidadeTotal = getAtaItemQuantidadeTotal(item, participanteId);
   return quantidadeTotal * parseNumberString(item.resultado.valorUnitarioLicitado);
 }
 
-function getAtaItemTotalCotado(item: AtaRegistroPrecoWithRelations["itens"][number]) {
+function getAtaItemTotalCotado(item: AtaRegistroPrecoWithRelations["itens"][number], participanteId?: string) {
   if (!item.cotacao?.valorUnitarioCotado) return 0;
-  const quantidadeTotal = item.quantidades.reduce((sum, quantidade) => sum + parseNumberString(quantidade.quantidade), 0);
+  const quantidadeTotal = getAtaItemQuantidadeTotal(item, participanteId);
   return quantidadeTotal * parseNumberString(item.cotacao.valorUnitarioCotado);
 }
 
@@ -468,11 +475,11 @@ export default function Dashboard() {
 
   const arpMetrics = useMemo(() => {
     const previstoCotado = filteredAtasRegistroPreco.reduce(
-      (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalCotado(item), 0),
+      (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalCotado(item, filterAtaParticipante || undefined), 0),
       0,
     );
     const previstoLicitado = filteredAtasRegistroPreco.reduce(
-      (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalLicitado(item), 0),
+      (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalLicitado(item, filterAtaParticipante || undefined), 0),
       0,
     );
     const contratado = filteredAtaContratos.reduce(
@@ -521,7 +528,7 @@ export default function Dashboard() {
       0,
     );
     return { previstoCotado, previstoLicitado, contratado, empenhado, emAf, faturado, pago };
-  }, [filteredAtaContratos, filteredAtasRegistroPreco]);
+  }, [filterAtaParticipante, filteredAtaContratos, filteredAtasRegistroPreco]);
 
   const arpResumoDepartamentos = useMemo<ArpDepartmentAggregate[]>(() => {
     const map = new Map<string, ArpDepartmentAggregate>();
@@ -535,7 +542,7 @@ export default function Dashboard() {
         previsto: 0,
         contratado: 0,
       };
-      current.previsto += ata.itens.reduce((sum, item) => sum + getAtaItemTotalLicitado(item), 0);
+      current.previsto += ata.itens.reduce((sum, item) => sum + getAtaItemTotalLicitado(item, filterAtaParticipante || undefined), 0);
       map.set(departamento.id, current);
     });
 
@@ -556,7 +563,7 @@ export default function Dashboard() {
     });
 
     return Array.from(map.values()).sort((a, b) => b.contratado - a.contratado);
-  }, [filteredAtaContratos, filteredAtasRegistroPreco]);
+  }, [filterAtaParticipante, filteredAtaContratos, filteredAtasRegistroPreco]);
 
   const arpResumoFornecedores = useMemo(() => {
     const map = new Map<string, { id: string; label: string; value: number; count: number }>();
