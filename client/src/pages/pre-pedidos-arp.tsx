@@ -123,7 +123,7 @@ export default function PrePedidosArpPage() {
   const [notaForm, setNotaForm] = useState(defaultNotaForm);
   const [enviarPagamentoForm, setEnviarPagamentoForm] = useState(defaultEnviarPagamentoForm);
   const [registrarPagamentoForm, setRegistrarPagamentoForm] = useState(defaultRegistrarPagamentoForm);
-  const [selectedAtaId, setSelectedAtaId] = useState("all");
+  const [selectedAtaId, setSelectedAtaId] = useState("");
 
   const canManageArp = useMemo(() => {
     if (user?.role === "admin") return true;
@@ -170,7 +170,7 @@ export default function PrePedidosArpPage() {
   }, [disponiveis, prePedidos]);
 
   const filteredDisponiveis = useMemo(
-    () => disponiveis.filter((ata) => selectedAtaId === "all" || ata.id === selectedAtaId),
+    () => disponiveis.filter((ata) => selectedAtaId && ata.id === selectedAtaId),
     [disponiveis, selectedAtaId],
   );
 
@@ -422,12 +422,12 @@ export default function PrePedidosArpPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Ata de Registro de Preco</Label>
-              <Select value={selectedAtaId} onValueChange={setSelectedAtaId}>
+              <Select value={selectedAtaId || "none"} onValueChange={(value) => setSelectedAtaId(value === "none" ? "" : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma ata" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as atas</SelectItem>
+                  <SelectItem value="none">Selecione uma ata</SelectItem>
                   {atasFiltro.map((ata) => (
                     <SelectItem key={ata.id} value={ata.id}>
                       {ata.numeroAta}
@@ -442,6 +442,8 @@ export default function PrePedidosArpPage() {
 
       {isLoading ? (
         <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando saldos disponiveis...</CardContent></Card>
+      ) : !selectedAtaId ? (
+        <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma ata para visualizar os pre-pedidos.</CardContent></Card>
       ) : filteredDisponiveis.length === 0 ? (
         <Card><CardContent className="py-10 text-center text-muted-foreground">Nenhuma ata disponivel para pre-pedido.</CardContent></Card>
       ) : (
