@@ -52,6 +52,7 @@ const prePedidoExportColumns: ReportColumn[] = [
   { key: "ata", label: "Ata" },
   { key: "ente", label: "Ente" },
   { key: "item", label: "Item" },
+  { key: "fornecedor", label: "Fornecedor" },
   { key: "fonte", label: "Fonte de Recurso" },
   { key: "ficha", label: "Ficha" },
   { key: "classificacao", label: "Classificacao" },
@@ -122,6 +123,7 @@ export default function PrePedidosArpPage() {
   const [notaForm, setNotaForm] = useState(defaultNotaForm);
   const [enviarPagamentoForm, setEnviarPagamentoForm] = useState(defaultEnviarPagamentoForm);
   const [registrarPagamentoForm, setRegistrarPagamentoForm] = useState(defaultRegistrarPagamentoForm);
+  const [selectedAtaId, setSelectedAtaId] = useState("all");
 
   const canManageArp = useMemo(() => {
     if (user?.role === "admin") return true;
@@ -153,12 +155,35 @@ export default function PrePedidosArpPage() {
     [groupedPrePedidos],
   );
 
+  const atasFiltro = useMemo(() => {
+    const map = new Map<string, { id: string; numeroAta: string }>();
+
+    disponiveis.forEach((ata) => {
+      map.set(ata.id, { id: ata.id, numeroAta: ata.numeroAta });
+    });
+
+    prePedidos.forEach((prePedido) => {
+      map.set(prePedido.ataId, { id: prePedido.ataId, numeroAta: prePedido.ata.numeroAta });
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.numeroAta.localeCompare(b.numeroAta));
+  }, [disponiveis, prePedidos]);
+
+  const filteredDisponiveis = useMemo(
+    () => disponiveis.filter((ata) => selectedAtaId === "all" || ata.id === selectedAtaId),
+    [disponiveis, selectedAtaId],
+  );
+
+  const getFornecedorNome = (prePedido: AtaPrePedidoWithRelations) =>
+    prePedido.item.resultado?.fornecedor?.nome ?? "-";
+
   const buildExportRows = (ata: AtaPrePedidoDisponivel) => {
     const rows = groupedPrePedidos[`${ata.id}:${ata.ente.id}`] ?? [];
     return rows.map((prePedido) => ({
       ata: prePedido.ata.numeroAta,
       ente: `${prePedido.ente.sigla} - ${prePedido.ente.nome}`,
       item: `${prePedido.item.codigoInterno} - ${prePedido.item.descricao}`,
+      fornecedor: getFornecedorNome(prePedido),
       fonte: `${prePedido.fonteRecurso.codigo} - ${prePedido.fonteRecurso.nome}`,
       ficha: prePedido.ficha.codigo,
       classificacao: prePedido.ficha.classificacao,
@@ -173,6 +198,7 @@ export default function PrePedidosArpPage() {
     ata: prePedido.ata.numeroAta,
     ente: `${prePedido.ente.sigla} - ${prePedido.ente.nome}`,
     item: `${prePedido.item.codigoInterno} - ${prePedido.item.descricao}`,
+    fornecedor: getFornecedorNome(prePedido),
     fonte: `${prePedido.fonteRecurso.codigo} - ${prePedido.fonteRecurso.nome}`,
     ficha: prePedido.ficha.codigo,
     classificacao: prePedido.ficha.classificacao,
@@ -391,13 +417,36 @@ export default function PrePedidosArpPage() {
         <p className="text-muted-foreground mt-1">Solicite itens da ata por fonte de recurso e ficha, respeitando o saldo licitado do seu ente.</p>
       </div>
 
+      <Card className="border-border/50 shadow-sm">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Ata de Registro de Preco</Label>
+              <Select value={selectedAtaId} onValueChange={setSelectedAtaId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma ata" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as atas</SelectItem>
+                  {atasFiltro.map((ata) => (
+                    <SelectItem key={ata.id} value={ata.id}>
+                      {ata.numeroAta}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {isLoading ? (
         <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando saldos disponiveis...</CardContent></Card>
-      ) : disponiveis.length === 0 ? (
+      ) : filteredDisponiveis.length === 0 ? (
         <Card><CardContent className="py-10 text-center text-muted-foreground">Nenhuma ata disponivel para pre-pedido.</CardContent></Card>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {disponiveis.map((ata) => (
+          {filteredDisponiveis.map((ata) => (
             <Card key={`${ata.id}:${ata.ente.id}`} className="border-border/50 shadow-sm">
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>

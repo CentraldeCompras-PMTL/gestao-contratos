@@ -140,6 +140,10 @@ export default function Dashboard() {
   const [filterEnte, setFilterEnte] = useState("");
   const [filterFonteRecurso, setFilterFonteRecurso] = useState("");
   const [filterFicha, setFilterFicha] = useState("");
+  const [filterAtaRegistroPreco, setFilterAtaRegistroPreco] = useState("");
+  const [filterAtaProcesso, setFilterAtaProcesso] = useState("");
+  const [filterAtaFornecedor, setFilterAtaFornecedor] = useState("");
+  const [filterAtaParticipante, setFilterAtaParticipante] = useState("");
 
   const accessibleEnteIds = user?.accessibleEnteIds ?? (user?.enteId ? [user.enteId] : []);
   const showEnteFilter = user?.role === "operacional" && accessibleEnteIds.length > 1;
@@ -156,6 +160,92 @@ export default function Dashboard() {
 
   const { data: atasRegistroPreco = [], isLoading: atasLoading } = useAtasRegistroPreco({ enabled: canManageArp });
   const { data: ataContratos = [], isLoading: ataContratosLoading } = useAtaContratos({ enabled: canManageArp });
+
+  const atasArpDisponiveis = useMemo(
+    () => atasRegistroPreco.map((ata) => ({ id: ata.id, label: ata.numeroAta })).sort((a, b) => a.label.localeCompare(b.label)),
+    [atasRegistroPreco],
+  );
+
+  const processosArpDisponiveis = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>();
+    atasRegistroPreco.forEach((ata) => {
+      map.set(ata.processoDigital.id, {
+        id: ata.processoDigital.id,
+        label: ata.processoDigital.numeroProcessoDigital,
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [atasRegistroPreco]);
+
+  const participantesArpDisponiveis = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>();
+    atasRegistroPreco.forEach((ata) => {
+      ata.participantes.forEach((participante) => {
+        map.set(participante.ente.id, {
+          id: participante.ente.id,
+          label: `${participante.ente.sigla} - ${participante.ente.nome}`,
+        });
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [atasRegistroPreco]);
+
+  const fornecedoresArpDisponiveis = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>();
+
+    atasRegistroPreco.forEach((ata) => {
+      ata.fornecedores.forEach((fornecedor) => {
+        map.set(fornecedor.fornecedor.id, {
+          id: fornecedor.fornecedor.id,
+          label: fornecedor.fornecedor.nome,
+        });
+      });
+
+      ata.itens.forEach((item) => {
+        const fornecedor = item.resultado?.fornecedor;
+        if (!fornecedor) return;
+        map.set(fornecedor.id, {
+          id: fornecedor.id,
+          label: fornecedor.nome,
+        });
+      });
+    });
+
+    ataContratos.forEach((contrato) => {
+      map.set(contrato.fornecedor.id, {
+        id: contrato.fornecedor.id,
+        label: contrato.fornecedor.nome,
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [ataContratos, atasRegistroPreco]);
+
+  const filteredAtasRegistroPreco = useMemo(() => {
+    return atasRegistroPreco.filter((ata) => {
+      if (filterAtaRegistroPreco && ata.id !== filterAtaRegistroPreco) return false;
+      if (filterAtaProcesso && ata.processoDigital.id !== filterAtaProcesso) return false;
+      if (filterAtaParticipante && !ata.participantes.some((participante) => participante.ente.id === filterAtaParticipante)) return false;
+      if (
+        filterAtaFornecedor &&
+        !ata.fornecedores.some((fornecedor) => fornecedor.fornecedor.id === filterAtaFornecedor) &&
+        !ata.itens.some((item) => item.resultado?.fornecedor?.id === filterAtaFornecedor)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [atasRegistroPreco, filterAtaFornecedor, filterAtaParticipante, filterAtaProcesso, filterAtaRegistroPreco]);
+
+  const filteredAtaContratos = useMemo(() => {
+    return ataContratos.filter((contrato) => {
+      if (filterAtaRegistroPreco && contrato.ataId !== filterAtaRegistroPreco) return false;
+      if (filterAtaProcesso && contrato.ata.processoDigital.id !== filterAtaProcesso) return false;
+      if (filterAtaFornecedor && contrato.fornecedor.id !== filterAtaFornecedor) return false;
+      if (filterAtaParticipante && !contrato.prePedidos.some((prePedido) => prePedido.ente.id === filterAtaParticipante)) return false;
+      return true;
+    });
+  }, [ataContratos, filterAtaFornecedor, filterAtaParticipante, filterAtaProcesso, filterAtaRegistroPreco]);
 
   const filteredContratos = useMemo(() => {
     return contratos.filter((contrato) => {
@@ -377,15 +467,15 @@ export default function Dashboard() {
   );
 
   const arpMetrics = useMemo(() => {
-    const previstoCotado = atasRegistroPreco.reduce(
+    const previstoCotado = filteredAtasRegistroPreco.reduce(
       (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalCotado(item), 0),
       0,
     );
-    const previstoLicitado = atasRegistroPreco.reduce(
+    const previstoLicitado = filteredAtasRegistroPreco.reduce(
       (sum, ata) => sum + ata.itens.reduce((itemSum, item) => itemSum + getAtaItemTotalLicitado(item), 0),
       0,
     );
-    const contratado = ataContratos.reduce(
+    const contratado = filteredAtaContratos.reduce(
       (sum, contrato) =>
         sum +
         contrato.prePedidos.reduce((prePedidoSum, prePedido) => {
@@ -394,15 +484,15 @@ export default function Dashboard() {
         }, 0),
       0,
     );
-    const empenhado = ataContratos.reduce(
+    const empenhado = filteredAtaContratos.reduce(
       (sum, contrato) => sum + contrato.empenhos.reduce((empenhoSum, empenho) => empenhoSum + parseNumberString(empenho.valorEmpenho), 0),
       0,
     );
-    const emAf = ataContratos.reduce(
+    const emAf = filteredAtaContratos.reduce(
       (sum, contrato) => sum + contrato.empenhos.reduce((empenhoSum, empenho) => empenhoSum + empenho.afs.reduce((afSum, af) => afSum + parseNumberString(af.valorAf), 0), 0),
       0,
     );
-    const faturado = ataContratos.reduce(
+    const faturado = filteredAtaContratos.reduce(
       (sum, contrato) =>
         sum +
         contrato.empenhos.reduce(
@@ -411,7 +501,7 @@ export default function Dashboard() {
         ),
       0,
     );
-    const pago = ataContratos.reduce(
+    const pago = filteredAtaContratos.reduce(
       (sum, contrato) =>
         sum +
         contrato.empenhos.reduce(
@@ -431,12 +521,12 @@ export default function Dashboard() {
       0,
     );
     return { previstoCotado, previstoLicitado, contratado, empenhado, emAf, faturado, pago };
-  }, [ataContratos, atasRegistroPreco]);
+  }, [filteredAtaContratos, filteredAtasRegistroPreco]);
 
   const arpResumoDepartamentos = useMemo<ArpDepartmentAggregate[]>(() => {
     const map = new Map<string, ArpDepartmentAggregate>();
 
-    atasRegistroPreco.forEach((ata) => {
+    filteredAtasRegistroPreco.forEach((ata) => {
       const departamento = ata.processoDigital.departamento;
       if (!departamento) return;
       const current = map.get(departamento.id) ?? {
@@ -449,7 +539,7 @@ export default function Dashboard() {
       map.set(departamento.id, current);
     });
 
-    ataContratos.forEach((contrato: AtaContratoWithRelations) => {
+    filteredAtaContratos.forEach((contrato: AtaContratoWithRelations) => {
       const departamento = contrato.ata.processoDigital.departamento;
       if (!departamento) return;
       const current = map.get(departamento.id) ?? {
@@ -466,11 +556,11 @@ export default function Dashboard() {
     });
 
     return Array.from(map.values()).sort((a, b) => b.contratado - a.contratado);
-  }, [ataContratos, atasRegistroPreco]);
+  }, [filteredAtaContratos, filteredAtasRegistroPreco]);
 
   const arpResumoFornecedores = useMemo(() => {
     const map = new Map<string, { id: string; label: string; value: number; count: number }>();
-    ataContratos.forEach((contrato) => {
+    filteredAtaContratos.forEach((contrato) => {
       const current = map.get(contrato.fornecedor.id) ?? {
         id: contrato.fornecedor.id,
         label: contrato.fornecedor.nome,
@@ -485,7 +575,7 @@ export default function Dashboard() {
       map.set(contrato.fornecedor.id, current);
     });
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
-  }, [ataContratos]);
+  }, [filteredAtaContratos]);
 
   if (statsLoading || notifLoading || contratosLoading || departamentosLoading || entesLoading || (canManageArp && (atasLoading || ataContratosLoading))) {
     return (
@@ -689,6 +779,55 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold tracking-tight">Execucao da ARP</h2>
           <p className="text-sm text-muted-foreground">Acompanhe previsto, contratado, empenhado, faturado e pago das atas de registro de preco.</p>
         </div>
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20">
+            <CardTitle className="text-lg">Filtros da ARP</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Ata de RP</label>
+                <Select value={filterAtaRegistroPreco || "all"} onValueChange={(v) => setFilterAtaRegistroPreco(v === "all" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Todas as atas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as atas</SelectItem>
+                    {atasArpDisponiveis.map((ata) => <SelectItem key={ata.id} value={ata.id}>{ata.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Processo da ARP</label>
+                <Select value={filterAtaProcesso || "all"} onValueChange={(v) => setFilterAtaProcesso(v === "all" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Todos os processos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os processos</SelectItem>
+                    {processosArpDisponiveis.map((processo) => <SelectItem key={processo.id} value={processo.id}>{processo.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Participante</label>
+                <Select value={filterAtaParticipante || "all"} onValueChange={(v) => setFilterAtaParticipante(v === "all" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Todos os participantes" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os participantes</SelectItem>
+                    {participantesArpDisponiveis.map((participante) => <SelectItem key={participante.id} value={participante.id}>{participante.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Fornecedor da ARP</label>
+                <Select value={filterAtaFornecedor || "all"} onValueChange={(v) => setFilterAtaFornecedor(v === "all" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os fornecedores</SelectItem>
+                    {fornecedoresArpDisponiveis.map((fornecedor) => <SelectItem key={fornecedor.id} value={fornecedor.id}>{fornecedor.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <Card className="border-border/50 shadow-md">
             <CardContent className="p-6">
