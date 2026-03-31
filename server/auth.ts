@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import type { PublicUser, User } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
+import { createRateLimit } from "./rate-limit";
 
 const PostgresStore = connectPg(session);
 const scryptAsync = promisify(scrypt);
@@ -41,9 +42,30 @@ function toPublicUser(user: AuthenticatedUser): PublicUser {
   };
 }
 
+function resolveSessionSecret() {
+  const secret = process.env.SESSION_SECRET;
+  if (process.env.NODE_ENV === "production") {
+    if (!secret || secret === "gestao-contratos-secret" || secret.length < 32) {
+      throw new Error("SESSION_SECRET invalido para producao. Defina uma chave longa e aleatoria.");
+    }
+  }
+  return secret || "gestao-contratos-secret";
+}
+
 export function setupAuth(app: Express) {
+  const sessionSecret = resolveSessionSecret();
+  const isProduction = app.get("env") === "production";
+  const loginRateLimit = createRateLimit({
+    windowMs: 15 * 60 * 1000,
+    maxAttempts: 10,
+    message: "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.",
+    keyPrefix: "login",
+    getKey: (req) => `${req.ip}:${String(req.body?.email ?? "").trim().toLowerCase()}`,
+  });
+
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "gestao-contratos-secret",
+    name: "sigec.sid",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     store: new PostgresStore({
@@ -51,7 +73,9 @@ export function setupAuth(app: Express) {
       tableName: "session",
     }),
     cookie: {
-      secure: app.get("env") === "production",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProduction,
       maxAge: 30 * 24 * 60 * 60 * 1000,
     },
   };
@@ -94,17 +118,24 @@ export function setupAuth(app: Express) {
     res.status(403).json({ message: "Cadastro publico desabilitado" });
   });
 
-  app.post("/api/login", (req, res, next) => {
+  app.post("/api/login", loginRateLimit, (req, res, next) => {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: info?.message || "Erro no login" });
-      req.login(user, (loginErr) => {
-        if (loginErr) return next(loginErr);
-        storage.getUserEnteIds(user.id)
-          .then((accessibleEnteIds) => {
-            res.status(200).json(toPublicUser({ ...user, accessibleEnteIds }));
-          })
-          .catch(next);
+      req.session.regenerate((sessionErr) => {
+        if (sessionErr) return next(sessionErr);
+        req.login(user, (loginErr) => {
+          if (loginErr) return next(loginErr);
+          storage.getUserEnteIds(user.id)
+            .then((accessibleEnteIds) => {
+              req.session.save((saveErr) => {
+                if (saveErr) return next(saveErr);
+                res.setHeader("Cache-Control", "no-store");
+                res.status(200).json(toPublicUser({ ...user, accessibleEnteIds }));
+              });
+            })
+            .catch(next);
+        });
       });
     })(req, res, next);
   });
@@ -112,7 +143,11 @@ export function setupAuth(app: Express) {
   app.post("/api/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.status(200).json({ message: "Deslogado com sucesso" });
+      req.session.destroy((destroyErr) => {
+        if (destroyErr) return next(destroyErr);
+        res.clearCookie("sigec.sid");
+        res.status(200).json({ message: "Deslogado com sucesso" });
+      });
     });
   });
 
@@ -120,6 +155,7 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Nao autorizado" });
     }
+    res.setHeader("Cache-Control", "no-store");
     res.json(toPublicUser(req.user as AuthenticatedUser));
   });
 }

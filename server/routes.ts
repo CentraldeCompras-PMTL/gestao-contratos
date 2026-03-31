@@ -8,6 +8,7 @@ import { HttpError, ensureDateOrder, parseDateOnly, parseMoney, startOfTodayUtc 
 import { sendMail } from "./mail";
 import { createResetToken, hashToken } from "./security";
 import { registerAtaRegistroPrecoRoutes } from "./routes-arp";
+import { createRateLimit } from "./rate-limit";
 
 function getErrorStatus(error: unknown): number {
   if (error instanceof HttpError) return error.status;
@@ -163,6 +164,27 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   setupAuth(app);
+  const passwordRecoveryRateLimit = createRateLimit({
+    windowMs: 15 * 60 * 1000,
+    maxAttempts: 5,
+    message: "Muitas solicitacoes de recuperacao de senha. Aguarde alguns minutos e tente novamente.",
+    keyPrefix: "forgot-password",
+    getKey: (req) => `${req.ip}:${String(req.body?.email ?? "").trim().toLowerCase()}`,
+  });
+  const passwordResetRateLimit = createRateLimit({
+    windowMs: 15 * 60 * 1000,
+    maxAttempts: 8,
+    message: "Muitas tentativas de redefinicao de senha. Aguarde alguns minutos e tente novamente.",
+    keyPrefix: "reset-password",
+    getKey: (req) => `${req.ip}:${String(req.body?.token ?? "").trim()}`,
+  });
+  const passwordChangeRateLimit = createRateLimit({
+    windowMs: 15 * 60 * 1000,
+    maxAttempts: 8,
+    message: "Muitas tentativas de alteracao de senha. Aguarde alguns minutos e tente novamente.",
+    keyPrefix: "change-password",
+    getKey: (req) => `${req.ip}:${(req.user as { id?: string } | undefined)?.id ?? "anon"}`,
+  });
 
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
@@ -362,7 +384,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.auth.forgotPassword.path, async (req, res) => {
+  app.post(api.auth.forgotPassword.path, passwordRecoveryRateLimit, async (req, res) => {
     try {
       const { email } = api.auth.forgotPassword.input.parse(req.body);
       const user = await storage.getUserByEmail(email);
@@ -397,7 +419,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.auth.resetPassword.path, async (req, res) => {
+  app.post(api.auth.resetPassword.path, passwordResetRateLimit, async (req, res) => {
     try {
       const data = api.auth.resetPassword.input.parse(req.body);
       const token = await storage.getValidPasswordResetToken(hashToken(data.token));
@@ -420,7 +442,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.auth.changePassword.path, requireAuth, async (req, res) => {
+  app.post(api.auth.changePassword.path, requireAuth, passwordChangeRateLimit, async (req, res) => {
     try {
       const data = api.auth.changePassword.input.parse(req.body);
       const authenticatedUserId = (req.user as { id: string } | undefined)?.id;

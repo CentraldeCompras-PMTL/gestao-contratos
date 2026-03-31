@@ -542,10 +542,13 @@ export default function PrePedidosArpPage() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => deletePrePedido.mutate(prePedido.id, {
-                                      onSuccess: () => toast({ title: "Registro excluido com sucesso!" }),
-                                      onError: (error) => toast({ variant: "destructive", title: "Erro", description: error instanceof Error ? error.message : "Erro ao excluir pre-pedido" }),
-                                    })}
+                                    onClick={() => {
+                                      if (!window.confirm(`Deseja realmente excluir o pre-pedido ${prePedido.id}?`)) return;
+                                      deletePrePedido.mutate(prePedido.id, {
+                                        onSuccess: () => toast({ title: "Registro excluido com sucesso!" }),
+                                        onError: (error) => toast({ variant: "destructive", title: "Erro", description: error instanceof Error ? error.message : "Erro ao excluir pre-pedido" }),
+                                      });
+                                    }}
                                   >
                                     <Trash2 size={16} />
                                   </Button>
