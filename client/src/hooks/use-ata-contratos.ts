@@ -45,7 +45,6 @@ export function useCreateAtaContrato() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
       invalidateDashboardQueries(queryClient);
@@ -80,7 +79,6 @@ export function useCreateAtaEmpenho() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       invalidateDashboardQueries(queryClient);
     },
   });
@@ -112,7 +110,6 @@ export function useCreateAtaAf() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       invalidateDashboardQueries(queryClient);
     },
   });
@@ -144,7 +141,6 @@ export function useCreateAtaNotaFiscal() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       invalidateDashboardQueries(queryClient);
     },
   });
@@ -174,7 +170,6 @@ export function useSendAtaNotaFiscalToPayment() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       invalidateDashboardQueries(queryClient);
     },
   });
@@ -203,7 +198,6 @@ export function useRegisterAtaNotaFiscalPayment() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       invalidateDashboardQueries(queryClient);
     },
   });

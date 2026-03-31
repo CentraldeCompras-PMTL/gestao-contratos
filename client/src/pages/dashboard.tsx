@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 import { useContratos } from "@/hooks/use-contratos";
 import { useNotificacoes } from "@/hooks/use-notificacoes";
@@ -167,26 +167,32 @@ export default function Dashboard() {
 
   const { data: atasRegistroPreco = [], isLoading: atasLoading } = useAtasRegistroPreco({ enabled: canManageArp });
   const { data: ataContratos = [], isLoading: ataContratosLoading } = useAtaContratos({ enabled: canManageArp });
+  const deferredContratos = useDeferredValue(contratos);
+  const deferredNotificacoes = useDeferredValue(notificacoes);
+  const deferredDepartamentos = useDeferredValue(departamentos);
+  const deferredEntes = useDeferredValue(entes);
+  const deferredAtasRegistroPreco = useDeferredValue(atasRegistroPreco);
+  const deferredAtaContratos = useDeferredValue(ataContratos);
 
   const atasArpDisponiveis = useMemo(
-    () => atasRegistroPreco.map((ata) => ({ id: ata.id, label: ata.numeroAta })).sort((a, b) => a.label.localeCompare(b.label)),
-    [atasRegistroPreco],
+    () => deferredAtasRegistroPreco.map((ata) => ({ id: ata.id, label: ata.numeroAta })).sort((a, b) => a.label.localeCompare(b.label)),
+    [deferredAtasRegistroPreco],
   );
 
   const processosArpDisponiveis = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
-    atasRegistroPreco.forEach((ata) => {
+    deferredAtasRegistroPreco.forEach((ata) => {
       map.set(ata.processoDigital.id, {
         id: ata.processoDigital.id,
         label: ata.processoDigital.numeroProcessoDigital,
       });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [atasRegistroPreco]);
+  }, [deferredAtasRegistroPreco]);
 
   const participantesArpDisponiveis = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
-    atasRegistroPreco.forEach((ata) => {
+    deferredAtasRegistroPreco.forEach((ata) => {
       ata.participantes.forEach((participante) => {
         map.set(participante.ente.id, {
           id: participante.ente.id,
@@ -195,12 +201,12 @@ export default function Dashboard() {
       });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [atasRegistroPreco]);
+  }, [deferredAtasRegistroPreco]);
 
   const fornecedoresArpDisponiveis = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
 
-    atasRegistroPreco.forEach((ata) => {
+    deferredAtasRegistroPreco.forEach((ata) => {
       ata.fornecedores.forEach((fornecedor) => {
         map.set(fornecedor.fornecedor.id, {
           id: fornecedor.fornecedor.id,
@@ -218,7 +224,7 @@ export default function Dashboard() {
       });
     });
 
-    ataContratos.forEach((contrato) => {
+    deferredAtaContratos.forEach((contrato) => {
       map.set(contrato.fornecedor.id, {
         id: contrato.fornecedor.id,
         label: contrato.fornecedor.nome,
@@ -226,10 +232,10 @@ export default function Dashboard() {
     });
 
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [ataContratos, atasRegistroPreco]);
+  }, [deferredAtaContratos, deferredAtasRegistroPreco]);
 
   const filteredAtasRegistroPreco = useMemo(() => {
-    return atasRegistroPreco.filter((ata) => {
+    return deferredAtasRegistroPreco.filter((ata) => {
       if (filterAtaRegistroPreco && ata.id !== filterAtaRegistroPreco) return false;
       if (filterAtaProcesso && ata.processoDigital.id !== filterAtaProcesso) return false;
       if (filterAtaParticipante && !ata.participantes.some((participante) => participante.ente.id === filterAtaParticipante)) return false;
@@ -242,20 +248,20 @@ export default function Dashboard() {
       }
       return true;
     });
-  }, [atasRegistroPreco, filterAtaFornecedor, filterAtaParticipante, filterAtaProcesso, filterAtaRegistroPreco]);
+  }, [deferredAtasRegistroPreco, filterAtaFornecedor, filterAtaParticipante, filterAtaProcesso, filterAtaRegistroPreco]);
 
   const filteredAtaContratos = useMemo(() => {
-    return ataContratos.filter((contrato) => {
+    return deferredAtaContratos.filter((contrato) => {
       if (filterAtaRegistroPreco && contrato.ataId !== filterAtaRegistroPreco) return false;
       if (filterAtaProcesso && contrato.ata.processoDigital.id !== filterAtaProcesso) return false;
       if (filterAtaFornecedor && contrato.fornecedor.id !== filterAtaFornecedor) return false;
       if (filterAtaParticipante && !contrato.prePedidos.some((prePedido) => prePedido.ente.id === filterAtaParticipante)) return false;
       return true;
     });
-  }, [ataContratos, filterAtaFornecedor, filterAtaParticipante, filterAtaProcesso, filterAtaRegistroPreco]);
+  }, [deferredAtaContratos, filterAtaFornecedor, filterAtaParticipante, filterAtaProcesso, filterAtaRegistroPreco]);
 
   const filteredContratos = useMemo(() => {
-    return contratos.filter((contrato) => {
+    return deferredContratos.filter((contrato) => {
       const matchesFonte = !filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso);
       const matchesFicha = !filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha);
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
@@ -265,10 +271,10 @@ export default function Dashboard() {
       if (!matchesFonte || !matchesFicha) return false;
       return true;
     });
-  }, [contratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const fornecedoresUnicos = useMemo(() => {
-    const base = contratos.filter((contrato) => {
+    const base = deferredContratos.filter((contrato) => {
       if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
@@ -277,10 +283,10 @@ export default function Dashboard() {
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.fornecedor.id, (contrato) => contrato.fornecedor.nome);
-  }, [contratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterProcesso, showEnteFilter]);
 
   const processosUnicos = useMemo(() => {
-    const base = contratos.filter((contrato) => {
+    const base = deferredContratos.filter((contrato) => {
       if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
@@ -289,7 +295,7 @@ export default function Dashboard() {
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.processoDigital.id, (contrato) => contrato.processoDigital.numeroProcessoDigital);
-  }, [contratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, showEnteFilter]);
+  }, [deferredContratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, showEnteFilter]);
 
   const departamentosUnicos = useMemo(() => {
     if (filterProcesso) {
@@ -304,12 +310,12 @@ export default function Dashboard() {
     }
 
     const departamentosFiltradosPorEnte = showEnteFilter && filterEnte
-      ? departamentos.filter((departamento) => departamento.enteId === filterEnte)
-      : departamentos;
+      ? deferredDepartamentos.filter((departamento) => departamento.enteId === filterEnte)
+      : deferredDepartamentos;
 
     const departamentosBase = filterFornecedor
       ? departamentosFiltradosPorEnte.filter((departamento) =>
-          contratos.some(
+          deferredContratos.some(
             (contrato) =>
               (!showEnteFilter || !filterEnte || contrato.processoDigital.departamento?.enteId === filterEnte) &&
               (!filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) &&
@@ -321,7 +327,7 @@ export default function Dashboard() {
       : departamentosFiltradosPorEnte;
 
     return aggregateBy(
-      contratos.filter((contrato) => {
+      deferredContratos.filter((contrato) => {
         if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
         if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
         if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
@@ -333,16 +339,16 @@ export default function Dashboard() {
       (contrato) => getContratoDepartamentoId(contrato),
       (contrato) => getContratoDepartamentoNome(contrato),
     ).sort((a, b) => a.label.localeCompare(b.label));
-  }, [contratos, departamentos, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, deferredDepartamentos, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const entesDisponiveis = useMemo(() => {
     if (!showEnteFilter) return [];
-    return entes.filter((ente) => accessibleEnteIds.includes(ente.id));
-  }, [accessibleEnteIds, entes, showEnteFilter]);
+    return deferredEntes.filter((ente) => accessibleEnteIds.includes(ente.id));
+  }, [accessibleEnteIds, deferredEntes, showEnteFilter]);
 
   const fontesDisponiveis = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
-    contratos.forEach((contrato) => {
+    deferredContratos.forEach((contrato) => {
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
@@ -355,11 +361,11 @@ export default function Dashboard() {
       });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [contratos, filterDepartamento, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterDepartamento, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const fichasDisponiveis = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
-    contratos.forEach((contrato) => {
+    deferredContratos.forEach((contrato) => {
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
@@ -373,7 +379,7 @@ export default function Dashboard() {
       });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [contratos, filterDepartamento, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterDepartamento, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const saldoFiltrado = useMemo(() => {
     let total = 0;
@@ -595,8 +601,8 @@ export default function Dashboard() {
     );
   }
 
-  const alertasAtraso = notificacoes.filter((n) => n.isLate);
-  const alertasAtencao = notificacoes.filter((n) => !n.isLate);
+  const alertasAtraso = deferredNotificacoes.filter((n) => n.isLate);
+  const alertasAtencao = deferredNotificacoes.filter((n) => !n.isLate);
   const overview: DashboardStatsType | undefined = stats;
 
   const kpis = [

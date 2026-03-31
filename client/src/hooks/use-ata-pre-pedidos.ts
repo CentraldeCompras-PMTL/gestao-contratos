@@ -60,7 +60,6 @@ export function useCreateAtaPrePedidos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.atasRegistroPreco.list.path] });
       invalidateDashboardQueries(queryClient);
     },
   });
@@ -148,7 +147,6 @@ export function useCreateAtaPrePedidoEmpenho() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.ataPrePedidos.disponiveis.path] });
-      queryClient.invalidateQueries({ queryKey: [api.ataContratos.list.path] });
       invalidateDashboardQueries(queryClient);
     },
   });

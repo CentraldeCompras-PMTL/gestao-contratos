@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { api, buildUrl } from "@shared/routes";
 import type { InsertNotaFiscal, NotaFiscalWithRelations } from "@shared/schema";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 
 async function readErrorMessage(res: Response, fallback: string) {
   try {
@@ -38,6 +39,7 @@ export function useCreateNotaFiscal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.notasFiscais.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -58,6 +60,7 @@ export function useSendNotaFiscalToPayment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.notasFiscais.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -78,7 +81,7 @@ export function useRegisterNotaFiscalPayment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.notasFiscais.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -97,7 +100,7 @@ export function useDeleteNotaFiscal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.notasFiscais.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }

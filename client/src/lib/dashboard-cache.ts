@@ -10,8 +10,6 @@ const dashboardQueryKeys = [
   [api.fontesRecurso.list.path],
   [api.atasRegistroPreco.list.path],
   [api.ataContratos.list.path],
-  [api.ataPrePedidos.list.path],
-  [api.ataPrePedidos.disponiveis.path],
 ] as const;
 
 export function invalidateDashboardQueries(queryClient: QueryClient) {

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { AfWithRelations, InsertAf } from "@shared/schema";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 
 async function readErrorMessage(res: Response, fallback: string) {
   try {
@@ -28,7 +29,7 @@ export function useCreateAf() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
-      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }
@@ -47,8 +48,8 @@ export function useNotifyAf() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }
@@ -69,8 +70,8 @@ export function useUpdateEntregaAf() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
+      invalidateDashboardQueries(queryClient);
     }
   });
 }
@@ -102,8 +103,8 @@ export function useExtendAf() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -122,9 +123,8 @@ export function useDeleteAf() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.afs.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.notificacoes.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.contratos.get.path] });
-      queryClient.invalidateQueries({ queryKey: [api.dashboard.stats.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
