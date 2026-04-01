@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createGzip } from "zlib";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -23,6 +24,30 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 app.use(securityHeaders);
+
+// gzip compression for API responses
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api")) return next();
+  const acceptEncoding = req.headers["accept-encoding"] || "";
+  if (!acceptEncoding.includes("gzip")) return next();
+
+  const originalJson = res.json.bind(res);
+  res.json = function (body: any) {
+    const jsonStr = JSON.stringify(body);
+    // only compress responses larger than 1KB
+    if (jsonStr.length < 1024) {
+      return originalJson(body);
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Encoding", "gzip");
+    res.removeHeader("Content-Length");
+    const gzip = createGzip();
+    gzip.pipe(res);
+    gzip.end(jsonStr);
+    return res;
+  };
+  next();
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -51,7 +76,8 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        const body = JSON.stringify(capturedJsonResponse);
+        logLine += ` :: ${body.length > 200 ? body.slice(0, 200) + '...' : body}`;
       }
 
       log(logLine);

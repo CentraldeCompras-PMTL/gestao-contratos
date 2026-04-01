@@ -868,8 +868,8 @@ export async function registerRoutes(
       if (processo.fases.length > 0) {
         throw new HttpError(400, "Nao e possivel excluir processo com fases cadastradas");
       }
-      const contratosDoProcesso = (await storage.getContratos()).filter((item) => item.processoDigitalId === processo.id);
-      if (contratosDoProcesso.length > 0) {
+      const contratoCount = await storage.countContratosByProcesso(processo.id);
+      if (contratoCount > 0) {
         throw new HttpError(400, "Nao e possivel excluir processo com contratos vinculados");
       }
       const deleted = await storage.deleteProcessoDigital(req.params.id);
@@ -982,8 +982,8 @@ export async function registerRoutes(
       }
       const processo = await storage.getProcessoDigital(fase.processoDigitalId);
       ensureEnteAccess(req, processo?.departamento?.enteId);
-      const contratosDaFase = (await storage.getContratos()).filter((item) => item.faseContratacaoId === fase.id);
-      if (contratosDaFase.length > 0) {
+      const contratoCount = await storage.countContratosByFase(fase.id);
+      if (contratoCount > 0) {
         throw new HttpError(400, "Nao e possivel excluir fase vinculada a contrato");
       }
       const deleted = await storage.deleteFaseContratacao(req.params.id);

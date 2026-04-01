@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -7,27 +8,39 @@ import { useAuth } from "./hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
 import Login from "./pages/login";
-import ForgotPassword from "./pages/forgot-password";
-import ResetPassword from "./pages/reset-password";
-import ChangePassword from "./pages/change-password";
-import Dashboard from "./pages/dashboard";
-import Fornecedores from "./pages/fornecedores";
-import FontesRecursoPage from "./pages/fontes-recurso";
-import AtasRegistroPrecoPage from "./pages/atas-registro-preco";
-import PrePedidosArpPage from "./pages/pre-pedidos-arp";
-import ContratosArpPage from "./pages/contratos-arp";
-import Processos from "./pages/processos";
-import Fases from "./pages/fases";
-import Contratos from "./pages/contratos";
-import ContratoDetail from "./pages/contratos/[id]";
-import Departamentos from "./pages/departamentos";
-import EntesPage from "./pages/entes";
-import NotasFiscais from "./pages/notas-fiscais";
-import AfsPanel from "./pages/afs";
-import Notificacoes from "./pages/notificacoes";
-import Usuarios from "./pages/usuarios";
-import Auditoria from "./pages/auditoria";
-import Relatorios from "./pages/relatorios";
+
+const ForgotPassword = lazy(() => import("./pages/forgot-password"));
+const ResetPassword = lazy(() => import("./pages/reset-password"));
+const ChangePassword = lazy(() => import("./pages/change-password"));
+const Dashboard = lazy(() => import("./pages/dashboard"));
+const Fornecedores = lazy(() => import("./pages/fornecedores"));
+const FontesRecursoPage = lazy(() => import("./pages/fontes-recurso"));
+const AtasRegistroPrecoPage = lazy(() => import("./pages/atas-registro-preco"));
+const PrePedidosArpPage = lazy(() => import("./pages/pre-pedidos-arp"));
+const ContratosArpPage = lazy(() => import("./pages/contratos-arp"));
+const Processos = lazy(() => import("./pages/processos"));
+const Fases = lazy(() => import("./pages/fases"));
+const Contratos = lazy(() => import("./pages/contratos"));
+const ContratoDetail = lazy(() => import("./pages/contratos/[id]"));
+const Departamentos = lazy(() => import("./pages/departamentos"));
+const EntesPage = lazy(() => import("./pages/entes"));
+const NotasFiscais = lazy(() => import("./pages/notas-fiscais"));
+const AfsPanel = lazy(() => import("./pages/afs"));
+const Notificacoes = lazy(() => import("./pages/notificacoes"));
+const Usuarios = lazy(() => import("./pages/usuarios"));
+const Auditoria = lazy(() => import("./pages/auditoria"));
+const Relatorios = lazy(() => import("./pages/relatorios"));
+
+function PageLoader() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    </div>
+  );
+}
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -93,7 +106,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <Suspense fallback={<PageLoader />}>
+          <Router />
+        </Suspense>
       </TooltipProvider>
     </QueryClientProvider>
   );

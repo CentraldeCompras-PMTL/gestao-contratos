@@ -263,6 +263,22 @@ export class DatabaseStorage implements IStorage {
     return result?.value ?? 0;
   }
 
+  async countContratosByProcesso(processoDigitalId: string): Promise<number> {
+    const [result] = await db
+      .select({ value: count() })
+      .from(contratos)
+      .where(eq(contratos.processoDigitalId, processoDigitalId));
+    return result?.value ?? 0;
+  }
+
+  async countContratosByFase(faseContratacaoId: string): Promise<number> {
+    const [result] = await db
+      .select({ value: count() })
+      .from(contratos)
+      .where(eq(contratos.faseContratacaoId, faseContratacaoId));
+    return result?.value ?? 0;
+  }
+
   async countFasesByFornecedor(fornecedorId: string): Promise<number> {
     const [result] = await db
       .select({ value: count() })
