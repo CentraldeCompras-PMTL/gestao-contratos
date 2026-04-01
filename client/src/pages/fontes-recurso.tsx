@@ -23,7 +23,7 @@ import { Edit2, Plus, Trash2 } from "lucide-react";
 import type { FichaOrcamentaria, FonteRecursoWithFichas, ProjetoAtividade } from "@shared/schema";
 
 const defaultFonteForm = { nome: "", codigo: "" };
-const defaultFichaForm = { codigo: "", projetoAtividadeId: "", classificacao: "consumo" as "consumo" | "servico" | "permanente" };
+const defaultFichaForm = { codigo: "", projetoAtividadeId: "", classificacao: "" };
 const defaultProjetoAtividadeForm = { codigo: "", descricao: "" };
 
 export default function FontesRecursoPage() {
@@ -255,7 +255,7 @@ export default function FontesRecursoPage() {
                                 setFichaForm({
                                   codigo: ficha.codigo,
                                   projetoAtividadeId: ficha.projetoAtividadeId,
-                                  classificacao: ficha.classificacao as typeof defaultFichaForm.classificacao,
+                                  classificacao: ficha.classificacao,
                                 });
                               }}>
                                 <Edit2 size={16} />
@@ -349,14 +349,19 @@ export default function FontesRecursoPage() {
             </div>
             <div className="space-y-2">
               <Label>Classificacao</Label>
-              <Select value={fichaForm.classificacao} onValueChange={(value: typeof defaultFichaForm.classificacao) => setFichaForm((current) => ({ ...current, classificacao: value }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="consumo">Consumo</SelectItem>
-                  <SelectItem value="servico">Servico</SelectItem>
-                  <SelectItem value="permanente">Permanente</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                value={fichaForm.classificacao}
+                onChange={(e) => setFichaForm((current) => ({ ...current, classificacao: e.target.value }))}
+                placeholder="Ex: consumo, servico, permanente..."
+                list="classificacoes-list"
+                required
+              />
+              <datalist id="classificacoes-list">
+                {Array.from(new Set(fontes.flatMap((f) => f.fichas.map((fi) => fi.classificacao)))).map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">Digite uma classificacao existente ou crie uma nova.</p>
             </div>
             <Button type="submit" className="w-full" disabled={createFicha.isPending || updateFicha.isPending}>
               {createFicha.isPending || updateFicha.isPending ? "Salvando..." : "Salvar"}
