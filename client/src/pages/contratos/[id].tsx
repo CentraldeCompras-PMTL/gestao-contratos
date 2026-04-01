@@ -67,6 +67,7 @@ export default function ContratoDetail() {
   const [empenhoDialog, setEmpenhoDialog] = useState(false);
   const [empForm, setEmpForm] = useState({ dataEmpenho: "", valorEmpenho: "", fonteRecursoId: "", fichaId: "", numeroEmpenho: "" });
 
+  const [afDialog, setAfDialog] = useState<string | null>(null);
   const [afForm, setAfForm] = useState({ dataPedidoAf: "", valorAf: "", numeroAf: "" });
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [motivoEncerramento, setMotivoEncerramento] = useState("");
