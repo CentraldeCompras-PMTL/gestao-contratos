@@ -209,6 +209,7 @@ export default function AfsPanel() {
     list.map((af) => (
       <TableRow key={af.id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
         <TableCell className="font-medium">{af.empenho.contrato.numeroContrato}</TableCell>
+        <TableCell className="font-medium text-center">{af.numeroAf}</TableCell>
         <TableCell className="text-sm">{af.empenho.contrato.fornecedor.nome}</TableCell>
         <TableCell className="text-sm text-muted-foreground">{af.empenho.contrato.processoDigital.numeroProcessoDigital}</TableCell>
         <TableCell className="font-medium">{formatCurrency(parseNumberString(af.valorAf))}</TableCell>
@@ -314,6 +315,7 @@ export default function AfsPanel() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Contrato</TableHead>
+                    <TableHead className="text-center">Número AF</TableHead>
                     <TableHead>Fornecedor</TableHead>
                     <TableHead>Processo</TableHead>
                     <TableHead>Valor AF</TableHead>
@@ -324,9 +326,9 @@ export default function AfsPanel() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8"><div className="flex flex-col items-center"><Package className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhuma AF</p></div></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8"><div className="flex flex-col items-center"><Package className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhuma AF</p></div></TableCell></TableRow>
                   ) : renderRows(filtered, false)}
                 </TableBody>
               </Table>
@@ -339,6 +341,7 @@ export default function AfsPanel() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Contrato</TableHead>
+                    <TableHead className="text-center">Número AF</TableHead>
                     <TableHead>Fornecedor</TableHead>
                     <TableHead>Processo</TableHead>
                     <TableHead>Valor AF</TableHead>
@@ -349,9 +352,9 @@ export default function AfsPanel() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8"><div className="flex flex-col items-center"><Package className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhuma AF entregue</p></div></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8"><div className="flex flex-col items-center"><Package className="w-12 h-12 text-muted-foreground/30 mb-2" /><p className="text-muted-foreground">Nenhuma AF entregue</p></div></TableCell></TableRow>
                   ) : renderRows(filtered, true)}
                 </TableBody>
               </Table>
