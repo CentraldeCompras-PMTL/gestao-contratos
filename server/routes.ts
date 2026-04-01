@@ -997,6 +997,15 @@ export async function registerRoutes(
   });
 
   app.get(api.contratos.list.path, requireAuth, async (req, res) => {
+    const c = await storage.getContratosLight();
+    if (!isAdmin(req)) {
+      return res.json(c.filter((item) => hasEnteAccess(req, item.processoDigital.departamento?.enteId)));
+    }
+    res.json(c);
+  });
+
+  // Full contratos with all relations (empenhos, AFs, notas, etc.) — used by dashboard
+  app.get(api.contratos.listFull.path, requireAuth, async (req, res) => {
     const c = await storage.getContratos();
     if (!isAdmin(req)) {
       return res.json(c.filter((item) => hasEnteAccess(req, item.processoDigital.departamento?.enteId)));

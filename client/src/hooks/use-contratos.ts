@@ -22,6 +22,17 @@ export function useContratos() {
   });
 }
 
+export function useContratosFull() {
+  return useQuery<ContratoWithRelations[]>({
+    queryKey: [api.contratos.listFull.path],
+    queryFn: async () => {
+      const res = await fetch(api.contratos.listFull.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    }
+  });
+}
+
 export function useContrato(id: string) {
   return useQuery<ContratoWithRelations>({
     queryKey: [api.contratos.get.path, id],

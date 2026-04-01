@@ -484,6 +484,28 @@ export class DatabaseStorage implements IStorage {
     return cs as ContratoWithRelations[];
   }
 
+  async getContratosLight() {
+    return await db.query.contratos.findMany({
+      with: {
+        processoDigital: {
+          with: {
+            departamento: {
+              with: { ente: true },
+            },
+          },
+        },
+        faseContratacao: {
+          with: {
+            departamento: true,
+            fornecedor: true,
+          },
+        },
+        departamento: true,
+        fornecedor: true,
+      }
+    });
+  }
+
   async getContrato(id: string): Promise<ContratoWithRelations | undefined> {
     const c = await db.query.contratos.findFirst({
       where: eq(contratos.id, id),

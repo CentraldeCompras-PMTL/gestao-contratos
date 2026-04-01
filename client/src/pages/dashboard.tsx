@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useDashboardStats } from "@/hooks/use-dashboard";
-import { useContratos } from "@/hooks/use-contratos";
+import { useContratosFull } from "@/hooks/use-contratos";
 import { useNotificacoes } from "@/hooks/use-notificacoes";
 import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useEntes } from "@/hooks/use-entes";
@@ -136,7 +136,7 @@ function getAtaItemTotalCotado(item: AtaRegistroPrecoWithRelations["itens"][numb
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: contratos = [], isLoading: contratosLoading } = useContratos();
+  const { data: contratos = [], isLoading: contratosLoading } = useContratosFull();
   const { data: notificacoes = [], isLoading: notifLoading } = useNotificacoes();
   const { data: departamentos = [], isLoading: departamentosLoading } = useDepartamentos();
   const { data: entes = [], isLoading: entesLoading } = useEntes();

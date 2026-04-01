@@ -552,6 +552,11 @@ export const api = {
       path: '/api/contratos' as const,
       responses: { 200: z.array(contratoWithRelationsSchema) },
     },
+    listFull: {
+      method: 'GET' as const,
+      path: '/api/contratos/full' as const,
+      responses: { 200: z.array(contratoWithRelationsSchema) },
+    },
     get: {
       method: 'GET' as const,
       path: '/api/contratos/:id' as const,
