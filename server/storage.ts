@@ -279,6 +279,14 @@ export class DatabaseStorage implements IStorage {
     return result?.value ?? 0;
   }
 
+  async countEmpenhosByFicha(fichaId: string): Promise<number> {
+    const [result] = await db
+      .select({ value: count() })
+      .from(empenhos)
+      .where(eq(empenhos.fichaId, fichaId));
+    return result?.value ?? 0;
+  }
+
   async countFasesByFornecedor(fornecedorId: string): Promise<number> {
     const [result] = await db
       .select({ value: count() })

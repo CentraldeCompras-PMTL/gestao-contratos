@@ -706,9 +706,8 @@ export async function registerRoutes(
     try {
       const ficha = await storage.getFicha(req.params.id);
       if (!ficha) return res.status(404).json({ message: "Ficha nao encontrada" });
-      const contratos = await storage.getContratos();
-      const hasEmpenhos = contratos.some((contrato) => contrato.empenhos.some((empenho) => empenho.fichaId === ficha.id));
-      if (hasEmpenhos) {
+      const empenhoCount = await storage.countEmpenhosByFicha(ficha.id);
+      if (empenhoCount > 0) {
         throw new HttpError(400, "Nao e possivel excluir ficha com empenhos vinculados");
       }
       const deleted = await storage.deleteFicha(ficha.id);
