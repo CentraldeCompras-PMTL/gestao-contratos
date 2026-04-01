@@ -263,6 +263,7 @@ export const ataEmpenhos = pgTable("ata_empenhos", {
 export const ataAfs = pgTable("ata_afs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ataEmpenhoId: varchar("ata_empenho_id").references(() => ataEmpenhos.id).notNull(),
+  numeroAf: text("numero_af").notNull().default("S/N"),
   dataPedidoAf: date("data_pedido_af", { mode: "string" }).notNull(),
   quantidadeAf: numeric("quantidade_af", { precision: 14, scale: 2 }).notNull(),
   valorAf: numeric("valor_af", { precision: 14, scale: 2 }).notNull(),
@@ -292,6 +293,7 @@ export const empenhos = pgTable("empenhos", {
   contratoId: varchar("contrato_id").references(() => contratos.id).notNull(),
   fonteRecursoId: varchar("fonte_recurso_id").references(() => fontesRecurso.id).notNull(),
   fichaId: varchar("ficha_id").references(() => fichasOrcamentarias.id).notNull(),
+  numeroEmpenho: text("numero_empenho").notNull().default("S/N"),
   dataEmpenho: date("data_empenho", { mode: "string" }).notNull(),
   valorEmpenho: numeric("valor_empenho", { precision: 12, scale: 2 }).notNull(),
   status: text("status").notNull().default("ativo"),
@@ -304,6 +306,7 @@ export const empenhos = pgTable("empenhos", {
 export const afs = pgTable("afs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   empenhoId: varchar("empenho_id").references(() => empenhos.id).notNull(),
+  numeroAf: text("numero_af").notNull().default("S/N"),
   dataPedidoAf: date("data_pedido_af", { mode: "string" }).notNull(),
   valorAf: numeric("valor_af", { precision: 12, scale: 2 }).notNull(),
   dataEstimadaEntrega: date("data_estimada_entrega", { mode: "string" }).notNull(),
@@ -696,6 +699,7 @@ export const faseContratacaoResponseSchema = z.object({
 export const afResponseSchema = z.object({
   id: z.string(),
   empenhoId: z.string(),
+  numeroAf: z.string(),
   dataPedidoAf: isoDateSchema,
   valorAf: z.union([z.string(), z.number()]),
   dataEstimadaEntrega: isoDateSchema,
@@ -710,6 +714,7 @@ export const empenhoResponseSchema = z.object({
   contratoId: z.string(),
   fonteRecursoId: z.string(),
   fichaId: z.string(),
+  numeroEmpenho: z.string(),
   dataEmpenho: isoDateSchema,
   valorEmpenho: z.union([z.string(), z.number()]),
   status: empenhoStatusSchema,

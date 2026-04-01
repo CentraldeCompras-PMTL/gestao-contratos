@@ -43,6 +43,7 @@ const defaultEmpenhoForm = {
 
 const defaultAfForm = {
   dataPedidoAf: "",
+  numeroAf: "",
   quantidadeAf: "",
   valorAf: "",
   dataEstimadaEntrega: "",
@@ -603,7 +604,7 @@ export default function ContratosArpPage() {
                               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                 <div>
                                                   <p className="font-medium text-sm">
-                                                    AF de {new Date(`${af.dataPedidoAf}T00:00:00`).toLocaleDateString("pt-BR")} - {formatCurrency(af.valorAf)}
+                                                    AF {af.numeroAf} de {new Date(`${af.dataPedidoAf}T00:00:00`).toLocaleDateString("pt-BR")} - {formatCurrency(af.valorAf)}
                                                   </p>
                                                   <p className="text-xs text-muted-foreground">
                                                     Empenho {empenho.numeroEmpenho} | Qtd. {af.quantidadeAf} | Entrega estimada {new Date(`${af.dataEstimadaEntrega}T00:00:00`).toLocaleDateString("pt-BR")}
@@ -732,6 +733,10 @@ export default function ContratosArpPage() {
             <DialogTitle>Criar AF da ARP</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Numero da AF</Label>
+              <Input value={afForm.numeroAf} onChange={(e) => setAfForm((current) => ({ ...current, numeroAf: e.target.value }))} placeholder="S/N" />
+            </div>
             <div className="space-y-2">
               <Label>Data do Pedido</Label>
               <Input type="date" value={afForm.dataPedidoAf} onChange={(e) => setAfForm((current) => ({ ...current, dataPedidoAf: e.target.value }))} />

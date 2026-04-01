@@ -65,10 +65,9 @@ export default function ContratoDetail() {
   const [, navigate] = useLocation();
 
   const [empenhoDialog, setEmpenhoDialog] = useState(false);
-  const [empForm, setEmpForm] = useState({ dataEmpenho: "", valorEmpenho: "", fonteRecursoId: "", fichaId: "" });
+  const [empForm, setEmpForm] = useState({ dataEmpenho: "", valorEmpenho: "", fonteRecursoId: "", fichaId: "", numeroEmpenho: "" });
 
-  const [afDialog, setAfDialog] = useState<string | null>(null);
-  const [afForm, setAfForm] = useState({ dataPedidoAf: "", valorAf: "" });
+  const [afForm, setAfForm] = useState({ dataPedidoAf: "", valorAf: "", numeroAf: "" });
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [motivoEncerramento, setMotivoEncerramento] = useState("");
   const [deleteContratoOpen, setDeleteContratoOpen] = useState(false);
@@ -117,7 +116,7 @@ export default function ContratoDetail() {
         onSuccess: () => {
           toast({ title: "Empenho registrado!" });
           setEmpenhoDialog(false);
-          setEmpForm({ dataEmpenho: "", valorEmpenho: "", fonteRecursoId: "", fichaId: "" });
+          setEmpForm({ dataEmpenho: "", valorEmpenho: "", fonteRecursoId: "", fichaId: "", numeroEmpenho: "" });
         },
       },
     );
@@ -138,7 +137,7 @@ export default function ContratoDetail() {
         onSuccess: () => {
           toast({ title: "AF gerada com sucesso! Data estimada calculada automaticamente (+30 dias)." });
           setAfDialog(null);
-          setAfForm({ dataPedidoAf: "", valorAf: "" });
+          setAfForm({ dataPedidoAf: "", valorAf: "", numeroAf: "" });
         },
       },
     );
@@ -422,6 +421,10 @@ export default function ContratoDetail() {
                       Saldo do Contrato: <strong>{formatCurrency(saldoContrato)}</strong>
                     </div>
                     <div className="space-y-2">
+                       <label className="text-sm font-medium">Numero do Empenho</label>
+                       <Input required value={empForm.numeroEmpenho} onChange={(e) => setEmpForm({ ...empForm, numeroEmpenho: e.target.value })} placeholder="Ex: 2024/0001" />
+                    </div>
+                    <div className="space-y-2">
                       <label className="text-sm font-medium">Data do Empenho</label>
                       <Input type="date" required value={empForm.dataEmpenho} onChange={(e) => setEmpForm({ ...empForm, dataEmpenho: e.target.value })} />
                     </div>
@@ -467,6 +470,7 @@ export default function ContratoDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Numero</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Fonte</TableHead>
                     <TableHead>Ficha</TableHead>
@@ -484,6 +488,7 @@ export default function ContratoDetail() {
                     const { valorTotal, totalAfs, valorAnulado, saldoDisponivel } = getEmpenhoMetrics(empenho);
                     return (
                       <TableRow key={empenho.id}>
+                        <TableCell className="font-medium text-muted-foreground">{empenho.numeroEmpenho}</TableCell>
                         <TableCell>{formatDate(empenho.dataEmpenho)}</TableCell>
                         <TableCell>{empenho.fonteRecurso.codigo}</TableCell>
                         <TableCell>{empenho.ficha.codigo}</TableCell>
@@ -511,6 +516,10 @@ export default function ContratoDetail() {
                                 <form onSubmit={(event) => handleAf(event, empenho)} className="space-y-4 pt-4">
                                   <div className="p-3 bg-muted rounded-lg text-sm">
                                     Saldo deste empenho: <strong>{formatCurrency(saldoDisponivel)}</strong>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-sm font-medium">Numero da AF</label>
+                                    <Input required value={afForm.numeroAf} onChange={(event) => setAfForm({ ...afForm, numeroAf: event.target.value })} placeholder="Ex: AF 123/2024" />
                                   </div>
                                   <div className="space-y-2">
                                     <label className="text-sm font-medium">Data do Pedido</label>
@@ -559,6 +568,7 @@ export default function ContratoDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Numero</TableHead>
                     <TableHead>Pedido</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Entrega Estimada</TableHead>
@@ -570,6 +580,7 @@ export default function ContratoDetail() {
                   {allAfs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhuma AF gerada</TableCell></TableRow>}
                   {allAfs.map((af) => (
                     <TableRow key={af.id}>
+                      <TableCell className="font-medium text-muted-foreground">{af.numeroAf}</TableCell>
                       <TableCell>{formatDate(af.dataPedidoAf)}</TableCell>
                       <TableCell className="font-medium">{formatCurrency(af.valorAf)}</TableCell>
                       <TableCell>{formatDate(af.dataEstimadaEntrega)}</TableCell>

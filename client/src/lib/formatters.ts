@@ -2,9 +2,16 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function formatCurrency(value: string | number): string {
-  const numericValue = typeof value === 'string'
-    ? parseFloat(value.replace(/\./g, "").replace(",", "."))
-    : value;
+  let numericValue = typeof value === 'number' ? value : 0;
+  
+  if (typeof value === 'string') {
+    if (value.includes(",")) {
+      numericValue = parseFloat(value.replace(/\./g, "").replace(",", "."));
+    } else {
+      numericValue = parseFloat(value);
+    }
+  }
+
   if (isNaN(numericValue)) return "R$ 0,00";
   
   return new Intl.NumberFormat('pt-BR', {
