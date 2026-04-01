@@ -147,6 +147,7 @@ export default function Dashboard() {
   const [filterEnte, setFilterEnte] = useState("");
   const [filterFonteRecurso, setFilterFonteRecurso] = useState("");
   const [filterFicha, setFilterFicha] = useState("");
+  const [filterClassificacao, setFilterClassificacao] = useState("");
   const [filterAtaRegistroPreco, setFilterAtaRegistroPreco] = useState("");
   const [filterAtaProcesso, setFilterAtaProcesso] = useState("");
   const [filterAtaFornecedor, setFilterAtaFornecedor] = useState("");
@@ -264,38 +265,41 @@ export default function Dashboard() {
     return deferredContratos.filter((contrato) => {
       const matchesFonte = !filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso);
       const matchesFicha = !filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha);
+      const matchesClassificacao = !filterClassificacao || contrato.empenhos.some((empenho) => empenho.ficha.classificacao === filterClassificacao);
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
       if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
-      if (!matchesFonte || !matchesFicha) return false;
+      if (!matchesFonte || !matchesFicha || !matchesClassificacao) return false;
       return true;
     });
-  }, [deferredContratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const fornecedoresUnicos = useMemo(() => {
     const base = deferredContratos.filter((contrato) => {
       if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
+      if (filterClassificacao && !contrato.empenhos.some((empenho) => empenho.ficha.classificacao === filterClassificacao)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
       if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.fornecedor.id, (contrato) => contrato.fornecedor.nome);
-  }, [deferredContratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterProcesso, showEnteFilter]);
 
   const processosUnicos = useMemo(() => {
     const base = deferredContratos.filter((contrato) => {
       if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
+      if (filterClassificacao && !contrato.empenhos.some((empenho) => empenho.ficha.classificacao === filterClassificacao)) return false;
       if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.processoDigital.id, (contrato) => contrato.processoDigital.numeroProcessoDigital);
-  }, [deferredContratos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, showEnteFilter]);
+  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, showEnteFilter]);
 
   const departamentosUnicos = useMemo(() => {
     if (filterProcesso) {
@@ -372,6 +376,7 @@ export default function Dashboard() {
       if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return;
       contrato.empenhos.forEach((empenho) => {
         if (filterFonteRecurso && empenho.fonteRecursoId !== filterFonteRecurso) return;
+        if (filterClassificacao && empenho.ficha.classificacao !== filterClassificacao) return;
         map.set(empenho.fichaId, {
           id: empenho.fichaId,
           label: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`,
@@ -379,6 +384,21 @@ export default function Dashboard() {
       });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+
+  const classificacoesDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    deferredContratos.forEach((contrato) => {
+      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
+      if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
+      if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
+      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return;
+      contrato.empenhos.forEach((empenho) => {
+        if (filterFonteRecurso && empenho.fonteRecursoId !== filterFonteRecurso) return;
+        if (empenho.ficha.classificacao) set.add(empenho.ficha.classificacao);
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b)).map((c) => ({ id: c, label: c }));
   }, [deferredContratos, filterDepartamento, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const saldoFiltrado = useMemo(() => {
@@ -728,11 +748,22 @@ export default function Dashboard() {
               const nextFonte = v === "all" ? "" : v;
               setFilterFonteRecurso(nextFonte);
               setFilterFicha("");
+              setFilterClassificacao("");
             }}>
               <SelectTrigger><SelectValue placeholder="Todas as fontes" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as fontes</SelectItem>
                 {fontesDisponiveis.map((fonte) => <SelectItem key={fonte.id} value={fonte.id}>{fonte.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Classificacao</label>
+            <Select value={filterClassificacao || "all"} onValueChange={(v) => { setFilterClassificacao(v === "all" ? "" : v); setFilterFicha(""); }}>
+              <SelectTrigger><SelectValue placeholder="Todas as classificacoes" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as classificacoes</SelectItem>
+                {classificacoesDisponiveis.map((c) => <SelectItem key={c.id} value={c.id} className="capitalize">{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
