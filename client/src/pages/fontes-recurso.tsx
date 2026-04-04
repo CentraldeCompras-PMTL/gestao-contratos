@@ -22,9 +22,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Edit2, Plus, Trash2 } from "lucide-react";
 import type { FichaOrcamentaria, FonteRecursoWithFichas, ProjetoAtividade } from "@shared/schema";
 
-const defaultFonteForm = { nome: "", codigo: "" };
-const defaultFichaForm = { codigo: "", projetoAtividadeId: "", classificacao: "" };
-const defaultProjetoAtividadeForm = { codigo: "", descricao: "" };
+const defaultFonteForm = { nome: "", codigo: "", ano: "" };
+const defaultFichaForm = { codigo: "", projetoAtividadeId: "", classificacao: "", ano: "" };
+const defaultProjetoAtividadeForm = { codigo: "", descricao: "", ano: "" };
 
 export default function FontesRecursoPage() {
   const { data: fontes = [], isLoading } = useFontesRecurso();
@@ -187,6 +187,10 @@ export default function FontesRecursoPage() {
                 <Label>Codigo</Label>
                 <Input value={fonteForm.codigo} onChange={(e) => setFonteForm((current) => ({ ...current, codigo: e.target.value }))} placeholder="1.500.0000" required />
               </div>
+              <div className="space-y-2">
+                <Label>Ano</Label>
+                <Input value={fonteForm.ano} onChange={(e) => setFonteForm((current) => ({ ...current, ano: e.target.value }))} placeholder="Ex: 2025" maxLength={4} required />
+              </div>
               <Button type="submit" className="w-full" disabled={createFonte.isPending || updateFonte.isPending}>
                 {createFonte.isPending || updateFonte.isPending ? "Salvando..." : "Salvar"}
               </Button>
@@ -207,7 +211,7 @@ export default function FontesRecursoPage() {
                   <p className="text-sm text-muted-foreground mt-1">{fonte.fichas.length} ficha(s) vinculada(s)</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => { setEditingFonte(fonte); setFonteForm({ nome: fonte.nome, codigo: fonte.codigo }); setFonteDialog(true); }}>
+                  <Button variant="outline" size="sm" onClick={() => { setEditingFonte(fonte); setFonteForm({ nome: fonte.nome, codigo: fonte.codigo, ano: fonte.ano }); setFonteDialog(true); }}>
                     <Edit2 size={16} />
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setFichaFonteId(fonte.id)}>
@@ -233,6 +237,7 @@ export default function FontesRecursoPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Ficha</TableHead>
+                      <TableHead>Ano</TableHead>
                       <TableHead>Projeto/Atividade</TableHead>
                       <TableHead>Classificacao</TableHead>
                       <TableHead className="text-right">Acao</TableHead>
@@ -245,6 +250,7 @@ export default function FontesRecursoPage() {
                       fonte.fichas.map((ficha) => (
                         <TableRow key={ficha.id}>
                           <TableCell>{ficha.codigo}</TableCell>
+                          <TableCell>{ficha.ano}</TableCell>
                           <TableCell>{fonte.projetosAtividade.find((projetoAtividade) => projetoAtividade.id === ficha.projetoAtividadeId)?.codigo ?? "-"}</TableCell>
                           <TableCell className="capitalize">{ficha.classificacao}</TableCell>
                           <TableCell className="text-right">
@@ -256,6 +262,7 @@ export default function FontesRecursoPage() {
                                   codigo: ficha.codigo,
                                   projetoAtividadeId: ficha.projetoAtividadeId,
                                   classificacao: ficha.classificacao,
+                                  ano: ficha.ano,
                                 });
                               }}>
                                 <Edit2 size={16} />
@@ -282,6 +289,7 @@ export default function FontesRecursoPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Projeto/Atividade</TableHead>
+                      <TableHead>Ano</TableHead>
                       <TableHead>Descricao</TableHead>
                       <TableHead className="text-right">Acao</TableHead>
                     </TableRow>
@@ -293,13 +301,14 @@ export default function FontesRecursoPage() {
                       fonte.projetosAtividade.map((projetoAtividade) => (
                         <TableRow key={projetoAtividade.id}>
                           <TableCell>{projetoAtividade.codigo}</TableCell>
+                          <TableCell>{projetoAtividade.ano}</TableCell>
                           <TableCell>{projetoAtividade.descricao}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button variant="ghost" size="sm" onClick={() => {
                                 setProjetoAtividadeFonteId(fonte.id);
                                 setEditingProjetoAtividade(projetoAtividade);
-                                setProjetoAtividadeForm({ codigo: projetoAtividade.codigo, descricao: projetoAtividade.descricao });
+                                setProjetoAtividadeForm({ codigo: projetoAtividade.codigo, descricao: projetoAtividade.descricao, ano: projetoAtividade.ano });
                               }}>
                                 <Edit2 size={16} />
                               </Button>
@@ -333,6 +342,10 @@ export default function FontesRecursoPage() {
             <div className="space-y-2">
               <Label>Ficha</Label>
               <Input value={fichaForm.codigo} onChange={(e) => setFichaForm((current) => ({ ...current, codigo: e.target.value }))} placeholder="001" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Ano</Label>
+              <Input value={fichaForm.ano} onChange={(e) => setFichaForm((current) => ({ ...current, ano: e.target.value }))} placeholder="Ex: 2025" maxLength={4} required />
             </div>
             <div className="space-y-2">
               <Label>Projeto/Atividade</Label>
@@ -377,6 +390,10 @@ export default function FontesRecursoPage() {
             <div className="space-y-2">
               <Label>Codigo</Label>
               <Input value={projetoAtividadeForm.codigo} onChange={(e) => setProjetoAtividadeForm((current) => ({ ...current, codigo: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Ano</Label>
+              <Input value={projetoAtividadeForm.ano} onChange={(e) => setProjetoAtividadeForm((current) => ({ ...current, ano: e.target.value }))} placeholder="Ex: 2025" maxLength={4} required />
             </div>
             <div className="space-y-2">
               <Label>Descricao</Label>

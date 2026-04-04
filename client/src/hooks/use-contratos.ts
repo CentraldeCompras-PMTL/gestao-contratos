@@ -204,6 +204,27 @@ export function useAnnulEmpenho() {
   });
 }
 
+export function useUpdateEmpenho() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, contratoId, ...data }: Partial<InsertEmpenho> & { id: string; contratoId: string }) => {
+      const url = buildUrl(api.empenhos.update.path, { id });
+      const res = await fetch(url, {
+        method: api.empenhos.update.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar empenho"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.contratos.get.path, variables.contratoId] });
+      queryClient.invalidateQueries({ queryKey: [api.contratos.list.path] });
+    }
+  });
+}
+
 export function useCreateContratoAditivo() {
   const queryClient = useQueryClient();
   return useMutation({

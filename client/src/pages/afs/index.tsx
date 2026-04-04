@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useAfs, useExtendAf, useNotifyAf, useUpdateEntregaAf } from "@/hooks/use-afs";
+import { useAfs, useExtendAf, useNotifyAf, useUpdateEntregaAf, useUpdateAf } from "@/hooks/use-afs";
 import { useCreateNotaFiscal } from "@/hooks/use-notas-fiscais";
 import { formatDate, formatCurrency, parseNumberString } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { BellRing, Clock, Package, CheckCircle, Trash2 } from "lucide-react";
+import { BellRing, Clock, Package, CheckCircle, Trash2, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteAf } from "@/hooks/use-afs";
 import type { AfWithRelations } from "@shared/schema";
@@ -87,6 +87,7 @@ export default function AfsPanel() {
   const notifyMutation = useNotifyAf();
   const updateEntregaMutation = useUpdateEntregaAf();
   const deleteAfMutation = useDeleteAf();
+  const updateAfMutation = useUpdateAf();
   const createNotaMutation = useCreateNotaFiscal();
   const { toast } = useToast();
 
@@ -97,6 +98,9 @@ export default function AfsPanel() {
   const [dialogMode, setDialogMode] = useState<"extend" | "entrega">("extend");
   const [extensionDate, setExtensionDate] = useState("");
   const [entregaForm, setEntregaForm] = useState({ dataEntregaReal: "", numeroNota: "", valorNota: "", dataNota: "" });
+
+  const [editAfId, setEditAfId] = useState<string | null>(null);
+  const [editAfForm, setEditAfForm] = useState({ numeroAf: "", dataPedidoAf: "", valorAf: "" });
 
   const afsAberto = useMemo(() => afs.filter((af) => !af.dataEntregaReal), [afs]);
   const afsEntregues = useMemo(() => afs.filter((af) => !!af.dataEntregaReal), [afs]);
@@ -133,6 +137,26 @@ export default function AfsPanel() {
           title: "Erro",
           description: err instanceof Error ? err.message : "Erro ao estender prazo",
         }),
+      },
+    );
+  };
+
+  const handleUpdateAf = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editAfId) return;
+    updateAfMutation.mutate(
+      { id: editAfId, ...editAfForm },
+      {
+        onSuccess: () => {
+          toast({ title: "AF atualizada com sucesso!" });
+          setEditAfId(null);
+        },
+        onError: (err) =>
+          toast({
+            variant: "destructive",
+            title: "Erro ao atualizar AF",
+            description: err instanceof Error ? err.message : "Falha ao atualizar AF",
+          }),
       },
     );
   };
@@ -238,6 +262,21 @@ export default function AfsPanel() {
         )}
         <TableCell>
           <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setEditAfId(af.id);
+                setEditAfForm({
+                  numeroAf: af.numeroAf,
+                  dataPedidoAf: af.dataPedidoAf.slice(0, 10),
+                  valorAf: String(af.valorAf),
+                });
+              }}
+              title="Editar AF"
+            >
+              <Pencil size={16} />
+            </Button>
             <Button
               size="sm"
               variant={delivered ? "outline" : af.dataEntregaReal ? "outline" : "default"}
@@ -406,6 +445,27 @@ export default function AfsPanel() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editAfId} onOpenChange={(open) => !open && setEditAfId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar AF</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpdateAf} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Numero da AF</label>
+              <Input required value={editAfForm.numeroAf} onChange={(e) => setEditAfForm({ ...editAfForm, numeroAf: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data do Pedido</label>
+              <Input type="date" required value={editAfForm.dataPedidoAf} onChange={(e) => setEditAfForm({ ...editAfForm, dataPedidoAf: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Valor da AF (R$)</label>
+              <Input type="number" step="0.01" required value={editAfForm.valorAf} onChange={(e) => setEditAfForm({ ...editAfForm, valorAf: e.target.value })} />
+            </div>
+            <Button type="submit" className="w-full" disabled={updateAfMutation.isPending}>Salvar Alteracoes</Button>
+          </form>
         </DialogContent>
       </Dialog>
 

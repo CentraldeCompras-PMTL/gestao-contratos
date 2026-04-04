@@ -501,7 +501,7 @@ export default function ProcessoDetail() {
                             <SelectTrigger><SelectValue placeholder="Selecione a ficha..." /></SelectTrigger>
                             <SelectContent>
                               {selectedFonteData.fichas.map((fi: any) => (
-                                <SelectItem key={fi.id} value={fi.id}>Ficha {fi.codigo} — {fi.classificacao}</SelectItem>
+                                <SelectItem key={fi.id} value={fi.id}>Ficha {fi.codigo} ({fi.ano}) — {fi.classificacao}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>

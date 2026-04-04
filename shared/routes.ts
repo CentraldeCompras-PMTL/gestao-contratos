@@ -694,7 +694,13 @@ export const api = {
       method: 'DELETE' as const,
       path: '/api/empenhos/:id' as const,
       responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
-    }
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/empenhos/:id' as const,
+      input: insertEmpenhoSchema.partial(),
+      responses: { 200: empenhoResponseSchema, 404: errorSchemas.notFound },
+    },
   },
   afs: {
     list: {
@@ -729,7 +735,13 @@ export const api = {
       method: 'DELETE' as const,
       path: '/api/afs/:id' as const,
       responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
-    }
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/afs/:id' as const,
+      input: insertAfSchema.partial(),
+      responses: { 200: afResponseSchema, 404: errorSchemas.notFound },
+    },
   },
   notasFiscais: {
     list: {

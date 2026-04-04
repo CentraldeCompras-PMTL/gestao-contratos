@@ -7,12 +7,13 @@ import {
   useCloseContrato,
   useDeleteContrato,
   useDeleteEmpenho,
+  useUpdateEmpenho,
   useCreateContratoAditivo,
   useDeleteContratoAditivo,
   useCreateContratoAnexo,
   useDeleteContratoAnexo,
 } from "@/hooks/use-contratos";
-import { useCreateAf } from "@/hooks/use-afs";
+import { useCreateAf, useUpdateAf } from "@/hooks/use-afs";
 import { useFontesRecurso } from "@/hooks/use-fontes-recurso";
 import { formatCurrency, formatDate, parseNumberString } from "@/lib/formatters";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, DollarSign, PackageOpen, Info, ArrowLeft, Trash2, Link2, FileBadge2 } from "lucide-react";
+import { Plus, DollarSign, PackageOpen, Info, ArrowLeft, Trash2, Link2, FileBadge2, Pencil } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Af, EmpenhoWithRelations } from "@shared/schema";
@@ -62,6 +63,8 @@ export default function ContratoDetail() {
   const createAf = useCreateAf();
   const { data: fontesRecurso = [] } = useFontesRecurso();
   const { toast } = useToast();
+  const updateEmpenho = useUpdateEmpenho();
+  const updateAf = useUpdateAf();
   const [, navigate] = useLocation();
 
   const [empenhoDialog, setEmpenhoDialog] = useState(false);
@@ -69,6 +72,12 @@ export default function ContratoDetail() {
 
   const [afDialog, setAfDialog] = useState<string | null>(null);
   const [afForm, setAfForm] = useState({ dataPedidoAf: "", valorAf: "", numeroAf: "" });
+
+  const [editEmpenhoId, setEditEmpenhoId] = useState<string | null>(null);
+  const [editEmpForm, setEditEmpForm] = useState({ numeroEmpenho: "", dataEmpenho: "", valorEmpenho: "" });
+
+  const [editAfId, setEditAfId] = useState<string | null>(null);
+  const [editAfForm, setEditAfForm] = useState({ numeroAf: "", dataPedidoAf: "", valorAf: "" });
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [motivoEncerramento, setMotivoEncerramento] = useState("");
   const [deleteContratoOpen, setDeleteContratoOpen] = useState(false);
@@ -144,6 +153,48 @@ export default function ContratoDetail() {
     );
   };
 
+  const handleUpdateEmpenho = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editEmpenhoId) return;
+    updateEmpenho.mutate(
+      { id: editEmpenhoId, contratoId: contrato.id, ...editEmpForm },
+      {
+        onSuccess: () => {
+          toast({ title: "Empenho atualizado com sucesso!" });
+          setEditEmpenhoId(null);
+        },
+        onError: (error) => {
+          toast({
+            variant: "destructive",
+            title: "Erro",
+            description: error instanceof Error ? error.message : "Erro ao atualizar empenho",
+          });
+        },
+      },
+    );
+  };
+
+  const handleUpdateAf = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editAfId) return;
+    updateAf.mutate(
+      { id: editAfId, ...editAfForm },
+      {
+        onSuccess: () => {
+          toast({ title: "AF atualizada com sucesso!" });
+          setEditAfId(null);
+        },
+        onError: (error) => {
+          toast({
+            variant: "destructive",
+            title: "Erro",
+            description: error instanceof Error ? error.message : "Erro ao atualizar AF",
+          });
+        },
+      },
+    );
+  };
+
   const handleAnnulEmpenho = () => {
     if (!annulEmpenhoId) return;
     annulEmpenho.mutate(
@@ -171,7 +222,7 @@ export default function ContratoDetail() {
     );
   };
 
-  const allAfs: Af[] = contrato.empenhos.flatMap((empenho) => empenho.afs);
+  const allAfs: any[] = contrato.empenhos.flatMap((empenho) => empenho.afs);
   const fichasDaFonte = fontesRecurso.find((fonte) => fonte.id === empForm.fonteRecursoId)?.fichas ?? [];
   const hasPendingAfs = allAfs.some((af) => !af.dataEntregaReal);
   const hasPendingNotas = contrato.notasFiscais.some((nota) => nota.statusPagamento !== "pago");
@@ -536,6 +587,21 @@ export default function ContratoDetail() {
                               </DialogContent>
                             </Dialog>
                             <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditEmpenhoId(empenho.id);
+                                setEditEmpForm({
+                                  numeroEmpenho: empenho.numeroEmpenho,
+                                  dataEmpenho: empenho.dataEmpenho.slice(0, 10),
+                                  valorEmpenho: String(empenho.valorEmpenho),
+                                });
+                              }}
+                              disabled={contrato.status === "encerrado"}
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                            <Button
                               variant="outline"
                               size="sm"
                               onClick={() => setAnnulEmpenhoId(empenho.id)}
@@ -598,8 +664,25 @@ export default function ContratoDetail() {
                         ) : af.flagEntregaNotificada ? (
                           <Badge variant="secondary" className="bg-amber-100 text-amber-800">Notificado</Badge>
                         ) : (
-                          <Badge variant="outline">Aguardando</Badge>
+                          <Badge variant="outline" className="bg-muted text-muted-foreground">Pendente</Badge>
                         )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditAfId(af.id);
+                            setEditAfForm({
+                              numeroAf: af.numeroAf,
+                              dataPedidoAf: af.dataPedidoAf.slice(0, 10),
+                              valorAf: String(af.valorAf),
+                            });
+                          }}
+                          disabled={contrato.status === "encerrado"}
+                        >
+                          <Pencil size={14} />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -763,6 +846,50 @@ export default function ContratoDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Empenho Dialog */}
+      <Dialog open={!!editEmpenhoId} onOpenChange={(open) => !open && setEditEmpenhoId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Empenho</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpdateEmpenho} className="space-y-4 pt-4">
+            <div className="space-y-2">
+               <label className="text-sm font-medium">Numero do Empenho</label>
+               <Input required value={editEmpForm.numeroEmpenho} onChange={(e) => setEditEmpForm({ ...editEmpForm, numeroEmpenho: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data do Empenho</label>
+              <Input type="date" required value={editEmpForm.dataEmpenho} onChange={(e) => setEditEmpForm({ ...editEmpForm, dataEmpenho: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Valor (R$)</label>
+              <Input type="number" step="0.01" required value={editEmpForm.valorEmpenho} onChange={(e) => setEditEmpForm({ ...editEmpForm, valorEmpenho: e.target.value })} />
+            </div>
+            <Button type="submit" className="w-full" disabled={updateEmpenho.isPending}>Salvar Alteracoes</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit AF Dialog */}
+      <Dialog open={!!editAfId} onOpenChange={(open) => !open && setEditAfId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar AF</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpdateAf} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Numero da AF</label>
+              <Input required value={editAfForm.numeroAf} onChange={(e) => setEditAfForm({ ...editAfForm, numeroAf: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data do Pedido</label>
+              <Input type="date" required value={editAfForm.dataPedidoAf} onChange={(e) => setEditAfForm({ ...editAfForm, dataPedidoAf: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Valor da AF (R$)</label>
+              <Input type="number" step="0.01" required value={editAfForm.valorAf} onChange={(e) => setEditAfForm({ ...editAfForm, valorAf: e.target.value })} />
+            </div>
+            <Button type="submit" className="w-full" disabled={updateAf.isPending}>Salvar Alteracoes</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
         <AlertDialogContent>

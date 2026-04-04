@@ -8,7 +8,7 @@ import {
   type ProcessoDigital, type InsertProcessoDigital, type FaseContratacao, type InsertFaseContratacao,
   type Contrato, type InsertContrato, type Empenho, type InsertEmpenho, type Af, type InsertAf, type NotaFiscal, type InsertNotaFiscal,
   type ContratoAditivo, type InsertContratoAditivo, type ContratoAnexo, type InsertContratoAnexo, type FonteRecursoWithFichas,
-  type ContratoWithRelations, type ProcessoDigitalWithRelations, type AfWithRelations, type NotaFiscalWithRelations, type AuditLogResponse
+  type ContratoWithRelations, type ProcessoDigitalWithRelations, type AfWithRelations, type NotaFiscalWithRelations, type AuditLogResponse, type EmpenhoWithRelations
 } from "@shared/schema";
 
 export interface IStorage {
@@ -100,8 +100,9 @@ export interface IStorage {
   getContratoAnexo(id: string): Promise<ContratoAnexo | undefined>;
   deleteContratoAnexo(id: string): Promise<ContratoAnexo | undefined>;
 
-  getEmpenho(id: string): Promise<(Empenho & { afs: Af[]; contrato: Contrato; fonteRecurso: FonteRecurso; ficha: FichaOrcamentaria }) | undefined>;
+  getEmpenho(id: string): Promise<EmpenhoWithRelations | undefined>;
   createEmpenho(empenho: InsertEmpenho): Promise<Empenho>;
+  updateEmpenho(id: string, empenho: Partial<InsertEmpenho>): Promise<Empenho | undefined>;
   updateEmpenhoAnulacao(
     id: string,
     data: {
@@ -116,6 +117,7 @@ export interface IStorage {
   getAfs(): Promise<AfWithRelations[]>;
   getAf(id: string): Promise<Af | undefined>;
   createAf(af: InsertAf): Promise<Af>;
+  updateAf(id: string, af: Partial<InsertAf>): Promise<Af>;
   updateAfEntrega(id: string, dataEntregaReal: string): Promise<Af>;
   notifyAf(id: string): Promise<Af>;
   extendAf(id: string, dataExtensao: string): Promise<Af>;
@@ -772,7 +774,7 @@ export class DatabaseStorage implements IStorage {
         fonteRecurso: true,
         ficha: true,
       }
-    });
+    }) as any;
   }
 
   async createEmpenho(e: InsertEmpenho): Promise<Empenho> {
@@ -784,6 +786,11 @@ export class DatabaseStorage implements IStorage {
       motivoAnulacao: null,
     }).returning();
     return created;
+  }
+
+  async updateEmpenho(id: string, e: Partial<InsertEmpenho>): Promise<Empenho | undefined> {
+    const [updated] = await db.update(empenhos).set(e).where(eq(empenhos.id, id)).returning();
+    return updated;
   }
 
   async updateEmpenhoAnulacao(
@@ -843,6 +850,12 @@ export class DatabaseStorage implements IStorage {
       flagEntregaNotificada: false
     }).returning();
     return created;
+  }
+
+  async updateAf(id: string, af: Partial<InsertAf>): Promise<Af> {
+    const [updated] = await db.update(afs).set(af).where(eq(afs.id, id)).returning();
+    if (!updated) throw new Error("AF nao encontrada");
+    return updated;
   }
 
   async updateAfEntrega(id: string, dataEntregaReal: string): Promise<Af> {

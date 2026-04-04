@@ -65,8 +65,8 @@ async function seed() {
   let fontes = existingFontes;
   if (existingFontes.length === 0) {
     fontes = await db.insert(fontesRecurso).values([
-      { nome: "Recursos Ordinarios", codigo: "1.500.0000" },
-      { nome: "Transferencias da Saude", codigo: "1.600.0000" },
+      { nome: "Recursos Ordinarios", codigo: "1.500.0000", ano: "2024" },
+      { nome: "Transferencias da Saude", codigo: "1.600.0000", ano: "2024" },
     ]).returning();
   }
 
@@ -76,16 +76,16 @@ async function seed() {
   let projetos = existingProjetosAtividade;
   if (existingProjetosAtividade.length === 0) {
     projetos = await db.insert(projetosAtividade).values([
-      { fonteRecursoId: fontes[0].id, codigo: "2001", descricao: "Manutencao administrativa" },
-      { fonteRecursoId: fontes[0].id, codigo: "2002", descricao: "Prestacao de servicos continuados" },
-      { fonteRecursoId: fontes[1].id, codigo: "3001", descricao: "Atencao basica em saude" },
+      { fonteRecursoId: fontes[0].id, codigo: "2001", descricao: "Manutencao administrativa", ano: "2024" },
+      { fonteRecursoId: fontes[0].id, codigo: "2002", descricao: "Prestacao de servicos continuados", ano: "2024" },
+      { fonteRecursoId: fontes[1].id, codigo: "3001", descricao: "Atencao basica em saude", ano: "2024" },
     ]).returning();
   }
   if (existingFichas.length === 0) {
     fichas = await db.insert(fichasOrcamentarias).values([
-      { fonteRecursoId: fontes[0].id, projetoAtividadeId: projetos[0].id, codigo: "001", classificacao: "consumo" },
-      { fonteRecursoId: fontes[0].id, projetoAtividadeId: projetos[1].id, codigo: "002", classificacao: "servico" },
-      { fonteRecursoId: fontes[1].id, projetoAtividadeId: projetos[2].id, codigo: "003", classificacao: "permanente" },
+      { fonteRecursoId: fontes[0].id, projetoAtividadeId: projetos[0].id, codigo: "001", classificacao: "consumo", ano: "2024" },
+      { fonteRecursoId: fontes[0].id, projetoAtividadeId: projetos[1].id, codigo: "002", classificacao: "servico", ano: "2024" },
+      { fonteRecursoId: fontes[1].id, projetoAtividadeId: projetos[2].id, codigo: "003", classificacao: "permanente", ano: "2024" },
     ]).returning();
   }
 

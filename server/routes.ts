@@ -1553,9 +1553,50 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Empenho nao encontrado" });
       }
       await audit(req, "delete", "empenho", deleted.id, `Contrato ${deleted.contratoId}`);
-      res.json({ message: "Empenho excluido com sucesso" });
+      res.status(200).json({ message: "Empenho excluido com sucesso" });
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir empenho") });
+    }
+  });
+
+  app.put(api.empenhos.update.path, requireAuth, async (req, res) => {
+    try {
+      const parsedBody = { ...req.body };
+      if (req.body.valorEmpenho) parsedBody.valorEmpenho = String(req.body.valorEmpenho);
+      const data = api.empenhos.update.input.parse(parsedBody);
+
+      const empenho = await storage.getEmpenho(req.params.id);
+      if (!empenho) return res.status(404).json({ message: "Empenho nao encontrado" });
+
+      const contrato = await storage.getContrato(empenho.contratoId);
+      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+
+      if (contrato?.status === "encerrado") {
+        throw new HttpError(400, "Contrato encerrado nao permite edicao de empenho");
+      }
+
+      if (data.valorEmpenho) {
+        const valorContrato = parseMoney(contrato!.valorContrato, "Valor do contrato");
+        const totalOutrosEmpenhos = contrato!.empenhos
+          .filter(e => e.id !== empenho.id)
+          .reduce((acc, e) => acc + getEmpenhoMetrics(e).valorComprometido, 0);
+        const novoValor = parseMoney(data.valorEmpenho, "Novo valor do empenho");
+        
+        if (totalOutrosEmpenhos + novoValor > valorContrato) {
+          throw new HttpError(400, "O novo valor excede o saldo do contrato");
+        }
+        
+        const totalAfs = empenho.afs.reduce((acc, af) => acc + parseMoney(af.valorAf, "AF"), 0);
+        if (novoValor < totalAfs) {
+          throw new HttpError(400, "O valor nao pode ser menor que o total das AFs ja emitidas");
+        }
+      }
+
+      const updated = await storage.updateEmpenho(req.params.id, data);
+      await audit(req, "update", "empenho", empenho.id, `Numero: ${empenho.numeroEmpenho} -> ${data.numeroEmpenho || empenho.numeroEmpenho}`);
+      res.json(updated);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar empenho") });
     }
   });
 
@@ -1681,9 +1722,51 @@ export async function registerRoutes(
         return res.status(404).json({ message: "AF nao encontrada" });
       }
       await audit(req, "delete", "af", deleted.id, "AF excluida");
-      res.json({ message: "AF excluida com sucesso" });
+      res.status(200).json({ message: "AF excluida com sucesso" });
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir AF") });
+    }
+  });
+
+  app.put(api.afs.update.path, requireAuth, async (req, res) => {
+    try {
+      const parsedBody = { ...req.body };
+      if (req.body.valorAf) parsedBody.valorAf = String(req.body.valorAf);
+      const data = api.afs.update.input.parse(parsedBody);
+
+      const af = await storage.getAf(req.params.id);
+      if (!af) return res.status(404).json({ message: "AF nao encontrada" });
+
+      const empenho = await storage.getEmpenho(af.empenhoId);
+      const contrato = await storage.getContrato(empenho!.contratoId);
+      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+
+      if (contrato?.status === "encerrado") {
+        throw new HttpError(400, "Contrato encerrado nao permite edicao de AF");
+      }
+
+      if (data.valorAf) {
+        const { saldoDisponivel } = getEmpenhoMetrics(empenho!);
+        const currentAfValue = parseMoney(af.valorAf, "AF atual");
+        const novoValorAf = parseMoney(data.valorAf, "Novo valor AF");
+        
+        if (novoValorAf > (saldoDisponivel + currentAfValue)) {
+          throw new HttpError(400, "O novo valor excede o saldo do empenho");
+        }
+      }
+
+      const updateData: any = { ...data };
+      if (data.dataPedidoAf) {
+        const [year, month, day] = data.dataPedidoAf.split("-").map(Number);
+        const dtEstimada = new Date(Date.UTC(year, month - 1, day + 30));
+        updateData.dataEstimadaEntrega = dtEstimada.toISOString().slice(0, 10);
+      }
+
+      const updated = await storage.updateAf(req.params.id, updateData);
+      await audit(req, "update", "af", af.id, `Numero: ${af.numeroAf} -> ${data.numeroAf || af.numeroAf}`);
+      res.json(updated);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar AF") });
     }
   });
 
