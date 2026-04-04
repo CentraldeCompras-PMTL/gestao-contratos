@@ -1,8 +1,8 @@
 import { db } from "./db";
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import { 
   users, userEntes, entes, departamentos, fornecedores, fontesRecurso, fichasOrcamentarias, processosDigitais, fasesContratacao, contratos, empenhos, afs, notasFiscais, contratoAditivos, contratoAnexos, passwordResetTokens, auditLogs,
-  projetosAtividade,
+  projetosAtividade, processoItens, processoItemQuantidades, processoItemCotacoes, processoItemResultados, processoParticipantes, processoDotacoes,
   type User, type InsertUser, type Ente, type InsertEnte, type Departamento, type InsertDepartamento, type Fornecedor, type InsertFornecedor,
   type FonteRecurso, type InsertFonteRecurso, type FichaOrcamentaria, type InsertFichaOrcamentaria, type ProjetoAtividade, type InsertProjetoAtividade,
   type ProcessoDigital, type InsertProcessoDigital, type FaseContratacao, type InsertFaseContratacao,
@@ -63,6 +63,23 @@ export interface IStorage {
   getProcessoDigital(id: string): Promise<ProcessoDigitalWithRelations | undefined>;
   createProcessoDigital(processo: InsertProcessoDigital): Promise<ProcessoDigital>;
   deleteProcessoDigital(id: string): Promise<ProcessoDigital | undefined>;
+  
+  // Processo Itens
+  getProcessoItens(processoId: string): Promise<any[]>;
+  createProcessoItem(item: any): Promise<any>;
+  updateProcessoItem(id: string, item: any): Promise<any>;
+  deleteProcessoItem(id: string): Promise<any>;
+  createProcessoItemQuantidade(data: any): Promise<any>;
+  updateProcessoItemQuantidade(id: string, data: any): Promise<any>;
+  deleteProcessoItemQuantidade(id: string): Promise<any>;
+  createProcessoItemCotacao(data: any): Promise<any>;
+  updateProcessoItemCotacao(id: string, data: any): Promise<any>;
+  createProcessoItemResultado(data: any): Promise<any>;
+  updateProcessoItemResultado(id: string, data: any): Promise<any>;
+  deleteProcessoItemResultado(id: string): Promise<any>;
+  saveProcessoQuantidades(processoId: string, quantidades: any[]): Promise<void>;
+  saveProcessoCotacoes(processoId: string, cotacoes: any[]): Promise<void>;
+  saveProcessoResultados(processoId: string, resultados: any[]): Promise<void>;
   
   getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; departamento: Departamento | null })[]>;
   getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; departamento: Departamento | null }) | undefined>;
@@ -383,6 +400,9 @@ export class DatabaseStorage implements IStorage {
         departamento: {
           with: { ente: true },
         },
+        participantes: {
+          with: { departamento: true },
+        },
       }
     });
     return procs as ProcessoDigitalWithRelations[];
@@ -397,6 +417,12 @@ export class DatabaseStorage implements IStorage {
         },
         departamento: {
           with: { ente: true },
+        },
+        participantes: {
+          with: { departamento: true },
+        },
+        dotacoes: {
+          with: { fichaOrcamentaria: true },
         },
       }
     });
@@ -416,6 +442,148 @@ export class DatabaseStorage implements IStorage {
   async deleteProcessoDigital(id: string): Promise<ProcessoDigital | undefined> {
     const [deleted] = await db.delete(processosDigitais).where(eq(processosDigitais.id, id)).returning();
     return deleted;
+  }
+
+  async addProcessoParticipante(processoId: string, departamentoId: string): Promise<void> {
+    await db.insert(processoParticipantes).values({ processoId, departamentoId }).onConflictDoNothing();
+  }
+
+  async removeProcessoParticipante(processoId: string, departamentoId: string): Promise<void> {
+    const records = await db.select().from(processoParticipantes).where(eq(processoParticipantes.processoId, processoId));
+    const target = records.find(r => r.departamentoId === departamentoId);
+    if (target) {
+      await db.delete(processoParticipantes).where(eq(processoParticipantes.id, target.id));
+    }
+  }
+
+  // --- Processo Itens Implementation ---
+  async getProcessoItens(processoId: string): Promise<any[]> {
+    return await db.query.processoItens.findMany({
+      where: eq(processoItens.processoId, processoId),
+      with: {
+        quantidades: {
+          with: { departamento: true },
+        },
+        cotacao: true,
+        resultado: {
+          with: { fornecedor: true },
+        },
+      },
+    });
+  }
+
+  async createProcessoItem(item: any): Promise<any> {
+    const [created] = await db.insert(processoItens).values(item).returning();
+    return created;
+  }
+
+  async updateProcessoItem(id: string, item: any): Promise<any> {
+    const [updated] = await db.update(processoItens).set(item).where(eq(processoItens.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProcessoItem(id: string): Promise<any> {
+    const [deleted] = await db.delete(processoItens).where(eq(processoItens.id, id)).returning();
+    return deleted;
+  }
+
+  async createProcessoItemQuantidade(data: any): Promise<any> {
+    const [created] = await db.insert(processoItemQuantidades).values(data).returning();
+    return created;
+  }
+
+  async updateProcessoItemQuantidade(id: string, data: any): Promise<any> {
+    const [updated] = await db.update(processoItemQuantidades).set(data).where(eq(processoItemQuantidades.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProcessoItemQuantidade(id: string): Promise<any> {
+    const [deleted] = await db.delete(processoItemQuantidades).where(eq(processoItemQuantidades.id, id)).returning();
+    return deleted;
+  }
+
+  async createProcessoItemCotacao(data: any): Promise<any> {
+    const [created] = await db.insert(processoItemCotacoes).values(data).returning();
+    return created;
+  }
+
+  async updateProcessoItemCotacao(id: string, data: any): Promise<any> {
+    const [updated] = await db.update(processoItemCotacoes).set(data).where(eq(processoItemCotacoes.id, id)).returning();
+    return updated;
+  }
+
+  async createProcessoItemResultado(data: any): Promise<any> {
+    const [created] = await db.insert(processoItemResultados).values(data).returning();
+    return created;
+  }
+
+  async updateProcessoItemResultado(id: string, data: any): Promise<any> {
+    const [updated] = await db.update(processoItemResultados).set(data).where(eq(processoItemResultados.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProcessoItemResultado(id: string): Promise<any> {
+    const [deleted] = await db.delete(processoItemResultados).where(eq(processoItemResultados.id, id)).returning();
+    return deleted;
+  }
+
+  async saveProcessoQuantidades(processoId: string, quantidades: any[]): Promise<void> {
+    const itens = await db.select({ id: processoItens.id }).from(processoItens).where(eq(processoItens.processoId, processoId));
+    const itemIds = itens.map(i => i.id);
+    if (itemIds.length > 0) {
+      await db.delete(processoItemQuantidades).where(inArray(processoItemQuantidades.itemId, itemIds));
+    }
+    if (quantidades.length > 0) {
+      for (const q of quantidades) {
+        if (Number(q.quantidade || 0) > 0) await db.insert(processoItemQuantidades).values(q);
+      }
+    }
+  }
+
+  async saveProcessoCotacoes(processoId: string, cotacoes: any[]): Promise<void> {
+    const itens = await db.select({ id: processoItens.id }).from(processoItens).where(eq(processoItens.processoId, processoId));
+    const itemIds = itens.map(i => i.id);
+    if (itemIds.length > 0) {
+      await db.delete(processoItemCotacoes).where(inArray(processoItemCotacoes.itemId, itemIds));
+    }
+    if (cotacoes.length > 0) {
+      for (const c of cotacoes) {
+         if (Number(c.valorUnitarioCotado || 0) > 0) await db.insert(processoItemCotacoes).values(c);
+      }
+    }
+  }
+
+  async saveProcessoResultados(processoId: string, resultados: any[]): Promise<void> {
+    const itens = await db.select({ id: processoItens.id }).from(processoItens).where(eq(processoItens.processoId, processoId));
+    const itemIds = itens.map(i => i.id);
+    if (itemIds.length > 0) {
+      await db.delete(processoItemResultados).where(inArray(processoItemResultados.itemId, itemIds));
+    }
+    if (resultados.length > 0) {
+      for (const r of resultados) {
+         if (r.itemFracassado || Number(r.valorUnitarioLicitado || 0) > 0) await db.insert(processoItemResultados).values({
+            ...r,
+            valorUnitarioLicitado: r.itemFracassado ? null : r.valorUnitarioLicitado,
+            fornecedorId: r.itemFracassado ? null : r.fornecedorId
+         });
+      }
+    }
+  }
+
+  async addProcessoDotacao(data: { processoId: string; fichaOrcamentariaId: string; anoDotacao: string; valorEstimado?: string }): Promise<any> {
+    const [created] = await db.insert(processoDotacoes).values(data).returning();
+    return created;
+  }
+
+  async removeProcessoDotacao(dotacaoId: string): Promise<void> {
+    await db.delete(processoDotacoes).where(eq(processoDotacoes.id, dotacaoId));
+  }
+
+  async getProcessoDotacoes(processoId: string): Promise<any[]> {
+    return await db.query.processoDotacoes.findMany({
+      where: eq(processoDotacoes.processoId, processoId),
+      with: { fichaOrcamentaria: true },
+    });
   }
 
   async getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; departamento: Departamento | null })[]> {

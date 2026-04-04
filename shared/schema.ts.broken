@@ -8,6 +8,7 @@ const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data invalida");
 const timestampSchema = z.string();
 export const userRoleSchema = z.enum(["admin", "operacional"]);
 export const contractStatusSchema = z.enum(["vigente", "encerrado"]);
+export const processoStatusSchema = z.enum(["planejamento", "cotacao", "licitada", "aguardando_contrato", "finalizado", "cancelado"]);
 export const ataRegistroPrecoStatusSchema = z.enum(["planejamento", "cotacao", "licitada", "vigente", "encerrada"]);
 export const ataPrePedidoStatusSchema = z.enum(["aberto", "concluido"]);
 export const aditivoTipoSchema = z.enum(["valor", "vigencia", "misto", "apostilamento", "outro"]);
@@ -171,17 +172,6 @@ export const processoItemResultados = pgTable("processo_item_resultados", {
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
-
-export const processoDotacoes = pgTable("processo_dotacoes", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  processoId: varchar("processo_id").references(() => processosDigitais.id).notNull(),
-  fichaOrcamentariaId: varchar("ficha_orcamentaria_id").references(() => fichasOrcamentarias.id).notNull(),
-  anoDotacao: varchar("ano_dotacao").notNull(),
-  valorEstimado: numeric("valor_estimado", { precision: 14, scale: 2 }),
-  criadoEm: timestamp("criado_em").defaultNow(),
-  atualizadoEm: timestamp("atualizado_em").defaultNow(),
-});
-
 
 export const fasesContratacao = pgTable("fases_contratacao", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -518,13 +508,15 @@ export const departamentosRelations = relations(departamentos, ({ one, many }) =
 }));
 
 export const processosDigitaisRelations = relations(processosDigitais, ({ one, many }) => ({
-  departamento: one(departamentos, { fields: [processosDigitais.departamentoId], references: [departamentos.id] }),
+  departamento: one(departamentos, {
+    fields: [processosDigitais.departamentoId],
+    references: [departamentos.id],
+  }),
   fases: many(fasesContratacao),
   contratos: many(contratos),
   atasRegistroPreco: many(atasRegistroPreco),
   itens: many(processoItens),
   participantes: many(processoParticipantes),
-  dotacoes: many(processoDotacoes),
 }));
 
 export const processoParticipantesRelations = relations(processoParticipantes, ({ one }) => ({
@@ -539,53 +531,24 @@ export const processoParticipantesRelations = relations(processoParticipantes, (
 }));
 
 export const processoItensRelations = relations(processoItens, ({ one, many }) => ({
-  processo: one(processosDigitais, {
-    fields: [processoItens.processoId],
-    references: [processosDigitais.id],
-  }),
+  processo: one(processosDigitais, { fields: [processoItens.processoId], references: [processosDigitais.id] }),
   quantidades: many(processoItemQuantidades),
-  cotacao: one(processoItemCotacoes),
-  resultado: one(processoItemResultados),
+  cotacao: one(processoItemCotacoes, { fields: [processoItens.id], references: [processoItemCotacoes.itemId] }),
+  resultado: one(processoItemResultados, { fields: [processoItens.id], references: [processoItemResultados.itemId] }),
 }));
 
 export const processoItemQuantidadesRelations = relations(processoItemQuantidades, ({ one }) => ({
-  item: one(processoItens, {
-    fields: [processoItemQuantidades.itemId],
-    references: [processoItens.id],
-  }),
-  departamento: one(departamentos, {
-    fields: [processoItemQuantidades.departamentoId],
-    references: [departamentos.id],
-  }),
+  item: one(processoItens, { fields: [processoItemQuantidades.itemId], references: [processoItens.id] }),
+  departamento: one(departamentos, { fields: [processoItemQuantidades.departamentoId], references: [departamentos.id] }),
 }));
 
 export const processoItemCotacoesRelations = relations(processoItemCotacoes, ({ one }) => ({
-  item: one(processoItens, {
-    fields: [processoItemCotacoes.itemId],
-    references: [processoItens.id],
-  }),
+  item: one(processoItens, { fields: [processoItemCotacoes.itemId], references: [processoItens.id] }),
 }));
 
 export const processoItemResultadosRelations = relations(processoItemResultados, ({ one }) => ({
-  item: one(processoItens, {
-    fields: [processoItemResultados.itemId],
-    references: [processoItens.id],
-  }),
-  fornecedor: one(fornecedores, {
-    fields: [processoItemResultados.fornecedorId],
-    references: [fornecedores.id],
-  }),
-}));
-
-export const processoDotacoesRelations = relations(processoDotacoes, ({ one }) => ({
-  processo: one(processosDigitais, {
-    fields: [processoDotacoes.processoId],
-    references: [processosDigitais.id],
-  }),
-  fichaOrcamentaria: one(fichasOrcamentarias, {
-    fields: [processoDotacoes.fichaOrcamentariaId],
-    references: [fichasOrcamentarias.id],
-  }),
+  item: one(processoItens, { fields: [processoItemResultados.itemId], references: [processoItens.id] }),
+  fornecedor: one(fornecedores, { fields: [processoItemResultados.fornecedorId], references: [fornecedores.id] }),
 }));
 
 export const fasesContratacaoRelations = relations(fasesContratacao, ({ one, many }) => ({
@@ -643,8 +606,14 @@ export const insertProjetoAtividadeSchema = createInsertSchema(projetosAtividade
   codigo: projetoAtividadeCodigoSchema,
   descricao: z.string().min(1, "Descricao obrigatoria"),
 });
-export const insertProcessoDigitalSchema = createInsertSchema(processosDigitais).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertProcessoDigitalSchema = createInsertSchema(processosDigitais).omit({ id: true, criadoEm: true, atualizadoEm: true }).extend({
+  status: processoStatusSchema.default("planejamento"),
+});
 export const insertFaseContratacaoSchema = createInsertSchema(fasesContratacao).omit({ id: true, criadoEm: true });
+export const insertProcessoItemSchema = createInsertSchema(processoItens).omit({ id: true, processoId: true, criadoEm: true, atualizadoEm: true });
+export const insertProcessoItemQuantidadeSchema = createInsertSchema(processoItemQuantidades).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertProcessoItemCotacaoSchema = createInsertSchema(processoItemCotacoes).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertProcessoItemResultadoSchema = createInsertSchema(processoItemResultados).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertContratoSchema = createInsertSchema(contratos).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertAtaRegistroPrecoSchema = createInsertSchema(atasRegistroPreco).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertAtaItemSchema = createInsertSchema(ataItens).omit({ id: true, ataId: true, criadoEm: true, atualizadoEm: true });
@@ -1202,91 +1171,6 @@ export type InsertAtaItem = z.infer<typeof insertAtaItemSchema>;
 export type InsertAtaItemQuantidade = z.infer<typeof insertAtaItemQuantidadeSchema>;
 export type InsertAtaItemCotacao = z.infer<typeof insertAtaItemCotacaoSchema>;
 export type InsertAtaItemResultado = z.infer<typeof insertAtaItemResultadoSchema>;
-export type InsertAtaPrePedido = z.infer<typeof insertAtaPrePedidoSchema>;
-export type InsertAtaContrato = z.infer<typeof insertAtaContratoSchema>;
-export type InsertAtaEmpenho = z.infer<typeof insertAtaEmpenhoSchema>;
-export type InsertAtaAf = z.infer<typeof insertAtaAfSchema>;
-export type InsertAtaNotaFiscal = z.infer<typeof insertAtaNotaFiscalSchema>;
-export type InsertEmpenho = z.infer<typeof insertEmpenhoSchema>;
-export type InsertAf = z.infer<typeof insertAfSchema>;
-export type InsertNotaFiscal = z.infer<typeof insertNotaFiscalSchema>;
-export type InsertContratoAditivo = z.infer<typeof insertContratoAditivoSchema>;
-export type InsertContratoAnexo = z.infer<typeof insertContratoAnexoSchema>;
-export type Departamento = typeof departamentos.$inferSelect;
-export type Ente = typeof entes.$inferSelect;
-export type UserEnte = typeof userEntes.$inferSelect;
-export type FonteRecurso = typeof fontesRecurso.$inferSelect;
-export type FichaOrcamentaria = typeof fichasOrcamentarias.$inferSelect;
-export type ProjetoAtividade = typeof projetosAtividade.$inferSelect;
-export type NotaFiscal = typeof notasFiscais.$inferSelect;
-export type ContratoAditivo = typeof contratoAditivos.$inferSelect;
-export type ContratoAnexo = typeof contratoAnexos.$inferSelect;
-
-export type FaseContratacaoWithRelations = FaseContratacao & {
-  fornecedor: Fornecedor;
-  processoDigital: ProcessoDigital;
-  departamento: Departamento | null;
-};
-export type ProcessoParticipanteWithDepartamento = ProcessoParticipante & {
-  departamento: Departamento;
-};
-
-export type ProcessoDotacaoWithFicha = ProcessoDotacao & {
-  fichaOrcamentaria: FichaOrcamentaria;
-};
-
-export type ProcessoItemWithRelations = ProcessoItem & {
-  quantidades: (ProcessoItemQuantidade & { departamento: Departamento })[];
-  cotacao: ProcessoItemCotacao | null;
-  resultado: (ProcessoItemResultado & { fornecedor: Fornecedor | null }) | null;
-};
-
-export type ProcessoDigitalWithRelations = ProcessoDigital & { 
-  fases: FaseContratacaoWithRelations[]; 
-  departamento: (Departamento & { ente: Ente | null }) | null;
-  participantes?: ProcessoParticipanteWithDepartamento[];
-  itens?: ProcessoItemWithRelations[];
-  dotacoes?: ProcessoDotacaoWithFicha[];
-};
-export type NotaFiscalWithRelations = NotaFiscal & { 
-  contrato: Contrato & { 
-    processoDigital: ProcessoDigital & { departamento: (Departamento & { ente: Ente | null }) | null };
-    fornecedor: Fornecedor;
-  } 
-};
-export type AfWithRelations = Af & {
-  empenho: Empenho & {
-    contrato: Contrato & {
-      fornecedor: Fornecedor;
-      processoDigital: ProcessoDigital & { departamento: (Departamento & { ente: Ente | null }) | null };
-    }
-  }
-};
-export type FonteRecursoWithFichas = FonteRecurso & { fichas: FichaOrcamentaria[]; projetosAtividade: ProjetoAtividade[] };
-export type EmpenhoWithRelations = Empenho & { afs: Af[]; fonteRecurso: FonteRecurso; ficha: FichaOrcamentaria };
-export type ContratoWithRelations = Contrato & { 
-  empenhos: EmpenhoWithRelations[];
-  processoDigital: ProcessoDigital & { departamento: (Departamento & { ente: Ente | null }) | null };
-  faseContratacao: FaseContratacaoWithRelations;
-  departamento: Departamento | null;
-  fornecedor: Fornecedor;
-  notasFiscais: NotaFiscal[];
-  aditivos: ContratoAditivo[];
-  anexos: ContratoAnexo[];
-};
-export type AtaParticipanteWithEnte = AtaParticipante & { ente: Ente };
-export type AtaFornecedorWithFornecedor = AtaFornecedor & { fornecedor: Fornecedor };
-export type AtaItemQuantidadeWithEnte = AtaItemQuantidade & { ente: Ente };
-export type AtaItemWithRelations = AtaItem & {
-  quantidades: AtaItemQuantidadeWithEnte[];
-  cotacao: AtaItemCotacao | null;
-  resultado: (AtaItemResultado & { fornecedor?: Fornecedor | null }) | null;
-};
-export type AtaRegistroPrecoWithRelations = AtaRegistroPreco & {
-  processoDigital: ProcessoDigital & { departamento: (Departamento & { ente: Ente | null }) | null };
-  participantes: AtaParticipanteWithEnte[];
-  fornecedores: AtaFornecedorWithFornecedor[];
-  itens: AtaItemWithRelations[];
 };
 export type AtaPrePedidoWithRelations = AtaPrePedido & {
   ataContrato?: AtaContrato | null;
@@ -1322,24 +1206,9 @@ export type DashboardStats = z.infer<typeof dashboardStatsResponseSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type AuditLogResponse = z.infer<typeof auditLogResponseSchema>;
 
-
-export const insertProcessoItemSchema = createInsertSchema(processoItens).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export type InsertProcessoItem = z.infer<typeof insertProcessoItemSchema>;
-export type ProcessoItem = typeof processoItens.$inferSelect;
-
-export const insertProcessoItemQuantidadeSchema = createInsertSchema(processoItemQuantidades).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export type ProcessoItemQuantidade = typeof processoItemQuantidades.$inferSelect;
-
-export const insertProcessoItemCotacaoSchema = createInsertSchema(processoItemCotacoes).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export type ProcessoItemCotacao = typeof processoItemCotacoes.$inferSelect;
-
-export const insertProcessoItemResultadoSchema = createInsertSchema(processoItemResultados).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export type ProcessoItemResultado = typeof processoItemResultados.$inferSelect;
-
 export const insertProcessoParticipanteSchema = createInsertSchema(processoParticipantes).omit({ id: true, criadoEm: true });
 export type InsertProcessoParticipante = z.infer<typeof insertProcessoParticipanteSchema>;
 export type ProcessoParticipante = typeof processoParticipantes.$inferSelect;
-
-export const insertProcessoDotacaoSchema = createInsertSchema(processoDotacoes).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export type InsertProcessoDotacao = z.infer<typeof insertProcessoDotacaoSchema>;
-export type ProcessoDotacao = typeof processoDotacoes.$inferSelect;
+export type ProcessoParticipanteWithDepartamento = ProcessoParticipante & {
+  departamento: Departamento;
+};

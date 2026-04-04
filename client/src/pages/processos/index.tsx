@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useProcessos, useCreateProcesso, useCreateFase, useUpdateProcesso, useDeleteProcesso } from "@/hooks/use-processos";
 import { useFornecedores } from "@/hooks/use-fornecedores";
 import { useDepartamentos } from "@/hooks/use-departamentos";
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FolderOpen, Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { FolderOpen, Plus, Search, Edit2, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Departamento, Fornecedor, InsertProcessoDigital, ProcessoDigitalWithRelations } from "@shared/schema";
 
@@ -38,6 +39,7 @@ const defaultProcessoForm: ProcessoForm = {
   objetoResumido: "",
   objetoCompleto: "",
   descricao: "",
+  status: "planejamento",
   departamentoId: "",
 };
 
@@ -84,6 +86,7 @@ export default function Processos() {
       objetoCompleto: processo.objetoCompleto,
       descricao: processo.descricao || "",
       departamentoId: processo.departamentoId || "",
+      status: (processo.status as any) || "planejamento",
     });
     setProcessoDialog(true);
   };
@@ -256,6 +259,11 @@ export default function Processos() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right gap-1 flex justify-end">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/processos/${processo.id}`}>
+                          <Eye size={16} />
+                        </Link>
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleEditProcesso(processo)} data-testid={`button-edit-${processo.id}`}>
                         <Edit2 size={16} />
                       </Button>

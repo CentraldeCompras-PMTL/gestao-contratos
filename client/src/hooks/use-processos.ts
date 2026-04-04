@@ -110,10 +110,206 @@ export function useCreateFase() {
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao criar fase"));
       return res.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.processoId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.fases.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
       invalidateDashboardQueries(queryClient);
-    }
+    },
+  });
+}
+
+export function useAddParticipante() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, departamentoId }: { id: string; departamentoId: string }) => {
+      const url = buildUrl(api.processos.addParticipante.path, { id });
+      const res = await fetch(url, {
+        method: api.processos.addParticipante.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ departamentoId }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao adicionar participante"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+      queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+    },
+  });
+}
+
+export function useRemoveParticipante() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, departamentoId }: { id: string; departamentoId: string }) => {
+      const url = buildUrl(api.processos.removeParticipante.path, { id, departamentoId });
+      const res = await fetch(url, {
+        method: api.processos.removeParticipante.method,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao remover participante"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+      queryClient.invalidateQueries({ queryKey: [api.processos.list.path] });
+    },
+  });
+}
+
+export function useAddDotacao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, fichaOrcamentariaId, anoDotacao, valorEstimado }: { id: string; fichaOrcamentariaId: string; anoDotacao: string; valorEstimado?: string }) => {
+      const url = buildUrl(api.processos.addDotacao.path, { id });
+      const res = await fetch(url, {
+        method: api.processos.addDotacao.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fichaOrcamentariaId, anoDotacao, valorEstimado }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao adicionar dotação"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+    },
+  });
+}
+
+export function useRemoveDotacao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, dotacaoId }: { id: string; dotacaoId: string }) => {
+      const url = buildUrl(api.processos.removeDotacao.path, { id, dotacaoId });
+      const res = await fetch(url, {
+        method: api.processos.removeDotacao.method,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao remover dotação"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+    },
+  });
+}
+
+export function useCreateProcessoItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const url = buildUrl(api.processos.createItem.path, { id });
+      const res = await fetch(url, {
+        method: api.processos.createItem.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao criar item"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+    },
+  });
+}
+
+export function useUpdateProcessoItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId, data }: { itemId: string; data: any }) => {
+      const url = buildUrl(api.processos.updateItem.path, { itemId });
+      const res = await fetch(url, {
+        method: api.processos.updateItem.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao atualizar item"));
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, data.processoId] });
+    },
+  });
+}
+
+export function useDeleteProcessoItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, itemId }: { id: string; itemId: string }) => {
+      const url = buildUrl(api.processos.deleteItem.path, { itemId });
+      const res = await fetch(url, {
+        method: api.processos.deleteItem.method,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao excluir item"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+    },
+  });
+}
+
+export function useSaveProcessoQuantidades() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, quantidades }: { id: string; quantidades: any[] }) => {
+      const url = buildUrl(api.processos.saveQuantidades.path, { id });
+      const res = await fetch(url, {
+        method: api.processos.saveQuantidades.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantidades }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao salvar quantidades"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+    },
+  });
+}
+
+export function useSaveProcessoCotacoes() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, cotacoes }: { id: string; cotacoes: any[] }) => {
+      const url = buildUrl(api.processos.saveCotacoes.path, { id });
+      const res = await fetch(url, {
+        method: api.processos.saveCotacoes.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cotacoes }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao salvar cotações"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+    },
+  });
+}
+
+export function useSaveProcessoResultados() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, resultados }: { id: string; resultados: any[] }) => {
+      const url = buildUrl(api.processos.saveResultados.path, { id });
+      const res = await fetch(url, {
+        method: api.processos.saveResultados.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resultados }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao salvar resultados"));
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.processos.get.path, variables.id] });
+    },
   });
 }

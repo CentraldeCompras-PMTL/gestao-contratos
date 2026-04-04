@@ -882,6 +882,146 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.processos.addParticipante.path, requireAuth, async (req, res) => {
+    try {
+      const { departamentoId } = api.processos.addParticipante.input.parse(req.body);
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+      
+      await storage.addProcessoParticipante(processo.id, departamentoId);
+      await audit(req, "create", "processo_participante", processo.id, `Departamento ${departamentoId}`);
+      res.status(201).json({ message: "Participante adicionado" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao adicionar participante") });
+    }
+  });
+
+  app.delete(api.processos.removeParticipante.path, requireAuth, async (req, res) => {
+    try {
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+      
+      await storage.removeProcessoParticipante(processo.id, req.params.departamentoId);
+      await audit(req, "delete", "processo_participante", processo.id, `Departamento ${req.params.departamentoId}`);
+      res.json({ message: "Participante removido" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao remover participante") });
+    }
+  });
+
+  app.post(api.processos.addDotacao.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.processos.addDotacao.input.parse(req.body);
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+      const dotacao = await storage.addProcessoDotacao({ processoId: processo.id, ...data });
+      await audit(req, "create", "processo_dotacao", dotacao.id, `Ficha ${data.fichaOrcamentariaId} - ${data.anoDotacao}`);
+      res.status(201).json(dotacao);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao adicionar dotacao") });
+    }
+  });
+
+  app.delete(api.processos.removeDotacao.path, requireAuth, async (req, res) => {
+    try {
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+      await storage.removeProcessoDotacao(req.params.dotacaoId);
+      await audit(req, "delete", "processo_dotacao", req.params.dotacaoId);
+      res.json({ message: "Dotacao removida" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao remover dotacao") });
+    }
+  });
+
+  app.post(api.processos.createItem.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.processos.createItem.input.parse(req.body);
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+      
+      const item = await storage.createProcessoItem({ ...data, processoId: processo.id });
+      await audit(req, "create", "processo_item", item.id, item.descricao);
+      res.status(201).json(item);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao criar item do processo") });
+    }
+  });
+
+  app.put(api.processos.updateItem.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.processos.updateItem.input.parse(req.body);
+      const item = await storage.updateProcessoItem(req.params.itemId, data);
+      await audit(req, "update", "processo_item", req.params.itemId, data.descricao);
+      res.json(item);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar item do processo") });
+    }
+  });
+
+  app.delete(api.processos.deleteItem.path, requireAuth, async (req, res) => {
+    try {
+      await storage.deleteProcessoItem(req.params.itemId);
+      await audit(req, "delete", "processo_item", req.params.itemId);
+      res.json({ message: "Item excluido" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir item") });
+    }
+  });
+
+  app.put(api.processos.saveQuantidades.path, requireAuth, async (req, res) => {
+    try {
+      const { quantidades } = api.processos.saveQuantidades.input.parse(req.body);
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+
+      await storage.saveProcessoQuantidades(processo.id, quantidades);
+      await audit(req, "update", "processo_quantidades", processo.id, `Quantidades atualizadas`);
+      const enrichedProcesso = await storage.getProcessoDigital(processo.id);
+      res.json(enrichedProcesso);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao salvar quantidades") });
+    }
+  });
+
+  app.put(api.processos.saveCotacoes.path, requireAuth, async (req, res) => {
+    try {
+      const { cotacoes } = api.processos.saveCotacoes.input.parse(req.body);
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+
+      await storage.saveProcessoCotacoes(processo.id, cotacoes);
+      await audit(req, "update", "processo_cotacoes", processo.id, `Cotacoes atualizadas`);
+      const enrichedProcesso = await storage.getProcessoDigital(processo.id);
+      res.json(enrichedProcesso);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao salvar cotacoes") });
+    }
+  });
+
+  app.put(api.processos.saveResultados.path, requireAuth, async (req, res) => {
+    try {
+      const { resultados } = api.processos.saveResultados.input.parse(req.body);
+      const processo = await storage.getProcessoDigital(req.params.id);
+      if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
+      ensureEnteAccess(req, processo.departamento?.enteId);
+
+      await storage.saveProcessoResultados(processo.id, resultados);
+      await audit(req, "update", "processo_resultados", processo.id, `Resultados atualizados`);
+      const enrichedProcesso = await storage.getProcessoDigital(processo.id);
+      res.json(enrichedProcesso);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao salvar resultados") });
+    }
+  });
+
   app.get(api.fases.list.path, requireAuth, async (req, res) => {
     const f = await storage.getFases();
     if (!isAdmin(req)) {

@@ -19,6 +19,7 @@ const AtasRegistroPrecoPage = lazy(() => import("./pages/atas-registro-preco"));
 const PrePedidosArpPage = lazy(() => import("./pages/pre-pedidos-arp"));
 const ContratosArpPage = lazy(() => import("./pages/contratos-arp"));
 const Processos = lazy(() => import("./pages/processos"));
+const ProcessoDetail = lazy(() => import("./pages/processos/[id]"));
 const Fases = lazy(() => import("./pages/fases"));
 const Contratos = lazy(() => import("./pages/contratos"));
 const ContratoDetail = lazy(() => import("./pages/contratos/[id]"));
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/pre-pedidos-arp" component={() => <ProtectedRoute component={PrePedidosArpPage} />} />
       <Route path="/contratos-arp" component={() => <ProtectedRoute component={ContratosArpPage} />} />
       <Route path="/processos" component={() => <ProtectedRoute component={Processos} />} />
+      <Route path="/processos/:id" component={() => <ProtectedRoute component={ProcessoDetail} />} />
       <Route path="/fases" component={() => <ProtectedRoute component={Fases} />} />
       <Route path="/contratos" component={() => <ProtectedRoute component={Contratos} />} />
       <Route path="/contratos/:id" component={() => <ProtectedRoute component={ContratoDetail} />} />

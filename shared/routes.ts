@@ -8,6 +8,10 @@ import {
   insertProjetoAtividadeSchema,
   insertEnteSchema,
   insertProcessoDigitalSchema, 
+  insertProcessoItemSchema,
+  insertProcessoItemQuantidadeSchema,
+  insertProcessoItemCotacaoSchema,
+  insertProcessoItemResultadoSchema,
   insertFaseContratacaoSchema,
   insertContratoSchema,
   insertAtaRegistroPrecoSchema,
@@ -515,7 +519,68 @@ export const api = {
       method: 'DELETE' as const,
       path: '/api/processos/:id' as const,
       responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
-    }
+    },
+    addParticipante: {
+      method: 'POST' as const,
+      path: '/api/processos/:id/participantes' as const,
+      input: z.object({ departamentoId: z.string() }),
+      responses: { 201: z.any() },
+    },
+    removeParticipante: {
+      method: 'DELETE' as const,
+      path: '/api/processos/:id/participantes/:departamentoId' as const,
+      responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
+    },
+    createItem: {
+      method: 'POST' as const,
+      path: '/api/processos/:id/itens' as const,
+      input: insertProcessoItemSchema,
+      responses: { 201: z.any() },
+    },
+    updateItem: {
+      method: 'PUT' as const,
+      path: '/api/processo-itens/:itemId' as const,
+      input: insertProcessoItemSchema.partial(),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    deleteItem: {
+      method: 'DELETE' as const,
+      path: '/api/processo-itens/:itemId' as const,
+      responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
+    },
+    saveQuantidades: {
+      method: 'PUT' as const,
+      path: '/api/processos/:id/quantidades' as const,
+      input: z.object({ quantidades: z.array(insertProcessoItemQuantidadeSchema.pick({ itemId: true, departamentoId: true, quantidade: true })) }),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    saveCotacoes: {
+      method: 'PUT' as const,
+      path: '/api/processos/:id/cotacoes' as const,
+      input: z.object({ cotacoes: z.array(insertProcessoItemCotacaoSchema.pick({ itemId: true, valorUnitarioCotado: true })) }),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    saveResultados: {
+      method: 'PUT' as const,
+      path: '/api/processos/:id/resultados' as const,
+      input: z.object({ resultados: z.array(insertProcessoItemResultadoSchema.pick({ itemId: true, fornecedorId: true, valorUnitarioLicitado: true, itemFracassado: true })) }),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    addDotacao: {
+      method: 'POST' as const,
+      path: '/api/processos/:id/dotacoes' as const,
+      input: z.object({
+        fichaOrcamentariaId: z.string().min(1),
+        anoDotacao: z.string().min(4, 'Ano obrigatorio'),
+        valorEstimado: z.string().optional(),
+      }),
+      responses: { 201: z.any() },
+    },
+    removeDotacao: {
+      method: 'DELETE' as const,
+      path: '/api/processos/:id/dotacoes/:dotacaoId' as const,
+      responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
+    },
   },
   fases: {
     list: {

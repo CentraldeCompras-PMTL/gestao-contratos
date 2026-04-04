@@ -155,6 +155,13 @@
       "when": 1770000021000,
       "tag": "0021_arp_execucao_direta_quantidades",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1775326185477,
+      "tag": "0022_bouncy_susan_delgado",
+      "breakpoints": true
     }
   ]
 }
