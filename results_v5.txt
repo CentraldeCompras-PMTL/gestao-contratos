@@ -1,0 +1,80 @@
+﻿Checking contracts...
+node.exe : Error in test: 
+Error: There is not 
+enough information to 
+infer relation 
+"contratos.aditivos"
+No linha:1 caractere:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (E  
+  rror in test: ...rato   
+ s.aditivos":String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+    at normalizeRelation (
+C:\Users\Eric\Documents\SI
+GEC-TL\gestao-contratos\no
+de_modules\src\relations.t
+s:631:8)
+    at PgDialect.buildRela
+tionalQueryWithoutPK (C:\U
+sers\Eric\Documents\SIGEC-
+TL\gestao-contratos\node_m
+odules\src\pg-core\dialect
+.ts:1282:32)
+    at 
+QueryPromise._getQuery (C:
+\Users\Eric\Documents\SIGE
+C-TL\gestao-contratos\node
+_modules\src\pg-core\query
+-builders\query.ts:117:23)
+    at 
+QueryPromise._toSQL (C:\Us
+ers\Eric\Documents\SIGEC-T
+L\gestao-contratos\node_mo
+dules\src\pg-core\query-bu
+ilders\query.ts:134:22)
+    at <anonymous> (C:\Use
+rs\Eric\Documents\SIGEC-TL
+\gestao-contratos\node_mod
+ules\src\pg-core\query-bui
+lders\query.ts:92:39)
+    at 
+Object.startActiveSpan (C:
+\Users\Eric\Documents\SIGE
+C-TL\gestao-contratos\node
+_modules\src\tracing.ts:27
+:11)
+    at 
+QueryPromise._prepare (C:\
+Users\Eric\Documents\SIGEC
+-TL\gestao-contratos\node_
+modules\src\pg-core\query-
+builders\query.ts:91:17)
+    at <anonymous> (C:\Use
+rs\Eric\Documents\SIGEC-TL
+\gestao-contratos\node_mod
+ules\src\pg-core\query-bui
+lders\query.ts:154:16)
+    at 
+Object.startActiveSpan (C:
+\Users\Eric\Documents\SIGE
+C-TL\gestao-contratos\node
+_modules\src\tracing.ts:27
+:11)
+    at 
+QueryPromise.execute (C:\U
+sers\Eric\Documents\SIGEC-
+TL\gestao-contratos\node_m
+odules\src\pg-core\query-b
+uilders\query.ts:153:17)

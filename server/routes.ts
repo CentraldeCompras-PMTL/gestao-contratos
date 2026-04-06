@@ -1486,7 +1486,7 @@ export async function registerRoutes(
       const contrato = await storage.getContrato(empenho.contratoId);
       ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
 
-      if (empenho.contrato.status === "encerrado") {
+      if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite anulacao de empenho");
       }
 
@@ -1538,7 +1538,7 @@ export async function registerRoutes(
       const contrato = await storage.getContrato(empenho.contratoId);
       ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
 
-      if (empenho.contrato.status === "encerrado") {
+      if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de empenho");
       }
       if (empenho.afs.length > 0) {
@@ -1620,7 +1620,7 @@ export async function registerRoutes(
       }
       const contratoPai = await storage.getContrato(empenho.contratoId);
       ensureEnteAccess(req, contratoPai?.processoDigital.departamento?.enteId);
-      if (empenho.contrato.status === "encerrado") {
+      if (contratoPai?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao aceita novas AFs");
       }
 
@@ -1714,7 +1714,7 @@ export async function registerRoutes(
       const empenho = await storage.getEmpenho(current.empenhoId);
       const contrato = empenho ? await storage.getContrato(empenho.contratoId) : undefined;
       ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
-      if (empenho?.contrato.status === "encerrado") {
+      if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de AF");
       }
       const deleted = await storage.deleteAf(req.params.id);

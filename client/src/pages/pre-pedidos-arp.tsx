@@ -34,8 +34,8 @@ type PrePedidoLine = {
   observacao: string;
 };
 
-type AtaAfWithNotasLike = AtaAf & { notasFiscais?: AtaNotaFiscal[] };
-type AtaEmpenhoWithRelationsLike = AtaEmpenho & { afs?: AtaAfWithNotasLike[] };
+type AtaAfWithNotasLike = any;
+type AtaEmpenhoWithRelationsLike = any;
 
 function makeLine(): PrePedidoLine {
   return {
@@ -114,10 +114,10 @@ export default function PrePedidosArpPage() {
   const [selectedDisponivel, setSelectedDisponivel] = useState<AtaPrePedidoDisponivel | null>(null);
   const [lines, setLines] = useState<PrePedidoLine[]>([makeLine()]);
   const [selectedPrePedidoEmpenho, setSelectedPrePedidoEmpenho] = useState<AtaPrePedidoWithRelations | null>(null);
-  const [selectedAtaEmpenho, setSelectedAtaEmpenho] = useState<AtaEmpenho | null>(null);
-  const [selectedAtaAf, setSelectedAtaAf] = useState<AtaAf | null>(null);
-  const [selectedAtaNota, setSelectedAtaNota] = useState<AtaNotaFiscal | null>(null);
-  const [selectedAtaNotaPagamento, setSelectedAtaNotaPagamento] = useState<AtaNotaFiscal | null>(null);
+  const [selectedAtaEmpenho, setSelectedAtaEmpenho] = useState<any | null>(null);
+  const [selectedAtaAf, setSelectedAtaAf] = useState<any | null>(null);
+  const [selectedAtaNota, setSelectedAtaNota] = useState<any | null>(null);
+  const [selectedAtaNotaPagamento, setSelectedAtaNotaPagamento] = useState<any | null>(null);
   const [empenhoForm, setEmpenhoForm] = useState(defaultEmpenhoForm);
   const [afForm, setAfForm] = useState(defaultAfForm);
   const [notaForm, setNotaForm] = useState(defaultNotaForm);
@@ -256,13 +256,13 @@ export default function PrePedidosArpPage() {
     Math.max(parseNumberString(prePedido.quantidadeSolicitada) - getQuantidadeEmpenhada(prePedido), 0);
 
   const getQuantidadeAf = (empenho: AtaEmpenhoWithRelationsLike) =>
-    (empenho.afs ?? []).reduce((sum, af) => sum + parseNumberString(af.quantidadeAf), 0);
+    (empenho.afs ?? []).reduce((sum: number, af: any) => sum + parseNumberString(af.quantidadeAf), 0);
 
   const getSaldoAf = (empenho: AtaEmpenhoWithRelationsLike) =>
     Math.max(parseNumberString(empenho.quantidadeEmpenhada) - getQuantidadeAf(empenho), 0);
 
   const getQuantidadeNota = (af: AtaAfWithNotasLike) =>
-    (af.notasFiscais ?? []).reduce((sum, nota) => sum + parseNumberString(nota.quantidadeNota), 0);
+    (af.notasFiscais ?? []).reduce((sum: number, nota: any) => sum + parseNumberString(nota.quantidadeNota), 0);
 
   const getSaldoNota = (af: AtaAfWithNotasLike) =>
     Math.max(parseNumberString(af.quantidadeAf) - getQuantidadeNota(af), 0);

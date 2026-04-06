@@ -1,0 +1,78 @@
+﻿Checking contracts...
+node.exe : Error in 
+test: error: column co
+ntratos_empenhos_fonte
+Recurso.ano does not 
+exist
+No linha:1 caractere:1
++ & "C:\Program Files\
+nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : 
+NotSpecified: (E    
+rror in test: ... doe 
+   s not 
+exist:String) [    ], 
+RemoteException
+    + 
+FullyQualifiedError   
+ Id : 
+NativeCommandErr    or
+ 
+    at C:\Users\Eric\D
+ocuments\SIGEC-TL\gest
+ao-contratos\node_modu
+les\pg-pool\index.js:4
+5:11
+    at process.process
+TicksAndRejections (no
+de:internal/process/ta
+sk_queues:104:5)
+    at async 
+<anonymous> (C:\Users\
+Eric\Documents\SIGEC-T
+L\gestao-contratos\nod
+e_modules\src\node-pos
+tgres\session.ts:104:1
+9)
+    at async DatabaseS
+torage.getContratos (C
+:\Users\Eric\Documents
+\SIGEC-TL\gestao-contr
+atos\server\storage.ts
+:646:21)
+    at async test (C:\
+Users\Eric\Documents\S
+IGEC-TL\gestao-contrat
+os\debug_storage.ts:6:
+23) {
+  length: 135,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '3872',
+  internalPosition: 
+undefined,
+  internalQuery: 
+undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: 
+undefined,
+  file: 
+'parse_relation.c',
+  line: '3716',
+  routine: 
+'errorMissingColumn'
+}

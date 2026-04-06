@@ -1,0 +1,67 @@
+﻿Checking contracts...
+node.exe : Error in test: 
+error: column contratos_pr
+ocessoDigital_dotacoes_fic
+haOrcamentaria.ano does 
+not exist
+No linha:1 caractere:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (E  
+  rror in test: ... doe   
+ s not exist:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+    at C:\Users\Eric\Docum
+ents\SIGEC-TL\gestao-contr
+atos\node_modules\pg-pool\
+index.js:45:11
+    at process.processTick
+sAndRejections (node:inter
+nal/process/task_queues:10
+4:5)
+    at async <anonymous> (
+C:\Users\Eric\Documents\SI
+GEC-TL\gestao-contratos\no
+de_modules\src\node-postgr
+es\session.ts:104:19)
+    at async DatabaseStora
+ge.getContratos (C:\Users\
+Eric\Documents\SIGEC-TL\ge
+stao-contratos\server\stor
+age.ts:645:16)
+    at async test (C:\User
+s\Eric\Documents\SIGEC-TL\
+gestao-contratos\debug_sto
+rage.ts:6:23) {
+  length: 156,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '7215',
+  internalPosition: 
+undefined,
+  internalQuery: 
+undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 
+'parse_relation.c',
+  line: '3716',
+  routine: 
+'errorMissingColumn'
+}

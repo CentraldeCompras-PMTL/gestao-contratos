@@ -1,0 +1,2 @@
+﻿Contratos columns: id, processo_digital_id, fase_contratacao_id, numero_contrato, fornecedor_id, valor_contrato, vigencia_inicial, vigencia_final, criado_em, atualizado_em, status, encerrado_em, motivo_encerramento, departamento_id
+ProcessosDigitais columns: id, numero_processo_digital, objeto_completo, objeto_resumido, descricao, departamento_id, criado_em, atualizado_em, status

@@ -396,15 +396,25 @@ export class DatabaseStorage implements IStorage {
   async getProcessosDigitais(): Promise<ProcessoDigitalWithRelations[]> {
     const procs = await db.query.processosDigitais.findMany({
       with: {
+        departamento: {
+          with: { ente: true }
+        },
         fases: {
           with: { fornecedor: true }
         },
-        departamento: {
-          with: { ente: true },
-        },
         participantes: {
-          with: { departamento: true },
+          with: { departamento: true }
         },
+        itens: {
+          with: {
+            quantidades: { with: { departamento: true } },
+            cotacao: true,
+            resultado: { with: { fornecedor: true } }
+          }
+        },
+        dotacoes: {
+          with: { fichaOrcamentaria: true }
+        }
       }
     });
     return procs as ProcessoDigitalWithRelations[];
@@ -426,6 +436,13 @@ export class DatabaseStorage implements IStorage {
         dotacoes: {
           with: { fichaOrcamentaria: true },
         },
+        itens: {
+          with: {
+            quantidades: { with: { departamento: true } },
+            cotacao: true,
+            resultado: { with: { fornecedor: true } }
+          }
+        }
       }
     });
     return proc as ProcessoDigitalWithRelations | undefined;
@@ -625,55 +642,64 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getContratos(): Promise<ContratoWithRelations[]> {
-    const cs = await db.query.contratos.findMany({
+    // Basic fetch with manual relation mapping for stability
+    const results = await db.query.contratos.findMany({
       with: {
-        processoDigital: {
-          with: {
-            departamento: {
-              with: { ente: true },
-            },
-          },
-        },
-        faseContratacao: {
-          with: {
-            departamento: true,
-            fornecedor: true,
-            processoDigital: true,
-          },
-        },
-        departamento: true,
+        departamento: { with: { ente: true } },
         fornecedor: true,
-        empenhos: {
-          with: { afs: true, fonteRecurso: true, ficha: true }
-        },
+        empenhos: { with: { afs: true, fonteRecurso: true, ficha: true } },
         notasFiscais: true,
         aditivos: true,
         anexos: true,
       }
     });
-    return cs as ContratoWithRelations[];
-  }
-
-  async getContratosLight() {
-    return await db.query.contratos.findMany({
+    
+    // Fetch processosDigitais separately and map them to avoid the deep join bug
+    const procIds = results.map(c => c.processoDigitalId);
+    const procs = await db.query.processosDigitais.findMany({
+      where: inArray(processosDigitais.id, procIds),
       with: {
-        processoDigital: {
-          with: {
-            departamento: {
-              with: { ente: true },
-            },
-          },
-        },
-        faseContratacao: {
-          with: {
-            departamento: true,
-            fornecedor: true,
-          },
-        },
-        departamento: true,
+        departamento: { with: { ente: true } },
+        fases: { with: { fornecedor: true } },
+      }
+    });
+
+    // Fetch faseContratacao separately
+    const faseIds = results.map(c => c.faseContratacaoId);
+    const fases = await db.query.fasesContratacao.findMany({
+      where: inArray(fasesContratacao.id, faseIds),
+      with: {
         fornecedor: true,
       }
     });
+
+    return results.map(c => ({
+      ...c,
+      processoDigital: procs.find(p => p.id === c.processoDigitalId),
+      faseContratacao: fases.find(f => f.id === c.faseContratacaoId),
+    })) as unknown as ContratoWithRelations[];
+  }
+
+  async getContratosLight(): Promise<ContratoWithRelations[]> {
+    const cs = await db.query.contratos.findMany({
+      with: {
+        processoDigital: {
+          with: {
+            departamento: { with: { ente: true } },
+          },
+        },
+        faseContratacao: {
+          with: { fornecedor: true },
+        },
+        departamento: { with: { ente: true } },
+        fornecedor: true,
+        empenhos: true,
+        notasFiscais: true,
+        aditivos: true,
+        anexos: true,
+      }
+    });
+    return cs as unknown as ContratoWithRelations[];
   }
 
   async getContrato(id: string): Promise<ContratoWithRelations | undefined> {
@@ -682,19 +708,15 @@ export class DatabaseStorage implements IStorage {
       with: {
         processoDigital: {
           with: {
-            departamento: {
-              with: { ente: true },
-            },
+            departamento: { with: { ente: true } },
+            fases: { with: { fornecedor: true } },
+            dotacoes: { with: { fichaOrcamentaria: true } },
           },
         },
         faseContratacao: {
-          with: {
-            departamento: true,
-            fornecedor: true,
-            processoDigital: true,
-          },
+          with: { fornecedor: true },
         },
-        departamento: true,
+        departamento: { with: { ente: true } },
         fornecedor: true,
         empenhos: {
           with: { afs: true, fonteRecurso: true, ficha: true }
@@ -765,16 +787,31 @@ export class DatabaseStorage implements IStorage {
     return deleted;
   }
 
-  async getEmpenho(id: string): Promise<(Empenho & { afs: Af[]; contrato: Contrato; fonteRecurso: FonteRecurso; ficha: FichaOrcamentaria }) | undefined> {
-    return await db.query.empenhos.findFirst({
+  async getEmpenho(id: string): Promise<EmpenhoWithRelations | undefined> {
+    const e = await db.query.empenhos.findFirst({
       where: eq(empenhos.id, id),
       with: {
         afs: true,
-        contrato: true,
+        contrato: {
+          with: {
+            processoDigital: {
+              with: {
+                departamento: {
+                  with: { ente: true }
+                }
+              }
+            },
+            fornecedor: true,
+            departamento: {
+              with: { ente: true }
+            }
+          }
+        },
         fonteRecurso: true,
         ficha: true,
       }
-    }) as any;
+    });
+    return e as EmpenhoWithRelations | undefined;
   }
 
   async createEmpenho(e: InsertEmpenho): Promise<Empenho> {
@@ -802,7 +839,7 @@ export class DatabaseStorage implements IStorage {
       motivoAnulacao: string;
     },
   ): Promise<Empenho | undefined> {
-    const [updated] = await db.update(empenhos).set(data).where(eq(empenhos.id, id)).returning();
+    const [updated] = await db.update(empenhos).set(data as any).where(eq(empenhos.id, id)).returning();
     return updated;
   }
 
@@ -825,9 +862,15 @@ export class DatabaseStorage implements IStorage {
                       with: { ente: true },
                     },
                   },
+                },
+                departamento: {
+                  with: { ente: true }
                 }
               }
-            }
+            },
+            fonteRecurso: true,
+            ficha: true,
+            afs: true,
           }
         }
       }
@@ -903,26 +946,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNotasFiscais(): Promise<NotaFiscalWithRelations[]> {
-    return await db.query.notasFiscais.findMany({
+    const rows = await db.query.notasFiscais.findMany({
       with: {
         contrato: {
           with: {
+            fornecedor: true,
             processoDigital: {
               with: {
-                departamento: {
-                  with: { ente: true },
-                },
-              },
+                departamento: { with: { ente: true } }
+              }
             },
-            fornecedor: true
+            departamento: { with: { ente: true } }
           }
         }
       }
     });
+    return rows as NotaFiscalWithRelations[];
   }
 
   async getNotaFiscal(id: string): Promise<NotaFiscalWithRelations | undefined> {
-    return await db.query.notasFiscais.findFirst({
+    const row = await db.query.notasFiscais.findFirst({
       where: eq(notasFiscais.id, id),
       with: {
         contrato: {
@@ -939,6 +982,7 @@ export class DatabaseStorage implements IStorage {
         },
       },
     });
+    return row as unknown as NotaFiscalWithRelations | undefined;
   }
 
   async createNotaFiscal(nota: InsertNotaFiscal): Promise<NotaFiscal> {
@@ -961,7 +1005,8 @@ export class DatabaseStorage implements IStorage {
       dataPagamento?: string | null;
     },
   ): Promise<NotaFiscal> {
-    const [updated] = await db.update(notasFiscais).set(data).where(eq(notasFiscais.id, id)).returning();
+    const [updated] = await db.update(notasFiscais).set(data as any).where(eq(notasFiscais.id, id)).returning();
+    if (!updated) throw new Error("Nota fiscal não encontrada");
     return updated;
   }
 

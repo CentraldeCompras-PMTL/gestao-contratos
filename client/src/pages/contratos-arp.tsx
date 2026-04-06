@@ -26,6 +26,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, parseNumberString } from "@/lib/formatters";
 import type { AtaAf, AtaPrePedidoWithRelations } from "@shared/schema";
 
+type AtaAfWithNotasLike = any;
+type AtaEmpenhoWithRelationsLike = any;
+
 const defaultContratoForm = {
   numeroContrato: "",
   objeto: "",
@@ -109,7 +112,7 @@ export default function ContratosArpPage() {
   const [contratoForm, setContratoForm] = useState(defaultContratoForm);
   const [empenhoDialogOpen, setEmpenhoDialogOpen] = useState<string | null>(null);
   const [afDialogOpen, setAfDialogOpen] = useState<string | null>(null);
-  const [notaDialogOpen, setNotaDialogOpen] = useState<AtaAf | null>(null);
+  const [notaDialogOpen, setNotaDialogOpen] = useState<any | null>(null);
   const [enviarPagamentoDialogOpen, setEnviarPagamentoDialogOpen] = useState<string | null>(null);
   const [registrarPagamentoDialogOpen, setRegistrarPagamentoDialogOpen] = useState<string | null>(null);
   const [empenhoForm, setEmpenhoForm] = useState(defaultEmpenhoForm);
@@ -213,7 +216,7 @@ export default function ContratosArpPage() {
     setAfForm(defaultAfForm);
   };
 
-  const handleOpenNota = (af: AtaAf) => {
+  const handleOpenNota = (af: any) => {
     setNotaDialogOpen(af);
     setNotaForm(defaultNotaForm);
   };

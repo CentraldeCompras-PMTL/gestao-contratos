@@ -1,0 +1,70 @@
+[
+  {
+    "table_name": "fichas_orcamentarias",
+    "column_name": "classificacao"
+  },
+  {
+    "table_name": "fichas_orcamentarias",
+    "column_name": "codigo"
+  },
+  {
+    "table_name": "fichas_orcamentarias",
+    "column_name": "criado_em"
+  },
+  {
+    "table_name": "fichas_orcamentarias",
+    "column_name": "fonte_recurso_id"
+  },
+  {
+    "table_name": "fichas_orcamentarias",
+    "column_name": "id"
+  },
+  {
+    "table_name": "fichas_orcamentarias",
+    "column_name": "projeto_atividade_id"
+  },
+  {
+    "table_name": "fontes_recurso",
+    "column_name": "atualizado_em"
+  },
+  {
+    "table_name": "fontes_recurso",
+    "column_name": "codigo"
+  },
+  {
+    "table_name": "fontes_recurso",
+    "column_name": "criado_em"
+  },
+  {
+    "table_name": "fontes_recurso",
+    "column_name": "id"
+  },
+  {
+    "table_name": "fontes_recurso",
+    "column_name": "nome"
+  },
+  {
+    "table_name": "projetos_atividade",
+    "column_name": "atualizado_em"
+  },
+  {
+    "table_name": "projetos_atividade",
+    "column_name": "codigo"
+  },
+  {
+    "table_name": "projetos_atividade",
+    "column_name": "criado_em"
+  },
+  {
+    "table_name": "projetos_atividade",
+    "column_name": "descricao"
+  },
+  {
+    "table_name": "projetos_atividade",
+    "column_name": "fonte_recurso_id"
+  },
+  {
+    "table_name": "projetos_atividade",
+    "column_name": "id"
+  }
+]

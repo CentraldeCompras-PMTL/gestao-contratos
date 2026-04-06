@@ -422,6 +422,14 @@ export const contratosRelations = relations(contratos, ({ one, many }) => ({
   anexos: many(contratoAnexos),
 }));
 
+export const contratoAditivosRelations = relations(contratoAditivos, ({ one }) => ({
+  contrato: one(contratos, { fields: [contratoAditivos.contratoId], references: [contratos.id] }),
+}));
+
+export const contratoAnexosRelations = relations(contratoAnexos, ({ one }) => ({
+  contrato: one(contratos, { fields: [contratoAnexos.contratoId], references: [contratos.id] }),
+}));
+
 export const atasRegistroPrecoRelations = relations(atasRegistroPreco, ({ one, many }) => ({
   processoDigital: one(processosDigitais, { fields: [atasRegistroPreco.processoDigitalId], references: [processosDigitais.id] }),
   participantes: many(ataParticipantes),
@@ -498,6 +506,13 @@ export const ataNotasFiscaisRelations = relations(ataNotasFiscais, ({ one }) => 
 
 export const notasFiscaisRelations = relations(notasFiscais, ({ one }) => ({
   contrato: one(contratos, { fields: [notasFiscais.contratoId], references: [contratos.id] }),
+}));
+
+export const fasesContratacaoRelations = relations(fasesContratacao, ({ one, many }) => ({
+  processoDigital: one(processosDigitais, { fields: [fasesContratacao.processoDigitalId], references: [processosDigitais.id] }),
+  fornecedor: one(fornecedores, { fields: [fasesContratacao.fornecedorId], references: [fornecedores.id] }),
+  departamento: one(departamentos, { fields: [fasesContratacao.departamentoId], references: [departamentos.id] }),
+  contratos: many(contratos),
 }));
 
 export const empenhosRelations = relations(empenhos, ({ one, many }) => ({
@@ -591,6 +606,35 @@ export const processoDotacoesRelations = relations(processoDotacoes, ({ one }) =
   }),
 }));
 
+export const fornecedoresRelations = relations(fornecedores, ({ many }) => ({
+  fasesContratacao: many(fasesContratacao),
+  contratos: many(contratos),
+  processoItemResultados: many(processoItemResultados),
+  ataFornecedores: many(ataFornecedores),
+}));
+
+export const fontesRecursoRelations = relations(fontesRecurso, ({ many }) => ({
+  fichas: many(fichasOrcamentarias),
+  projetosAtividade: many(projetosAtividade),
+  empenhos: many(empenhos),
+}));
+
+export const fichasOrcamentariasRelations = relations(fichasOrcamentarias, ({ one, many }) => ({
+  fonteRecurso: one(fontesRecurso, {
+    fields: [fichasOrcamentarias.fonteRecursoId],
+    references: [fontesRecurso.id],
+  }),
+  empenhos: many(empenhos),
+  processoDotacoes: many(processoDotacoes),
+}));
+
+export const projetosAtividadeRelations = relations(projetosAtividade, ({ one }) => ({
+  fonteRecurso: one(fontesRecurso, {
+    fields: [projetosAtividade.fonteRecursoId],
+    references: [fontesRecurso.id],
+  }),
+}));
+
 // Schemas de Inserção
 export const insertUserSchema = z.object(createInsertSchema(users).shape).omit({ id: true, createdAt: true });
 export const insertEnteSchema = z.object(createInsertSchema(entes).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
@@ -603,7 +647,7 @@ export const insertProcessoDigitalSchema = z.object(createInsertSchema(processos
 export const insertFaseContratacaoSchema = z.object(createInsertSchema(fasesContratacao).shape).omit({ id: true, criadoEm: true });
 export const insertContratoSchema = z.object(createInsertSchema(contratos).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertAtaRegistroPrecoSchema = z.object(createInsertSchema(atasRegistroPreco).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export const insertAtaItemSchema = z.object(createInsertSchema(ataItens).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertAtaItemSchema = z.object(createInsertSchema(ataItens).shape).omit({ id: true, ataId: true, criadoEm: true, atualizadoEm: true });
 
 export const insertAtaItemQuantidadeSchema = z.object(createInsertSchema(ataItemQuantidades).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertAtaItemCotacaoSchema = z.object(createInsertSchema(ataItemCotacoes).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
@@ -990,6 +1034,7 @@ export const ataEmpenhoResponseSchema = z.object({
 export const ataAfResponseSchema = z.object({
   id: z.string(),
   ataEmpenhoId: z.string(),
+  numeroAf: z.string(),
   dataPedidoAf: isoDateSchema,
   quantidadeAf: z.union([z.string(), z.number()]),
   valorAf: z.union([z.string(), z.number()]),
@@ -1117,6 +1162,7 @@ export const ataRegistroPrecoWithRelationsSchema = ataRegistroPrecoResponseSchem
   participantes: z.array(ataParticipanteWithEnteSchema),
   fornecedores: z.array(ataFornecedorWithFornecedorSchema),
   itens: z.array(ataItemWithRelationsSchema),
+  prePedidos: z.array(ataPrePedidoResponseSchema).optional(),
 });
 
 export const ataPrePedidoWithRelationsSchema = ataPrePedidoResponseSchema.extend({

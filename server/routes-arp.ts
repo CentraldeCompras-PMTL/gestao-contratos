@@ -62,7 +62,7 @@ async function getAtaWithRelations(id: string): Promise<AtaRegistroPrecoWithRela
         },
       },
     },
-  });
+  }) as unknown as Promise<AtaRegistroPrecoWithRelations | undefined>;
 }
 
 async function getPrePedidoWithRelations(id: string): Promise<AtaPrePedidoWithRelations | undefined> {
@@ -110,7 +110,7 @@ async function getPrePedidoWithRelations(id: string): Promise<AtaPrePedidoWithRe
         },
       },
     },
-  });
+  }) as unknown as Promise<AtaPrePedidoWithRelations | undefined>;
 }
 
 async function getAtaContratoWithRelations(id: string): Promise<AtaContratoWithRelations | undefined> {
@@ -218,7 +218,7 @@ async function getAtaContratoWithRelations(id: string): Promise<AtaContratoWithR
         },
       },
     },
-  });
+  }) as any;
 }
 
 async function getAtaEmpenhoWithRelations(id: string): Promise<AtaEmpenhoWithRelations | undefined> {
@@ -266,28 +266,28 @@ async function getAtaEmpenhoWithRelations(id: string): Promise<AtaEmpenhoWithRel
         },
       },
     },
-  });
+  }) as unknown as Promise<AtaEmpenhoWithRelations | undefined>;
 }
 
 async function getPrePedidoEmpenhado(prePedidoId: string) {
   const empenhos = await db.query.ataEmpenhos.findMany({
     where: eq(ataEmpenhos.ataPrePedidoId, prePedidoId),
-  });
-  return empenhos.reduce((sum, empenho) => sum + parseMoney(empenho.quantidadeEmpenhada, "Quantidade empenhada"), 0);
+  }) as unknown as any[];
+  return empenhos.reduce((sum: number, empenho: any) => sum + parseMoney(empenho.quantidadeEmpenhada, "Quantidade empenhada"), 0);
 }
 
 async function getEmpenhoAfQuantidade(ataEmpenhoId: string) {
   const afs = await db.query.ataAfs.findMany({
     where: eq(ataAfs.ataEmpenhoId, ataEmpenhoId),
-  });
-  return afs.reduce((sum, af) => sum + parseMoney(af.quantidadeAf, "Quantidade da AF"), 0);
+  }) as unknown as any[];
+  return afs.reduce((sum: number, af: any) => sum + parseMoney(af.quantidadeAf, "Quantidade da AF"), 0);
 }
 
 async function getAfQuantidadeFaturada(ataAfId: string) {
   const notas = await db.query.ataNotasFiscais.findMany({
     where: eq(ataNotasFiscais.ataAfId, ataAfId),
-  });
-  return notas.reduce((sum, nota) => sum + parseMoney(nota.quantidadeNota, "Quantidade da nota"), 0);
+  }) as unknown as any[];
+  return notas.reduce((sum: number, nota: any) => sum + parseMoney(nota.quantidadeNota, "Quantidade da nota"), 0);
 }
 
 function normalizeEnteName(value: string | null | undefined) {
@@ -348,7 +348,7 @@ async function listAtasDisponiveisParaPrePedido(req: any, helpers: RouteHelpers)
       },
       prePedidos: true,
     },
-  });
+  }) as unknown as AtaRegistroPrecoWithRelations[];
 
   const accessibleEnteIds = helpers.isAdmin(req) ? null : helpers.getUserEnteIds(req);
   const filteredAtas = atas.filter((ata) =>
@@ -376,9 +376,9 @@ async function listAtasDisponiveisParaPrePedido(req: any, helpers: RouteHelpers)
             const quantidadeParticipante = item.quantidades
               .filter((quantidade) => quantidade.enteId === participante.enteId)
               .reduce((sum, quantidade) => sum + parseMoney(quantidade.quantidade, "Quantidade participante"), 0);
-            const quantidadePrePedida = ata.prePedidos
-              .filter((prePedido) => prePedido.itemId === item.id && prePedido.enteId === participante.enteId)
-              .reduce((sum, prePedido) => sum + parseMoney(prePedido.quantidadeSolicitada, "Quantidade pre-pedida"), 0);
+            const quantidadePrePedida = (ata.prePedidos || [])
+              .filter((prePedido: any) => prePedido.itemId === item.id && prePedido.enteId === participante.enteId)
+              .reduce((sum: number, prePedido: any) => sum + parseMoney(prePedido.quantidadeSolicitada, "Quantidade pre-pedida"), 0);
             return {
               ...item,
               quantidadeParticipante,
@@ -443,7 +443,7 @@ export function registerAtaRegistroPrecoRoutes(app: Express, helpers: RouteHelpe
           },
         },
       },
-    });
+    }) as unknown as AtaRegistroPrecoWithRelations[];
 
     if (helpers.isAdmin(req)) {
       return res.json(atas);
