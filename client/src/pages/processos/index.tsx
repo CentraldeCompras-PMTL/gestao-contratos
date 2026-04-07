@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useProcessos, useCreateProcesso, useCreateFase, useUpdateProcesso, useDeleteProcesso } from "@/hooks/use-processos";
 import { useFornecedores } from "@/hooks/use-fornecedores";
+import { useEntes } from "@/hooks/use-entes";
 import { useDepartamentos } from "@/hooks/use-departamentos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { FolderOpen, Plus, Search, Edit2, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Departamento, Fornecedor, InsertProcessoDigital, ProcessoDigitalWithRelations } from "@shared/schema";
+import type { Ente, Fornecedor, InsertProcessoDigital, ProcessoDigitalWithRelations } from "@shared/schema";
 
 type ProcessoForm = InsertProcessoDigital;
 type FaseForm = {
@@ -40,6 +41,7 @@ const defaultProcessoForm: ProcessoForm = {
   objetoCompleto: "",
   descricao: "",
   status: "planejamento",
+  enteId: "",
   departamentoId: "",
 };
 
@@ -55,6 +57,7 @@ const defaultFaseForm: FaseForm = {
 export default function Processos() {
   const { data: processos = [], isLoading } = useProcessos();
   const { data: fornecedores = [] } = useFornecedores();
+  const { data: entes = [] } = useEntes();
   const { data: departamentos = [] } = useDepartamentos();
   const createProcesso = useCreateProcesso();
   const updateProcesso = useUpdateProcesso();
@@ -85,6 +88,7 @@ export default function Processos() {
       objetoResumido: processo.objetoResumido,
       objetoCompleto: processo.objetoCompleto,
       descricao: processo.descricao || "",
+      enteId: processo.enteId || "",
       departamentoId: processo.departamentoId || "",
       status: (processo.status as any) || "planejamento",
     });
@@ -95,6 +99,7 @@ export default function Processos() {
     e.preventDefault();
     const payload = {
       ...procForm,
+      enteId: procForm.enteId || undefined,
       departamentoId: procForm.departamentoId || undefined,
     };
     if (editingProcId) {
@@ -198,16 +203,30 @@ export default function Processos() {
                 <Textarea value={procForm.descricao || ""} onChange={(e) => setProcForm({ ...procForm, descricao: e.target.value })} placeholder="Descricao adicional..." />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Departamento Responsavel</label>
-                <Select value={procForm.departamentoId || ""} onValueChange={(value) => setProcForm({ ...procForm, departamentoId: value })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <label className="text-sm font-medium">Secretaria Responsavel</label>
+                <Select value={procForm.enteId || ""} onValueChange={(value) => setProcForm({ ...procForm, enteId: value, departamentoId: "" })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a secretaria..." /></SelectTrigger>
                   <SelectContent>
-                    {departamentos.map((departamento: Departamento) => (
-                      <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
+                    {entes.map((ente: Ente) => (
+                      <SelectItem key={ente.id} value={ente.id}>{ente.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              {procForm.enteId && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <label className="text-sm font-medium">Departamento (Opcional)</label>
+                  <Select value={procForm.departamentoId || ""} onValueChange={(value) => setProcForm({ ...procForm, departamentoId: value })}>
+                    <SelectTrigger><SelectValue placeholder="Todos os departamentos" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos os departamentos</SelectItem>
+                      {departamentos.filter(d => d.enteId === procForm.enteId).map((dep) => (
+                        <SelectItem key={dep.id} value={dep.id}>{dep.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={createProcesso.isPending || updateProcesso.isPending}>
                 {editingProcId ? "Atualizar" : "Cadastrar"} Processo
               </Button>

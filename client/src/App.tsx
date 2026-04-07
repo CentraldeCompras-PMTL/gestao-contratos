@@ -28,6 +28,7 @@ const EntesPage = lazy(() => import("./pages/entes"));
 const NotasFiscais = lazy(() => import("./pages/notas-fiscais"));
 const AfsPanel = lazy(() => import("./pages/afs"));
 const Notificacoes = lazy(() => import("./pages/notificacoes"));
+const ClassificacoesOrcamentarias = lazy(() => import("./pages/classificacoes-orcamentarias"));
 const Usuarios = lazy(() => import("./pages/usuarios"));
 const Auditoria = lazy(() => import("./pages/auditoria"));
 const Relatorios = lazy(() => import("./pages/relatorios"));
@@ -93,6 +94,7 @@ function Router() {
       <Route path="/notas-fiscais" component={() => <ProtectedRoute component={NotasFiscais} />} />
       <Route path="/afs" component={() => <ProtectedRoute component={AfsPanel} />} />
       <Route path="/departamentos" component={() => <ProtectedRoute component={Departamentos} />} />
+      <Route path="/classificacoes-orcamentarias" component={() => <ProtectedRoute component={ClassificacoesOrcamentarias} />} />
       <Route path="/entes" component={() => <ProtectedRoute component={EntesPage} />} />
       <Route path="/notificacoes" component={() => <ProtectedRoute component={Notificacoes} />} />
       <Route path="/usuarios" component={() => <ProtectedRoute component={Usuarios} />} />

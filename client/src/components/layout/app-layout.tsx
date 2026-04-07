@@ -29,6 +29,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Fornecedores", href: "/fornecedores", icon: Users },
     { name: "Fontes de Recurso", href: "/fontes-recurso", icon: FileText },
+    { name: "Classificações", href: "/classificacoes-orcamentarias", icon: FileText },
     ...(canAccessAtaModule ? [{ name: "Atas de RP", href: "/atas-registro-preco", icon: FileText }] : []),
     { name: "Pre-pedidos ARP", href: "/pre-pedidos-arp", icon: FileText },
     ...(canAccessAtaModule ? [{ name: "Contratos ARP", href: "/contratos-arp", icon: FileText }] : []),
@@ -41,7 +42,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { name: "Departamentos", href: "/departamentos", icon: Users },
     { name: "Notificacoes", href: "/notificacoes", icon: Bell },
     ...(user?.role === "admin" ? [
-      { name: "Entes", href: "/entes", icon: Users },
+      { name: "Secretarias", href: "/entes", icon: Users },
       { name: "Usuarios", href: "/usuarios", icon: Users },
       { name: "Auditoria", href: "/auditoria", icon: Bell },
     ] : []),

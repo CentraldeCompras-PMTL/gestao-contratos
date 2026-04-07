@@ -13,7 +13,7 @@ import {
   useSaveProcessoCotacoes,
   useSaveProcessoResultados,
 } from "@/hooks/use-processos";
-import { useDepartamentos } from "@/hooks/use-departamentos";
+import { useEntes } from "@/hooks/use-entes";
 import { useFontesRecurso } from "@/hooks/use-fontes-recurso";
 import { useFornecedores } from "@/hooks/use-fornecedores";
 import {
@@ -60,7 +60,7 @@ function toDisplayDecimal(value: string | number | null | undefined) {
 export default function ProcessoDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: processo, isLoading } = useProcesso(id ?? "");
-  const { data: departamentos = [] } = useDepartamentos();
+  const { data: entes = [] } = useEntes();
   const { data: fontes = [] } = useFontesRecurso();
   const { data: fornecedores = [] } = useFornecedores();
   const { toast } = useToast();
@@ -79,7 +79,7 @@ export default function ProcessoDetail() {
 
   // States
   const [participanteDialog, setParticipanteDialog] = useState(false);
-  const [selectedDept, setSelectedDept] = useState("");
+  const [selectedEnte, setSelectedEnte] = useState("");
 
   const [dotacaoDialog, setDotacaoDialog] = useState(false);
   const [dotacaoForm, setDotacaoForm] = useState({ fichaId: "", ano: "", valor: "" });
@@ -104,16 +104,16 @@ export default function ProcessoDetail() {
   const allParticipantes = useMemo(() => {
     if (!processo) return [];
     // O gestor tambem e participante implicito
-    const gestor = processo.departamento;
-    const parts = participantes.map((p: any) => p.departamento);
+    const gestor = processo.ente;
+    const parts = participantes.map((p: any) => p.ente);
     if (gestor && !parts.find((p: any) => p.id === gestor.id)) {
       return [gestor, ...parts];
     }
     return parts;
   }, [processo, participantes]);
 
-  const participantesIds = new Set(participantes.map((p: any) => p.departamentoId));
-  const availableDepts = departamentos.filter((d) => !participantesIds.has(d.id) && d.id !== processo?.departamentoId);
+  const participantesIds = new Set(participantes.map((p: any) => p.enteId));
+  const availableEntes = entes.filter((e) => !participantesIds.has(e.id) && e.id !== processo?.enteId);
   const selectedFonteData = fontes.find((f) => f.id === selectedFonte);
 
   const valorEstimado = useMemo(() => itens.reduce((acc: number, item: any) => {
@@ -129,16 +129,16 @@ export default function ProcessoDetail() {
 
   // Handlers
   const handleAddParticipante = () => {
-    if (!selectedDept || !id) return;
-    addParticipante.mutate({ id, departamentoId: selectedDept }, {
-      onSuccess: () => { toast({ title: "Secretaria adicionada!" }); setParticipanteDialog(false); setSelectedDept(""); },
+    if (!selectedEnte || !id) return;
+    addParticipante.mutate({ id, enteId: selectedEnte }, {
+      onSuccess: () => { toast({ title: "Secretaria adicionada!" }); setParticipanteDialog(false); setSelectedEnte(""); },
       onError: (e) => toast({ variant: "destructive", title: "Erro", description: e instanceof Error ? e.message : "Erro" }),
     });
   };
 
-  const handleRemoveParticipante = (departamentoId: string) => {
+  const handleRemoveParticipante = (enteId: string) => {
     if (!id) return;
-    removeParticipante.mutate({ id, departamentoId }, {
+    removeParticipante.mutate({ id, enteId }, {
       onSuccess: () => toast({ title: "Secretaria removida!" }),
       onError: (e) => toast({ variant: "destructive", title: "Erro", description: e instanceof Error ? e.message : "Erro" }),
     });
@@ -179,7 +179,7 @@ export default function ProcessoDetail() {
   const openQtdDialog = (item: any) => {
     const form: Record<string, string> = {};
     item.quantidades?.forEach((q: any) => {
-      form[q.departamentoId] = toDisplayDecimal(q.quantidade);
+      form[q.enteId] = toDisplayDecimal(q.quantidade);
     });
     setQuantidadesForm(form);
     setActiveItemForQtd(item);
@@ -190,7 +190,7 @@ export default function ProcessoDetail() {
     if (!id || !activeItemForQtd) return;
     const quantidades = allParticipantes.map(p => ({
       itemId: activeItemForQtd.id,
-      departamentoId: p.id,
+      enteId: p.id,
       quantidade: toStorageDecimal(quantidadesForm[p.id] || "0"),
     })).filter(q => Number(q.quantidade) > 0);
 
@@ -290,7 +290,7 @@ export default function ProcessoDetail() {
           </h1>
           <p className="text-sm text-muted-foreground flex items-center gap-1.5">
             <Building2 className="w-4 h-4" />
-            Órgão Gestor: <strong>{processo.departamento?.nome || "Não vinculado"}</strong>
+            Secretaria Gestora: <strong>{processo.ente?.nome || "Não vinculada"}</strong>
           </p>
         </div>
       </div>
@@ -387,7 +387,7 @@ export default function ProcessoDetail() {
                     Gerencie quais secretarias participam deste processo de compra
                   </CardDescription>
                 </div>
-                <Dialog open={participanteDialog} onOpenChange={(o) => { setParticipanteDialog(o); if (!o) setSelectedDept(""); }}>
+                <Dialog open={participanteDialog} onOpenChange={(o) => { setParticipanteDialog(o); if (!o) setSelectedEnte(""); }}>
                   <DialogTrigger asChild>
                     <Button size="sm" variant="outline" className="gap-2 bg-background hover:bg-violet-50 hover:text-violet-600 transition-colors">
                       <Plus className="w-4 h-4" /> Adicionar Secretaria
@@ -397,20 +397,23 @@ export default function ProcessoDetail() {
                     <DialogHeader><DialogTitle>Adicionar Secretaria Participante</DialogTitle></DialogHeader>
                     <div className="space-y-4 pt-4">
                       <div className="space-y-2">
-                        <Label>Secretaria / Departamento</Label>
-                        <Select value={selectedDept} onValueChange={setSelectedDept}>
+                        <Label>Secretaria</Label>
+                        <Select value={selectedEnte} onValueChange={setSelectedEnte}>
                           <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                           <SelectContent>
-                            {availableDepts.map((d) => (
-                              <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
+                            {availableEntes.map((e: any) => (
+                              <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      <Button className="w-full" onClick={handleAddParticipante} disabled={!selectedDept || addParticipante.isPending}>
-                        {addParticipante.isPending ? "Adicionando..." : "Confirmar"}
-                      </Button>
                     </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setParticipanteDialog(false)}>Cancelar</Button>
+                      <Button onClick={handleAddParticipante} disabled={!selectedEnte || addParticipante.isPending}>
+                        Adicionar
+                      </Button>
+                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -422,7 +425,7 @@ export default function ProcessoDetail() {
                       <Building2 className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold">{processo.departamento?.nome || "Órgão gestor"}</p>
+                      <p className="text-sm font-bold">{processo.ente?.nome || "Órgão gestor"}</p>
                       <p className="text-xs text-muted-foreground">Órgão Gestor do Processo</p>
                     </div>
                   </div>
@@ -434,20 +437,31 @@ export default function ProcessoDetail() {
                     <p className="text-sm text-muted-foreground">Nenhuma secretaria participante adicional.</p>
                   </div>
                 ) : (
-                  participantes.map((p: any) => (
-                    <div key={p.id} className="flex items-center justify-between px-6 py-4 border-b last:border-0 group hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
-                          <Users className="w-5 h-5 text-violet-500" />
+                  <div className="flex-1 space-y-3 p-6">
+                    {allParticipantes.map((ente: any, idx: number) => (
+                      <div key={ente.id} className="flex items-center justify-between p-3 rounded-lg border bg-background/50 hover:bg-background transition-colors group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold">
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">{ente.nome}</p>
+                            <p className="text-xs text-muted-foreground">{ente.id === processo.enteId ? "Órgão Gestor" : "Participante"}</p>
+                          </div>
                         </div>
-                        <p className="text-sm font-semibold">{p.departamento?.nome}</p>
+                        {ente.id !== processo.enteId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleRemoveParticipante(ente.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 h-9 w-9 p-0"
-                        onClick={() => handleRemoveParticipante(p.departamentoId)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
             </CardContent>
           </Card>
@@ -700,9 +714,9 @@ export default function ProcessoDetail() {
                       {allParticipantes.map((p: any) => (
                         <TableRow key={p.id}>
                           <TableCell className="font-medium">
-                            <span className={p.id === processo.departamentoId ? "text-primary font-bold" : ""}>
+                            <span className={p.id === processo.enteId ? "text-primary font-bold" : ""}>
                               {p.nome}
-                              {p.id === processo.departamentoId && <Badge variant="outline" className="ml-2 text-[10px] h-4">Gestor</Badge>}
+                              {p.id === processo.enteId && <Badge variant="outline" className="ml-2 text-[10px] h-4">Gestor</Badge>}
                             </span>
                           </TableCell>
                           <TableCell>

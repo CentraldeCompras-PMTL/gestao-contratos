@@ -11,6 +11,7 @@ import {
   useUpdateFonteRecurso,
   useUpdateProjetoAtividade,
 } from "@/hooks/use-fontes-recurso";
+import { useClassificacoesOrcamentarias } from "@/hooks/use-classificacoes-orcamentarias";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -23,11 +24,12 @@ import { Edit2, Plus, Trash2 } from "lucide-react";
 import type { FichaOrcamentaria, FonteRecursoWithFichas, ProjetoAtividade } from "@shared/schema";
 
 const defaultFonteForm = { nome: "", codigo: "", ano: "" };
-const defaultFichaForm = { codigo: "", projetoAtividadeId: "", classificacao: "", ano: "" };
+const defaultFichaForm = { codigo: "", projetoAtividadeId: "", classificacaoId: "", ano: "" };
 const defaultProjetoAtividadeForm = { codigo: "", descricao: "", ano: "" };
 
 export default function FontesRecursoPage() {
   const { data: fontes = [], isLoading } = useFontesRecurso();
+  const { data: classificacoes = [] } = useClassificacoesOrcamentarias();
   const createFonte = useCreateFonteRecurso();
   const updateFonte = useUpdateFonteRecurso();
   const deleteFonte = useDeleteFonteRecurso();
@@ -251,8 +253,10 @@ export default function FontesRecursoPage() {
                         <TableRow key={ficha.id}>
                           <TableCell>{ficha.codigo}</TableCell>
                           <TableCell>{ficha.ano}</TableCell>
-                          <TableCell>{fonte.projetosAtividade.find((projetoAtividade) => projetoAtividade.id === ficha.projetoAtividadeId)?.codigo ?? "-"}</TableCell>
-                          <TableCell className="capitalize">{ficha.classificacao}</TableCell>
+                          <TableCell>{fontes.find(f => f.id === ficha.fonteRecursoId)?.projetosAtividade.find((projetoAtividade) => projetoAtividade.id === ficha.projetoAtividadeId)?.codigo ?? "-"}</TableCell>
+                          <TableCell className="capitalize">
+                            {(ficha as any).classificacao?.nome || ficha.classificacao || "-"}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button variant="ghost" size="sm" onClick={() => {
@@ -261,7 +265,7 @@ export default function FontesRecursoPage() {
                                 setFichaForm({
                                   codigo: ficha.codigo,
                                   projetoAtividadeId: ficha.projetoAtividadeId,
-                                  classificacao: ficha.classificacao,
+                                  classificacaoId: (ficha as any).classificacaoId || "",
                                   ano: ficha.ano,
                                 });
                               }}>
@@ -361,20 +365,19 @@ export default function FontesRecursoPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Classificacao</Label>
-              <Input
-                value={fichaForm.classificacao}
-                onChange={(e) => setFichaForm((current) => ({ ...current, classificacao: e.target.value }))}
-                placeholder="Ex: consumo, servico, permanente..."
-                list="classificacoes-list"
-                required
-              />
-              <datalist id="classificacoes-list">
-                {Array.from(new Set(fontes.flatMap((f) => f.fichas.map((fi) => fi.classificacao)))).map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-              <p className="text-xs text-muted-foreground">Digite uma classificacao existente ou crie uma nova.</p>
+              <Label>Classificação</Label>
+              <Select 
+                value={fichaForm.classificacaoId} 
+                onValueChange={(value) => setFichaForm((current) => ({ ...current, classificacaoId: value }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione a classificação" /></SelectTrigger>
+                <SelectContent>
+                  {classificacoes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Selecione uma categoria validada para a ficha.</p>
             </div>
             <Button type="submit" className="w-full" disabled={createFicha.isPending || updateFicha.isPending}>
               {createFicha.isPending || updateFicha.isPending ? "Salvando..." : "Salvar"}

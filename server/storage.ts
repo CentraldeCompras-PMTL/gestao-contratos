@@ -3,8 +3,10 @@ import { count, desc, eq, inArray } from "drizzle-orm";
 import { 
   users, userEntes, entes, departamentos, fornecedores, fontesRecurso, fichasOrcamentarias, processosDigitais, fasesContratacao, contratos, empenhos, afs, notasFiscais, contratoAditivos, contratoAnexos, passwordResetTokens, auditLogs,
   projetosAtividade, processoItens, processoItemQuantidades, processoItemCotacoes, processoItemResultados, processoParticipantes, processoDotacoes,
+  classificacoesOrcamentarias,
   type User, type InsertUser, type Ente, type InsertEnte, type Departamento, type InsertDepartamento, type Fornecedor, type InsertFornecedor,
   type FonteRecurso, type InsertFonteRecurso, type FichaOrcamentaria, type InsertFichaOrcamentaria, type ProjetoAtividade, type InsertProjetoAtividade,
+  type ClassificacaoOrcamentaria, type InsertClassificacao,
   type ProcessoDigital, type InsertProcessoDigital, type FaseContratacao, type InsertFaseContratacao,
   type Contrato, type InsertContrato, type Empenho, type InsertEmpenho, type Af, type InsertAf, type NotaFiscal, type InsertNotaFiscal,
   type ContratoAditivo, type InsertContratoAditivo, type ContratoAnexo, type InsertContratoAnexo, type FonteRecursoWithFichas,
@@ -58,31 +60,23 @@ export interface IStorage {
   createProjetoAtividade(data: InsertProjetoAtividade): Promise<ProjetoAtividade>;
   updateProjetoAtividade(id: string, data: Partial<InsertProjetoAtividade>): Promise<ProjetoAtividade | undefined>;
   deleteProjetoAtividade(id: string): Promise<ProjetoAtividade | undefined>;
+  
+  getClassificacoesOrcamentarias(): Promise<ClassificacaoOrcamentaria[]>;
+  getClassificacaoOrcamentaria(id: string): Promise<ClassificacaoOrcamentaria | undefined>;
+  createClassificacaoOrcamentaria(data: InsertClassificacao): Promise<ClassificacaoOrcamentaria>;
+  updateClassificacaoOrcamentaria(id: string, data: Partial<InsertClassificacao>): Promise<ClassificacaoOrcamentaria | undefined>;
+  deleteClassificacaoOrcamentaria(id: string): Promise<ClassificacaoOrcamentaria | undefined>;
+
 
   getProcessosDigitais(): Promise<ProcessoDigitalWithRelations[]>;
   getProcessoDigital(id: string): Promise<ProcessoDigitalWithRelations | undefined>;
   createProcessoDigital(processo: InsertProcessoDigital): Promise<ProcessoDigital>;
   deleteProcessoDigital(id: string): Promise<ProcessoDigital | undefined>;
+  addProcessoParticipante(processoId: string, enteId: string): Promise<void>;
+  removeProcessoParticipante(processoId: string, enteId: string): Promise<void>;
   
-  // Processo Itens
-  getProcessoItens(processoId: string): Promise<any[]>;
-  createProcessoItem(item: any): Promise<any>;
-  updateProcessoItem(id: string, item: any): Promise<any>;
-  deleteProcessoItem(id: string): Promise<any>;
-  createProcessoItemQuantidade(data: any): Promise<any>;
-  updateProcessoItemQuantidade(id: string, data: any): Promise<any>;
-  deleteProcessoItemQuantidade(id: string): Promise<any>;
-  createProcessoItemCotacao(data: any): Promise<any>;
-  updateProcessoItemCotacao(id: string, data: any): Promise<any>;
-  createProcessoItemResultado(data: any): Promise<any>;
-  updateProcessoItemResultado(id: string, data: any): Promise<any>;
-  deleteProcessoItemResultado(id: string): Promise<any>;
-  saveProcessoQuantidades(processoId: string, quantidades: any[]): Promise<void>;
-  saveProcessoCotacoes(processoId: string, cotacoes: any[]): Promise<void>;
-  saveProcessoResultados(processoId: string, resultados: any[]): Promise<void>;
-  
-  getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; departamento: Departamento | null })[]>;
-  getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; departamento: Departamento | null }) | undefined>;
+  getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null })[]>;
+  getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null }) | undefined>;
   createFaseContratacao(fase: InsertFaseContratacao): Promise<FaseContratacao>;
   updateFaseContratacao(id: string, fase: Partial<InsertFaseContratacao>): Promise<FaseContratacao>;
   deleteFaseContratacao(id: string): Promise<FaseContratacao | undefined>;
@@ -320,22 +314,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFontesRecurso(): Promise<FonteRecursoWithFichas[]> {
-    return await db.query.fontesRecurso.findMany({
+    const rows = await db.query.fontesRecurso.findMany({
       with: {
-        fichas: true,
-        projetosAtividade: true,
+        fichas: {
+          with: {
+            classificacao: true,
+          }
+        },
       },
-    }) as FonteRecursoWithFichas[];
+    });
+    return rows as any;
   }
 
   async getFonteRecurso(id: string): Promise<FonteRecursoWithFichas | undefined> {
-    return await db.query.fontesRecurso.findFirst({
+    const row = await db.query.fontesRecurso.findFirst({
       where: eq(fontesRecurso.id, id),
       with: {
-        fichas: true,
+        fichas: {
+          with: {
+            classificacao: true,
+          }
+        },
         projetosAtividade: true,
       },
-    }) as FonteRecursoWithFichas | undefined;
+    });
+    return row as any;
   }
 
   async createFonteRecurso(data: InsertFonteRecurso): Promise<FonteRecurso> {
@@ -354,22 +357,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFicha(id: string): Promise<FichaOrcamentaria | undefined> {
-    const [ficha] = await db.select().from(fichasOrcamentarias).where(eq(fichasOrcamentarias.id, id));
-    return ficha;
+    const row = await db.query.fichasOrcamentarias.findFirst({
+      where: eq(fichasOrcamentarias.id, id),
+      with: {
+        classificacao: true,
+      },
+    });
+    return row as any;
   }
 
   async createFicha(data: InsertFichaOrcamentaria): Promise<FichaOrcamentaria> {
     const [created] = await db.insert(fichasOrcamentarias).values(data).returning();
-    return created;
+    const full = await this.getFicha(created.id);
+    return full!;
   }
 
   async updateFicha(id: string, data: Partial<InsertFichaOrcamentaria>): Promise<FichaOrcamentaria | undefined> {
-    const [updated] = await db.update(fichasOrcamentarias).set(data).where(eq(fichasOrcamentarias.id, id)).returning();
-    return updated;
+    await db.update(fichasOrcamentarias).set(data).where(eq(fichasOrcamentarias.id, id));
+    return await this.getFicha(id);
   }
 
   async deleteFicha(id: string): Promise<FichaOrcamentaria | undefined> {
     const [deleted] = await db.delete(fichasOrcamentarias).where(eq(fichasOrcamentarias.id, id)).returning();
+    return deleted as any;
+  }
+
+  async getClassificacoesOrcamentarias(): Promise<ClassificacaoOrcamentaria[]> {
+    return await db.select().from(classificacoesOrcamentarias).orderBy(desc(classificacoesOrcamentarias.criadoEm));
+  }
+
+  async getClassificacaoOrcamentaria(id: string): Promise<ClassificacaoOrcamentaria | undefined> {
+    const [row] = await db.select().from(classificacoesOrcamentarias).where(eq(classificacoesOrcamentarias.id, id));
+    return row;
+  }
+
+  async createClassificacaoOrcamentaria(data: InsertClassificacao): Promise<ClassificacaoOrcamentaria> {
+    const [created] = await db.insert(classificacoesOrcamentarias).values(data).returning();
+    return created;
+  }
+
+  async updateClassificacaoOrcamentaria(id: string, data: Partial<InsertClassificacao>): Promise<ClassificacaoOrcamentaria | undefined> {
+    const [updated] = await db.update(classificacoesOrcamentarias).set(data).where(eq(classificacoesOrcamentarias.id, id)).returning();
+    return updated;
+  }
+
+  async deleteClassificacaoOrcamentaria(id: string): Promise<ClassificacaoOrcamentaria | undefined> {
+    const [deleted] = await db.delete(classificacoesOrcamentarias).where(eq(classificacoesOrcamentarias.id, id)).returning();
     return deleted;
   }
 
@@ -396,28 +429,26 @@ export class DatabaseStorage implements IStorage {
   async getProcessosDigitais(): Promise<ProcessoDigitalWithRelations[]> {
     const procs = await db.query.processosDigitais.findMany({
       with: {
-        departamento: {
-          with: { ente: true }
-        },
+        ente: true,
         fases: {
           with: { fornecedor: true }
         },
         participantes: {
-          with: { departamento: true }
+          with: { ente: true }
         },
         itens: {
           with: {
-            quantidades: { with: { departamento: true } },
+            quantidades: { with: { ente: true } },
             cotacao: true,
             resultado: { with: { fornecedor: true } }
           }
         },
         dotacoes: {
           with: { fichaOrcamentaria: true }
-        }
+        },
       }
     });
-    return procs as ProcessoDigitalWithRelations[];
+    return procs as any;
   }
 
   async getProcessoDigital(id: string): Promise<ProcessoDigitalWithRelations | undefined> {
@@ -427,18 +458,16 @@ export class DatabaseStorage implements IStorage {
         fases: {
           with: { fornecedor: true }
         },
-        departamento: {
-          with: { ente: true },
-        },
+        ente: true,
         participantes: {
-          with: { departamento: true },
+          with: { ente: true },
         },
         dotacoes: {
           with: { fichaOrcamentaria: true },
         },
         itens: {
           with: {
-            quantidades: { with: { departamento: true } },
+            quantidades: { with: { ente: true } },
             cotacao: true,
             resultado: { with: { fornecedor: true } }
           }
@@ -463,13 +492,13 @@ export class DatabaseStorage implements IStorage {
     return deleted;
   }
 
-  async addProcessoParticipante(processoId: string, departamentoId: string): Promise<void> {
-    await db.insert(processoParticipantes).values({ processoId, departamentoId }).onConflictDoNothing();
+  async addProcessoParticipante(processoId: string, enteId: string): Promise<void> {
+    await db.insert(processoParticipantes).values({ processoId, enteId }).onConflictDoNothing();
   }
 
-  async removeProcessoParticipante(processoId: string, departamentoId: string): Promise<void> {
+  async removeProcessoParticipante(processoId: string, enteId: string): Promise<void> {
     const records = await db.select().from(processoParticipantes).where(eq(processoParticipantes.processoId, processoId));
-    const target = records.find(r => r.departamentoId === departamentoId);
+    const target = records.find(r => r.enteId === enteId);
     if (target) {
       await db.delete(processoParticipantes).where(eq(processoParticipantes.id, target.id));
     }
@@ -481,7 +510,7 @@ export class DatabaseStorage implements IStorage {
       where: eq(processoItens.processoId, processoId),
       with: {
         quantidades: {
-          with: { departamento: true },
+          with: { ente: true },
         },
         cotacao: true,
         resultado: {
@@ -605,23 +634,23 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; departamento: Departamento | null })[]> {
+  async getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null })[]> {
     return await db.query.fasesContratacao.findMany({
       with: {
         fornecedor: true,
         processoDigital: true,
-        departamento: true,
+        ente: true,
       }
     });
   }
 
-  async getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; departamento: Departamento | null }) | undefined> {
+  async getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null }) | undefined> {
     return await db.query.fasesContratacao.findFirst({
       where: eq(fasesContratacao.id, id),
       with: {
         fornecedor: true,
         processoDigital: true,
-        departamento: true,
+        ente: true,
       }
     });
   }
@@ -645,7 +674,7 @@ export class DatabaseStorage implements IStorage {
     // Basic fetch with manual relation mapping for stability
     const results = await db.query.contratos.findMany({
       with: {
-        departamento: { with: { ente: true } },
+        ente: true,
         fornecedor: true,
         empenhos: { with: { afs: true, fonteRecurso: true, ficha: true } },
         notasFiscais: true,
@@ -659,7 +688,7 @@ export class DatabaseStorage implements IStorage {
     const procs = await db.query.processosDigitais.findMany({
       where: inArray(processosDigitais.id, procIds),
       with: {
-        departamento: { with: { ente: true } },
+        ente: true,
         fases: { with: { fornecedor: true } },
       }
     });
@@ -685,13 +714,13 @@ export class DatabaseStorage implements IStorage {
       with: {
         processoDigital: {
           with: {
-            departamento: { with: { ente: true } },
+            ente: true,
           },
         },
         faseContratacao: {
           with: { fornecedor: true },
         },
-        departamento: { with: { ente: true } },
+        ente: true,
         fornecedor: true,
         empenhos: true,
         notasFiscais: true,
@@ -708,25 +737,22 @@ export class DatabaseStorage implements IStorage {
       with: {
         processoDigital: {
           with: {
-            departamento: { with: { ente: true } },
+            ente: true,
             fases: { with: { fornecedor: true } },
-            dotacoes: { with: { fichaOrcamentaria: true } },
           },
         },
         faseContratacao: {
           with: { fornecedor: true },
         },
-        departamento: { with: { ente: true } },
+        ente: true,
         fornecedor: true,
-        empenhos: {
-          with: { afs: true, fonteRecurso: true, ficha: true }
-        },
+        empenhos: { with: { afs: true, fonteRecurso: true, ficha: true } },
         notasFiscais: true,
         aditivos: true,
         anexos: true,
       }
     });
-    return c as ContratoWithRelations | undefined;
+    return c as unknown as ContratoWithRelations | undefined;
   }
 
   async createContrato(c: InsertContrato): Promise<Contrato> {
@@ -788,30 +814,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEmpenho(id: string): Promise<EmpenhoWithRelations | undefined> {
-    const e = await db.query.empenhos.findFirst({
+    const emp = await db.query.empenhos.findFirst({
       where: eq(empenhos.id, id),
       with: {
-        afs: true,
         contrato: {
           with: {
             processoDigital: {
               with: {
-                departamento: {
-                  with: { ente: true }
-                }
+                ente: true,
               }
-            },
-            fornecedor: true,
-            departamento: {
-              with: { ente: true }
             }
           }
         },
         fonteRecurso: true,
         ficha: true,
-      }
+        afs: true,
+      },
     });
-    return e as EmpenhoWithRelations | undefined;
+    return emp as EmpenhoWithRelations | undefined;
   }
 
   async createEmpenho(e: InsertEmpenho): Promise<Empenho> {
@@ -849,7 +869,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAfs(): Promise<AfWithRelations[]> {
-    const afsData = await db.query.afs.findMany({
+    const results = await db.query.afs.findMany({
       with: {
         empenho: {
           with: {
@@ -858,24 +878,16 @@ export class DatabaseStorage implements IStorage {
                 fornecedor: true,
                 processoDigital: {
                   with: {
-                    departamento: {
-                      with: { ente: true },
-                    },
-                  },
-                },
-                departamento: {
-                  with: { ente: true }
+                    ente: true,
+                  }
                 }
               }
-            },
-            fonteRecurso: true,
-            ficha: true,
-            afs: true,
+            }
           }
         }
       }
     });
-    return afsData as AfWithRelations[];
+    return results as unknown as AfWithRelations[];
   }
 
   async getAf(id: string): Promise<Af | undefined> {
@@ -921,6 +933,43 @@ export class DatabaseStorage implements IStorage {
     return deleted;
   }
 
+  async getNotasFiscais(): Promise<NotaFiscalWithRelations[]> {
+    const rows = await db.query.notasFiscais.findMany({
+      with: {
+        contrato: {
+          with: {
+            fornecedor: true,
+            processoDigital: {
+              with: {
+                ente: true
+              }
+            }
+          }
+        },
+      }
+    });
+    return rows as unknown as NotaFiscalWithRelations[];
+  }
+
+  async getNotaFiscal(id: string): Promise<NotaFiscalWithRelations | undefined> {
+    const row = await db.query.notasFiscais.findFirst({
+      where: eq(notasFiscais.id, id),
+      with: {
+        contrato: {
+          with: {
+            fornecedor: true,
+            processoDigital: {
+              with: {
+                ente: true,
+              },
+            },
+          },
+        },
+      }
+    });
+    return row as unknown as NotaFiscalWithRelations | undefined;
+  }
+
   async getDepartamentos(): Promise<Departamento[]> {
     return await db.select().from(departamentos);
   }
@@ -943,46 +992,6 @@ export class DatabaseStorage implements IStorage {
   async deleteDepartamento(id: string): Promise<Departamento | undefined> {
     const [deleted] = await db.delete(departamentos).where(eq(departamentos.id, id)).returning();
     return deleted;
-  }
-
-  async getNotasFiscais(): Promise<NotaFiscalWithRelations[]> {
-    const rows = await db.query.notasFiscais.findMany({
-      with: {
-        contrato: {
-          with: {
-            fornecedor: true,
-            processoDigital: {
-              with: {
-                departamento: { with: { ente: true } }
-              }
-            },
-            departamento: { with: { ente: true } }
-          }
-        }
-      }
-    });
-    return rows as NotaFiscalWithRelations[];
-  }
-
-  async getNotaFiscal(id: string): Promise<NotaFiscalWithRelations | undefined> {
-    const row = await db.query.notasFiscais.findFirst({
-      where: eq(notasFiscais.id, id),
-      with: {
-        contrato: {
-          with: {
-            processoDigital: {
-              with: {
-                departamento: {
-                  with: { ente: true },
-                },
-              },
-            },
-            fornecedor: true,
-          },
-        },
-      },
-    });
-    return row as unknown as NotaFiscalWithRelations | undefined;
   }
 
   async createNotaFiscal(nota: InsertNotaFiscal): Promise<NotaFiscal> {

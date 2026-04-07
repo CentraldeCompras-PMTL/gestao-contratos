@@ -2,8 +2,8 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 import { useContratosFull } from "@/hooks/use-contratos";
 import { useNotificacoes } from "@/hooks/use-notificacoes";
-import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useEntes } from "@/hooks/use-entes";
+import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useAuth } from "@/hooks/use-auth";
 import { useAtasRegistroPreco } from "@/hooks/use-atas-registro-preco";
 import { useAtaContratos } from "@/hooks/use-ata-contratos";
@@ -36,7 +36,7 @@ type MonthlyExecutionPoint = {
   pago: number;
 };
 
-type ArpDepartmentAggregate = {
+type ArpEnteAggregate = {
   id: string;
   label: string;
   previsto: number;
@@ -69,12 +69,12 @@ function aggregateBy<T extends string>(
   return Array.from(map.values());
 }
 
-function getContratoDepartamentoId(contrato: ContratoWithRelations) {
-  return contrato.departamentoId ?? contrato.processoDigital.departamentoId ?? null;
+function getContratoEnteId(contrato: ContratoWithRelations) {
+  return contrato.enteId ?? contrato.processoDigital.enteId ?? null;
 }
 
-function getContratoDepartamentoNome(contrato: ContratoWithRelations) {
-  return contrato.departamento?.nome ?? contrato.processoDigital.departamento?.nome ?? "Sem departamento";
+function getContratoEnteNome(contrato: ContratoWithRelations) {
+  return contrato.ente?.nome ?? contrato.processoDigital.ente?.nome ?? "Sem secretaria";
 }
 
 function aggregateEmpenhos(
@@ -138,13 +138,13 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: contratos = [], isLoading: contratosLoading } = useContratosFull();
   const { data: notificacoes = [], isLoading: notifLoading } = useNotificacoes();
-  const { data: departamentos = [], isLoading: departamentosLoading } = useDepartamentos();
   const { data: entes = [], isLoading: entesLoading } = useEntes();
+  const { data: departamentos = [] } = useDepartamentos();
 
   const [filterFornecedor, setFilterFornecedor] = useState("");
   const [filterProcesso, setFilterProcesso] = useState("");
-  const [filterDepartamento, setFilterDepartamento] = useState("");
   const [filterEnte, setFilterEnte] = useState("");
+  const [filterDepartamento, setFilterDepartamento] = useState("");
   const [filterFonteRecurso, setFilterFonteRecurso] = useState("");
   const [filterFicha, setFilterFicha] = useState("");
   const [filterClassificacao, setFilterClassificacao] = useState("");
@@ -154,7 +154,7 @@ export default function Dashboard() {
   const [filterAtaParticipante, setFilterAtaParticipante] = useState("");
 
   const accessibleEnteIds = user?.accessibleEnteIds ?? (user?.enteId ? [user.enteId] : []);
-  const showEnteFilter = user?.role === "operacional" && accessibleEnteIds.length > 1;
+  const showEnteFilter = user?.role === "admin" || (user?.role === "operacional" && accessibleEnteIds.length > 1);
   const canManageArp = useMemo(() => {
     if (user?.role === "admin") return true;
     if (!user?.canAccessAtaModule) return false;
@@ -170,7 +170,6 @@ export default function Dashboard() {
   const { data: ataContratos = [], isLoading: ataContratosLoading } = useAtaContratos({ enabled: canManageArp });
   const deferredContratos = useDeferredValue(contratos);
   const deferredNotificacoes = useDeferredValue(notificacoes);
-  const deferredDepartamentos = useDeferredValue(departamentos);
   const deferredEntes = useDeferredValue(entes);
   const deferredAtasRegistroPreco = useDeferredValue(atasRegistroPreco);
   const deferredAtaContratos = useDeferredValue(ataContratos);
@@ -265,98 +264,94 @@ export default function Dashboard() {
     return deferredContratos.filter((contrato) => {
       const matchesFonte = !filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso);
       const matchesFicha = !filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha);
-      const matchesClassificacao = !filterClassificacao || contrato.empenhos.some((empenho) => empenho.ficha.classificacao === filterClassificacao);
-      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
+      const matchesClassificacao = !filterClassificacao || contrato.empenhos.some((empenho) => empenho.ficha.classificacaoId === filterClassificacao);
+      if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
-      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
+      if (filterDepartamento && contrato.departamentoId !== filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
+      if (filterEnte && getContratoEnteId(contrato) !== filterEnte) return false;
       if (!matchesFonte || !matchesFicha || !matchesClassificacao) return false;
       return true;
     });
-  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterClassificacao, filterEnte, filterDepartamento, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const fornecedoresUnicos = useMemo(() => {
     const base = deferredContratos.filter((contrato) => {
       if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
-      if (filterClassificacao && !contrato.empenhos.some((empenho) => empenho.ficha.classificacao === filterClassificacao)) return false;
-      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
+      if (filterClassificacao && !contrato.empenhos.some((empenho) => empenho.ficha.classificacaoId === filterClassificacao)) return false;
+      if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
-      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.fornecedor.id, (contrato) => contrato.fornecedor.nome);
-  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterClassificacao, filterEnte, filterFicha, filterFonteRecurso, filterProcesso, showEnteFilter]);
 
   const processosUnicos = useMemo(() => {
     const base = deferredContratos.filter((contrato) => {
       if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
       if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
-      if (filterClassificacao && !contrato.empenhos.some((empenho) => empenho.ficha.classificacao === filterClassificacao)) return false;
-      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
+      if (filterClassificacao && !contrato.empenhos.some((empenho) => empenho.ficha.classificacaoId === filterClassificacao)) return false;
+      if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
-      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       return true;
     });
     return aggregateBy(base, (contrato) => contrato.processoDigital.id, (contrato) => contrato.processoDigital.numeroProcessoDigital);
-  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, showEnteFilter]);
+  }, [deferredContratos, filterClassificacao, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, showEnteFilter]);
 
-  const departamentosUnicos = useMemo(() => {
+  const entesUnicos = useMemo(() => {
     if (filterProcesso) {
       const processoSelecionado = contratos.find((contrato) => contrato.processoDigital.id === filterProcesso)?.processoDigital;
-      if (!processoSelecionado?.departamentoId) return [];
+      if (!processoSelecionado?.enteId) return [];
       return [{
-        id: processoSelecionado.departamentoId,
-        label: processoSelecionado.departamento?.nome ?? "Sem departamento",
+        id: processoSelecionado.enteId,
+        label: processoSelecionado.ente?.nome ?? "Sem secretaria",
         count: 0,
         value: 0,
       }];
     }
 
-    const departamentosFiltradosPorEnte = showEnteFilter && filterEnte
-      ? deferredDepartamentos.filter((departamento) => departamento.enteId === filterEnte)
-      : deferredDepartamentos;
-
-    const departamentosBase = filterFornecedor
-      ? departamentosFiltradosPorEnte.filter((departamento) =>
+    const entesBase = filterFornecedor
+      ? deferredEntes.filter((ente) =>
           deferredContratos.some(
             (contrato) =>
-              (!showEnteFilter || !filterEnte || contrato.processoDigital.departamento?.enteId === filterEnte) &&
+              (!showEnteFilter || !filterEnte || getContratoEnteId(contrato) === filterEnte) &&
               (!filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) &&
               (!filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) &&
               contrato.fornecedor.id === filterFornecedor &&
-              getContratoDepartamentoId(contrato) === departamento.id,
+              getContratoEnteId(contrato) === ente.id,
           ),
         )
-      : departamentosFiltradosPorEnte;
+      : deferredEntes;
 
     return aggregateBy(
       deferredContratos.filter((contrato) => {
-        if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return false;
+        if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return false;
         if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
         if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
         if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
         if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
-        const departamentoId = getContratoDepartamentoId(contrato);
-        return !!departamentoId && departamentosBase.some((departamento) => departamento.id === departamentoId);
+        const enteId = getContratoEnteId(contrato);
+        return !!enteId && entesBase.some((ente) => ente.id === enteId);
       }),
-      (contrato) => getContratoDepartamentoId(contrato),
-      (contrato) => getContratoDepartamentoNome(contrato),
+      (contrato) => getContratoEnteId(contrato),
+      (contrato) => getContratoEnteNome(contrato),
     ).sort((a, b) => a.label.localeCompare(b.label));
-  }, [deferredContratos, deferredDepartamentos, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, deferredEntes, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const entesDisponiveis = useMemo(() => {
     if (!showEnteFilter) return [];
+    if (user?.role === "admin") return deferredEntes;
     return deferredEntes.filter((ente) => accessibleEnteIds.includes(ente.id));
-  }, [accessibleEnteIds, deferredEntes, showEnteFilter]);
+  }, [accessibleEnteIds, deferredEntes, showEnteFilter, user?.role]);
 
   const fontesDisponiveis = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
     deferredContratos.forEach((contrato) => {
-      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
+      if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
-      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return;
+      if (filterEnte && getContratoEnteId(contrato) !== filterEnte) return;
       contrato.empenhos.forEach((empenho) => {
         map.set(empenho.fonteRecursoId, {
           id: empenho.fonteRecursoId,
@@ -365,41 +360,51 @@ export default function Dashboard() {
       });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [deferredContratos, filterDepartamento, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterEnte, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const fichasDisponiveis = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
     deferredContratos.forEach((contrato) => {
-      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
+      if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
-      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return;
+      if (filterEnte && getContratoEnteId(contrato) !== filterEnte) return;
       contrato.empenhos.forEach((empenho) => {
         if (filterFonteRecurso && empenho.fonteRecursoId !== filterFonteRecurso) return;
-        if (filterClassificacao && empenho.ficha.classificacao !== filterClassificacao) return;
+        if (filterClassificacao && empenho.ficha.classificacaoId !== filterClassificacao) return;
         map.set(empenho.fichaId, {
           id: empenho.fichaId,
-          label: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`,
+          label: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao?.nome || empenho.ficha.classificacao || "Sem classificacao"}`,
         });
       });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [deferredContratos, filterClassificacao, filterDepartamento, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, filterClassificacao, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const classificacoesDisponiveis = useMemo(() => {
-    const set = new Set<string>();
+    const classificacoesMap = new Map<string, { id: string; label: string }>();
     deferredContratos.forEach((contrato) => {
-      if (showEnteFilter && filterEnte && contrato.processoDigital.departamento?.enteId !== filterEnte) return;
+      if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return;
-      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return;
+      if (filterEnte && getContratoEnteId(contrato) !== filterEnte) return;
       contrato.empenhos.forEach((empenho) => {
         if (filterFonteRecurso && empenho.fonteRecursoId !== filterFonteRecurso) return;
-        if (empenho.ficha.classificacao) set.add(empenho.ficha.classificacao);
+        if (empenho.ficha.classificacaoId) {
+          const c = empenho.ficha.classificacao;
+          const label = typeof c === 'string' ? c : c?.nome || "Sem classificacao";
+          const id = typeof c === 'string' ? c : c?.id || "";
+          if (id) classificacoesMap.set(id, { id, label });
+        }
       });
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b)).map((c) => ({ id: c, label: c }));
-  }, [deferredContratos, filterDepartamento, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+    return Array.from(classificacoesMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [deferredContratos, filterEnte, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+
+  const departamentosDisponiveis = useMemo(() => {
+    if (!filterEnte) return [];
+    return departamentos.filter((dep) => dep.enteId === filterEnte);
+  }, [departamentos, filterEnte]);
 
   const saldoFiltrado = useMemo(() => {
     let total = 0;
@@ -449,7 +454,7 @@ export default function Dashboard() {
   );
 
   const fichasResumo = useMemo(
-    () => aggregateEmpenhos(filteredContratos, (_contrato, empenho) => empenho.fichaId, (_contrato, empenho) => `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`),
+    () => aggregateEmpenhos(filteredContratos, (_contrato, empenho) => empenho.fichaId, (_contrato, empenho) => `${empenho.ficha.codigo} - ${empenho.ficha.classificacao?.nome || empenho.ficha.classificacao || "Sem classificacao"}`),
     [filteredContratos],
   );
 
@@ -556,28 +561,28 @@ export default function Dashboard() {
     return { previstoCotado, previstoLicitado, contratado, empenhado, emAf, faturado, pago };
   }, [filterAtaParticipante, filteredAtaContratos, filteredAtasRegistroPreco]);
 
-  const arpResumoDepartamentos = useMemo<ArpDepartmentAggregate[]>(() => {
-    const map = new Map<string, ArpDepartmentAggregate>();
+  const arpResumoEntes = useMemo<ArpEnteAggregate[]>(() => {
+    const map = new Map<string, ArpEnteAggregate>();
 
     filteredAtasRegistroPreco.forEach((ata) => {
-      const departamento = ata.processoDigital.departamento;
-      if (!departamento) return;
-      const current = map.get(departamento.id) ?? {
-        id: departamento.id,
-        label: departamento.nome,
+      const ente = ata.processoDigital.ente;
+      if (!ente) return;
+      const current = map.get(ente.id) ?? {
+        id: ente.id,
+        label: ente.nome,
         previsto: 0,
         contratado: 0,
       };
       current.previsto += ata.itens.reduce((sum, item) => sum + getAtaItemTotalLicitado(item, filterAtaParticipante || undefined), 0);
-      map.set(departamento.id, current);
+      map.set(ente.id, current);
     });
 
     filteredAtaContratos.forEach((contrato: AtaContratoWithRelations) => {
-      const departamento = contrato.ata.processoDigital.departamento;
-      if (!departamento) return;
-      const current = map.get(departamento.id) ?? {
-        id: departamento.id,
-        label: departamento.nome,
+      const ente = contrato.ata.processoDigital.ente;
+      if (!ente) return;
+      const current = map.get(ente.id) ?? {
+        id: ente.id,
+        label: ente.nome,
         previsto: 0,
         contratado: 0,
       };
@@ -585,7 +590,7 @@ export default function Dashboard() {
         const valorUnitario = parseNumberString(prePedido.item.resultado?.valorUnitarioLicitado ?? 0);
         return sum + parseNumberString(prePedido.quantidadeSolicitada) * valorUnitario;
       }, 0);
-      map.set(departamento.id, current);
+      map.set(ente.id, current);
     });
 
     return Array.from(map.values()).sort((a, b) => b.contratado - a.contratado);
@@ -610,7 +615,7 @@ export default function Dashboard() {
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
   }, [filteredAtaContratos]);
 
-  if (statsLoading || notifLoading || contratosLoading || departamentosLoading || entesLoading || (canManageArp && (atasLoading || ataContratosLoading))) {
+  if (statsLoading || notifLoading || contratosLoading || entesLoading || (canManageArp && (atasLoading || ataContratosLoading))) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -702,12 +707,24 @@ export default function Dashboard() {
         <div className={`grid grid-cols-1 ${showEnteFilter ? "md:grid-cols-3 lg:grid-cols-6" : "md:grid-cols-3 lg:grid-cols-5"} gap-4`}>
           {showEnteFilter && (
             <div>
-              <label className="text-sm font-medium mb-2 block">Ente</label>
+              <label className="text-sm font-medium mb-2 block">Secretaria (Ente)</label>
               <Select value={filterEnte || "all"} onValueChange={(v) => setFilterEnte(v === "all" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Todos os entes vinculados" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os entes vinculados</SelectItem>
                   {entesDisponiveis.map((ente) => <SelectItem key={ente.id} value={ente.id}>{ente.sigla}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {filterEnte && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">Departamento</label>
+              <Select value={filterDepartamento || "all"} onValueChange={(v) => setFilterDepartamento(v === "all" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Todos os departamentos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os departamentos</SelectItem>
+                  {departamentosDisponiveis.map((dep) => <SelectItem key={dep.id} value={dep.id}>{dep.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -729,16 +746,6 @@ export default function Dashboard() {
               <SelectContent>
                 <SelectItem value="all">Todos os processos</SelectItem>
                 {processosUnicos.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Departamento</label>
-            <Select value={filterDepartamento || "all"} onValueChange={(v) => setFilterDepartamento(v === "all" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Todos os departamentos" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os departamentos</SelectItem>
-                {departamentosUnicos.map((d) => <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -817,138 +824,143 @@ export default function Dashboard() {
         </Card>
       </div>
 
+
       {canManageArp && (
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Execucao da ARP</h2>
-          <p className="text-sm text-muted-foreground">Acompanhe previsto, contratado, empenhado, faturado e pago das atas de registro de preco.</p>
-        </div>
-        <Card className="border-border/50 shadow-md">
-          <CardHeader className="border-b border-border/50 bg-muted/20">
-            <CardTitle className="text-lg">Filtros da ARP</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Ata de RP</label>
-                <Select value={filterAtaRegistroPreco || "all"} onValueChange={(v) => setFilterAtaRegistroPreco(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Todas as atas" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as atas</SelectItem>
-                    {atasArpDisponiveis.map((ata) => <SelectItem key={ata.id} value={ata.id}>{ata.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Processo da ARP</label>
-                <Select value={filterAtaProcesso || "all"} onValueChange={(v) => setFilterAtaProcesso(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Todos os processos" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os processos</SelectItem>
-                    {processosArpDisponiveis.map((processo) => <SelectItem key={processo.id} value={processo.id}>{processo.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Participante</label>
-                <Select value={filterAtaParticipante || "all"} onValueChange={(v) => setFilterAtaParticipante(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Todos os participantes" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os participantes</SelectItem>
-                    {participantesArpDisponiveis.map((participante) => <SelectItem key={participante.id} value={participante.id}>{participante.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Fornecedor da ARP</label>
-                <Select value={filterAtaFornecedor || "all"} onValueChange={(v) => setFilterAtaFornecedor(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os fornecedores</SelectItem>
-                    {fornecedoresArpDisponiveis.map((fornecedor) => <SelectItem key={fornecedor.id} value={fornecedor.id}>{fornecedor.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          <Card className="border-border/50 shadow-md">
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Previsto Cotado</p>
-              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.previstoCotado)}</h3>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50 shadow-md">
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Previsto Licitado</p>
-              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.previstoLicitado)}</h3>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50 shadow-md">
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Contratado / Empenhado</p>
-              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.contratado)}</h3>
-              <p className="text-xs text-muted-foreground mt-2">Empenhado: {formatCurrency(arpMetrics.empenhado)}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50 shadow-md">
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">Em AF / Faturado / Pago</p>
-              <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.emAf)}</h3>
-              <p className="text-xs text-muted-foreground mt-2">Faturado: {formatCurrency(arpMetrics.faturado)} | Pago: {formatCurrency(arpMetrics.pago)}</p>
-            </CardContent>
-          </Card>
-        </div>
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-2xl font-bold tracking-tight">Execucao da ARP</h2>
+            <p className="text-muted-foreground">Acompanhe previsto, contratado, empenhado, faturado e pago das atas de registro de preco.</p>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="border-border/50 shadow-md">
             <CardHeader className="border-b border-border/50 bg-muted/20">
-              <CardTitle className="text-lg">ARP por Departamento</CardTitle>
+              <CardTitle className="text-lg">Filtros da ARP</CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/50 max-h-[320px] overflow-auto">
-                {arpResumoDepartamentos.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">Nenhuma ARP cadastrada</div>
-                ) : (
-                  arpResumoDepartamentos.map((departamento) => (
-                    <div key={departamento.id} className="p-4 flex justify-between gap-4">
-                      <div>
-                        <p className="font-medium text-sm">{departamento.label}</p>
-                        <p className="text-xs text-muted-foreground">Previsto: {formatCurrency(departamento.previsto)}</p>
-                      </div>
-                      <p className="font-semibold text-sm">{formatCurrency(departamento.contratado)}</p>
-                    </div>
-                  ))
-                )}
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Ata de RP</label>
+                  <Select value={filterAtaRegistroPreco || "all"} onValueChange={(v) => setFilterAtaRegistroPreco(v === "all" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Todas as atas" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as atas</SelectItem>
+                      {atasArpDisponiveis.map((ata) => <SelectItem key={ata.id} value={ata.id}>{ata.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Processo da ARP</label>
+                  <Select value={filterAtaProcesso || "all"} onValueChange={(v) => setFilterAtaProcesso(v === "all" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Todos os processos" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os processos</SelectItem>
+                      {processosArpDisponiveis.map((processo) => <SelectItem key={processo.id} value={processo.id}>{processo.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Participante</label>
+                  <Select value={filterAtaParticipante || "all"} onValueChange={(v) => setFilterAtaParticipante(v === "all" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Todos os participantes" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os participantes</SelectItem>
+                      {participantesArpDisponiveis.map((participante) => <SelectItem key={participante.id} value={participante.id}>{participante.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Fornecedor da ARP</label>
+                  <Select value={filterAtaFornecedor || "all"} onValueChange={(v) => setFilterAtaFornecedor(v === "all" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os fornecedores</SelectItem>
+                      {fornecedoresArpDisponiveis.map((fornecedor) => <SelectItem key={fornecedor.id} value={fornecedor.id}>{fornecedor.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 shadow-md">
-            <CardHeader className="border-b border-border/50 bg-muted/20">
-              <CardTitle className="text-lg">Contratos ARP por Fornecedor</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/50 max-h-[320px] overflow-auto">
-                {arpResumoFornecedores.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">Nenhum contrato ARP cadastrado</div>
-                ) : (
-                  arpResumoFornecedores.map((fornecedor) => (
-                    <div key={fornecedor.id} className="p-4 flex justify-between gap-4">
-                      <div>
-                        <p className="font-medium text-sm">{fornecedor.label}</p>
-                        <p className="text-xs text-muted-foreground">{fornecedor.count} contrato(s) ARP</p>
-                      </div>
-                      <p className="font-semibold text-sm">{formatCurrency(fornecedor.value)}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <Card className="border-border/50 shadow-md">
+              <CardContent className="p-6">
+                <p className="text-sm text-muted-foreground">Previsto Cotado</p>
+                <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.previstoCotado)}</h3>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-md">
+              <CardContent className="p-6">
+                <p className="text-sm text-muted-foreground">Previsto Licitado</p>
+                <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.previstoLicitado)}</h3>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-md">
+              <CardContent className="p-6">
+                <p className="text-sm text-muted-foreground">Contratado / Empenhado</p>
+                <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.contratado)}</h3>
+                <p className="text-xs text-muted-foreground mt-2">Empenhado: {formatCurrency(arpMetrics.empenhado)}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-md">
+              <CardContent className="p-6">
+                <p className="text-sm text-muted-foreground">Em AF / Faturado / Pago</p>
+                <h3 className="text-2xl font-bold mt-1">{formatCurrency(arpMetrics.emAf)}</h3>
+                <p className="text-xs text-muted-foreground mt-2">Faturado: {formatCurrency(arpMetrics.faturado)} | Pago: {formatCurrency(arpMetrics.pago)}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="border-border/50 shadow-md">
+              <CardHeader className="border-b border-border/50 bg-muted/20">
+                <CardTitle className="text-lg">ARP por Ente</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/50 max-h-[320px] overflow-auto">
+                  {arpResumoEntes.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">Nenhuma ARP cadastrada</div>
+                  ) : (
+                    <div className="space-y-4 p-4">
+                      {arpResumoEntes.map((ente) => (
+                        <div key={ente.id} className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium">{ente.label}</span>
+                            <span className="text-muted-foreground">{formatCurrency(ente.contratado)}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Previsto: {formatCurrency(ente.previsto)}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50 shadow-md">
+              <CardHeader className="border-b border-border/50 bg-muted/20">
+                <CardTitle className="text-lg">Contratos ARP por Fornecedor</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/50 max-h-[320px] overflow-auto">
+                  {arpResumoFornecedores.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">Nenhum contrato ARP cadastrado</div>
+                  ) : (
+                    arpResumoFornecedores.map((fornecedor) => (
+                      <div key={fornecedor.id} className="p-4 flex justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-sm">{fornecedor.label}</p>
+                          <p className="text-xs text-muted-foreground">{fornecedor.count} contrato(s) ARP</p>
+                        </div>
+                        <p className="font-semibold text-sm">{formatCurrency(fornecedor.value)}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -981,10 +993,10 @@ export default function Dashboard() {
         </Card>
 
         <Card className="border-border/50 shadow-md">
-          <CardHeader className="border-b border-border/50 bg-muted/20"><CardTitle className="text-lg flex items-center gap-2"><Building2 size={20} />Valor por Departamento</CardTitle></CardHeader>
+          <CardHeader className="border-b border-border/50 bg-muted/20"><CardTitle className="text-lg flex items-center gap-2"><Building2 size={20} />Valor por Secretaria</CardTitle></CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border/50 max-h-[400px] overflow-auto">
-              {departamentosUnicos.length === 0 ? <div className="p-4 text-center text-muted-foreground">Nenhum departamento</div> : departamentosUnicos.map((d) => (
+              {entesUnicos.length === 0 ? <div className="p-4 text-center text-muted-foreground">Nenhuma secretaria</div> : entesUnicos.map((d: any) => (
                 <div key={d.id} className="p-4 flex justify-between items-start hover:bg-muted/30 transition-colors">
                   <div><p className="font-medium text-sm">{d.label}</p><p className="text-xs text-muted-foreground">{d.count} contrato{d.count !== 1 ? "s" : ""}</p></div>
                   <p className="font-semibold text-sm">{formatCurrency(d.value)}</p>

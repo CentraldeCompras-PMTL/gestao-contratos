@@ -70,13 +70,13 @@ export default function EntesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Entes</h1>
-          <p className="text-muted-foreground mt-1">Gerencie as secretarias municipais.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Secretarias</h1>
+          <p className="text-muted-foreground mt-1">Gerencie as secretarias municipais (Entes).</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) reset(); }}>
-          <DialogTrigger asChild><Button>Novo Ente</Button></DialogTrigger>
+          <DialogTrigger asChild><Button>Nova Secretaria</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>{editingId ? "Editar" : "Novo"} Ente</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar" : "Nova"} Secretaria</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-2"><label className="text-sm font-medium">Nome</label><Input value={form.nome} onChange={(e) => setForm((c) => ({ ...c, nome: e.target.value }))} required /></div>
               <div className="space-y-2"><label className="text-sm font-medium">Sigla</label><Input value={form.sigla} onChange={(e) => setForm((c) => ({ ...c, sigla: e.target.value.toUpperCase() }))} required /></div>

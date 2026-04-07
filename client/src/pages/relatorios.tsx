@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useContratos } from "@/hooks/use-contratos";
 import { useEntes } from "@/hooks/use-entes";
-import { useDepartamentos } from "@/hooks/use-departamentos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,11 +27,9 @@ export default function Relatorios() {
   const { user } = useAuth();
   const { data: contratos = [], isLoading } = useContratos();
   const { data: entes = [] } = useEntes();
-  const { data: departamentos = [] } = useDepartamentos();
 
   const [reportType, setReportType] = useState("contratos_detalhado");
   const [enteFilter, setEnteFilter] = useState("all");
-  const [departamentoFilter, setDepartamentoFilter] = useState("all");
   const [fornecedorFilter, setFornecedorFilter] = useState("all");
   const [processoFilter, setProcessoFilter] = useState("all");
   const [contratoFilter, setContratoFilter] = useState("all");
@@ -45,8 +42,7 @@ export default function Relatorios() {
 
   const filteredContratos = useMemo(() => {
     return contratos.filter((contrato) => {
-      if (showEnteFilter && enteFilter !== "all" && contrato.processoDigital.departamento?.enteId !== enteFilter) return false;
-      if (departamentoFilter !== "all" && (contrato.departamentoId ?? contrato.processoDigital.departamentoId) !== departamentoFilter) return false;
+      if (enteFilter !== "all" && (contrato.enteId ?? contrato.processoDigital.enteId) !== enteFilter) return false;
       if (fornecedorFilter !== "all" && contrato.fornecedorId !== fornecedorFilter) return false;
       if (processoFilter !== "all" && contrato.processoDigitalId !== processoFilter) return false;
       if (contratoFilter !== "all" && contrato.id !== contratoFilter) return false;
@@ -55,7 +51,7 @@ export default function Relatorios() {
       if (fichaFilter !== "all" && !contrato.empenhos.some((empenho) => empenho.fichaId === fichaFilter)) return false;
       return true;
     });
-  }, [contratos, contratoFilter, departamentoFilter, enteFilter, fichaFilter, fonteFilter, fornecedorFilter, processoFilter, showEnteFilter, statusContratoFilter]);
+  }, [contratos, contratoFilter, enteFilter, fichaFilter, fonteFilter, fornecedorFilter, processoFilter, showEnteFilter, statusContratoFilter]);
 
   const contratosOpcoes = filteredContratos.map((contrato) => ({ id: contrato.id, label: contrato.numeroContrato }));
   const fornecedoresOpcoes = Array.from(new Map(contratos.map((contrato) => [contrato.fornecedorId, { id: contrato.fornecedorId, label: contrato.fornecedor.nome }])).values());
@@ -71,8 +67,7 @@ export default function Relatorios() {
 
   const report = useMemo<ReportDefinition>(() => {
     const baseColumns = {
-      ente: { key: "ente", label: "Ente" },
-      departamento: { key: "departamento", label: "Departamento" },
+      secretaria: { key: "secretaria", label: "Secretaria" },
       processo: { key: "processo", label: "Processo Digital" },
       contrato: { key: "contrato", label: "Contrato" },
       fornecedor: { key: "fornecedor", label: "Fornecedor" },
@@ -85,8 +80,7 @@ export default function Relatorios() {
         id: "contratos_detalhado",
         label: "Contratos Detalhados",
         columns: [
-          baseColumns.ente,
-          baseColumns.departamento,
+          baseColumns.secretaria,
           baseColumns.processo,
           baseColumns.contrato,
           baseColumns.fornecedor,
@@ -95,8 +89,7 @@ export default function Relatorios() {
           { key: "vigencia", label: "Vigencia" },
         ],
         rows: filteredContratos.map((contrato) => ({
-          ente: contrato.processoDigital.departamento?.ente?.sigla ?? "-",
-          departamento: contrato.departamento?.nome ?? contrato.processoDigital.departamento?.nome ?? "-",
+          secretaria: contrato.ente?.nome ?? contrato.processoDigital.ente?.nome ?? "-",
           processo: contrato.processoDigital.numeroProcessoDigital,
           contrato: contrato.numeroContrato,
           fornecedor: contrato.fornecedor.nome,
@@ -109,8 +102,7 @@ export default function Relatorios() {
         id: "empenhos_detalhado",
         label: "Empenhos Detalhados",
         columns: [
-          baseColumns.ente,
-          baseColumns.departamento,
+          baseColumns.secretaria,
           baseColumns.contrato,
           baseColumns.fornecedor,
           baseColumns.fonte,
@@ -125,8 +117,7 @@ export default function Relatorios() {
           contrato.empenhos
             .filter((empenho) => (fonteFilter === "all" || empenho.fonteRecursoId === fonteFilter) && (fichaFilter === "all" || empenho.fichaId === fichaFilter))
             .map((empenho) => ({
-              ente: contrato.processoDigital.departamento?.ente?.sigla ?? "-",
-              departamento: contrato.departamento?.nome ?? contrato.processoDigital.departamento?.nome ?? "-",
+              secretaria: contrato.ente?.nome ?? contrato.processoDigital.ente?.nome ?? "-",
               contrato: contrato.numeroContrato,
               fornecedor: contrato.fornecedor.nome,
               fonte: `${empenho.fonteRecurso.codigo} - ${empenho.fonteRecurso.nome}`,
@@ -143,8 +134,7 @@ export default function Relatorios() {
         id: "afs_detalhado",
         label: "AFs Detalhadas",
         columns: [
-          baseColumns.ente,
-          baseColumns.departamento,
+          baseColumns.secretaria,
           baseColumns.contrato,
           baseColumns.fornecedor,
           baseColumns.fonte,
@@ -158,8 +148,7 @@ export default function Relatorios() {
             .filter((empenho) => (fonteFilter === "all" || empenho.fonteRecursoId === fonteFilter) && (fichaFilter === "all" || empenho.fichaId === fichaFilter))
             .flatMap((empenho) =>
               empenho.afs.map((af) => ({
-                ente: contrato.processoDigital.departamento?.ente?.sigla ?? "-",
-                departamento: contrato.departamento?.nome ?? contrato.processoDigital.departamento?.nome ?? "-",
+                secretaria: contrato.ente?.nome ?? contrato.processoDigital.ente?.nome ?? "-",
                 contrato: contrato.numeroContrato,
                 fornecedor: contrato.fornecedor.nome,
                 fonte: `${empenho.fonteRecurso.codigo} - ${empenho.fonteRecurso.nome}`,
@@ -175,8 +164,7 @@ export default function Relatorios() {
         id: "notas_detalhado",
         label: "Notas Fiscais",
         columns: [
-          baseColumns.ente,
-          baseColumns.departamento,
+          baseColumns.secretaria,
           baseColumns.contrato,
           baseColumns.fornecedor,
           { key: "nota", label: "Nota" },
@@ -187,8 +175,7 @@ export default function Relatorios() {
         ],
         rows: filteredContratos.flatMap((contrato) =>
           contrato.notasFiscais.map((nota) => ({
-            ente: contrato.processoDigital.departamento?.ente?.sigla ?? "-",
-            departamento: contrato.departamento?.nome ?? contrato.processoDigital.departamento?.nome ?? "-",
+            secretaria: contrato.ente?.nome ?? contrato.processoDigital.ente?.nome ?? "-",
             contrato: contrato.numeroContrato,
             fornecedor: contrato.fornecedor.nome,
             nota: nota.numeroNota,
@@ -225,14 +212,14 @@ export default function Relatorios() {
           };
         }),
       },
-      resumo_departamento: {
-        id: "resumo_departamento",
-        label: "Resumo por Departamento",
-        columns: [{ key: "departamento", label: "Departamento" }, { key: "contratos", label: "Contratos" }, { key: "valor", label: "Valor Total" }],
-        rows: Array.from(new Map(filteredContratos.map((contrato) => [contrato.departamentoId ?? contrato.processoDigital.departamentoId ?? "sem", contrato])).keys()).map((departamentoId) => {
-          const rows = filteredContratos.filter((contrato) => (contrato.departamentoId ?? contrato.processoDigital.departamentoId ?? "sem") === departamentoId);
+      resumo_secretaria: {
+        id: "resumo_secretaria",
+        label: "Resumo por Secretaria",
+        columns: [{ key: "secretaria", label: "Secretaria" }, { key: "contratos", label: "Contratos" }, { key: "valor", label: "Valor Total" }],
+        rows: Array.from(new Map(filteredContratos.map((contrato) => [contrato.enteId ?? contrato.processoDigital.enteId ?? "sem", contrato])).keys()).map((enteId) => {
+          const rows = filteredContratos.filter((contrato) => (contrato.enteId ?? contrato.processoDigital.enteId ?? "sem") === enteId);
           return {
-            departamento: rows[0]?.departamento?.nome ?? rows[0]?.processoDigital.departamento?.nome ?? "Sem departamento",
+            secretaria: rows[0]?.ente?.nome ?? rows[0]?.processoDigital.ente?.nome ?? "Sem secretaria",
             contratos: rows.length,
             valor: formatCurrency(rows.reduce((acc, contrato) => acc + parseNumberString(contrato.valorContrato), 0)),
           };
@@ -272,12 +259,11 @@ export default function Relatorios() {
           };
         }),
       },
-      cruzado_contrato_empenho_departamento: {
-        id: "cruzado_contrato_empenho_departamento",
-        label: "Contratos por Empenho por Departamento",
+      cruzado_contrato_empenho_secretaria: {
+        id: "cruzado_contrato_empenho_secretaria",
+        label: "Contratos x Empenhos x Secretaria",
         columns: [
-          baseColumns.ente,
-          baseColumns.departamento,
+          baseColumns.secretaria,
           baseColumns.processo,
           baseColumns.contrato,
           baseColumns.fornecedor,
@@ -291,8 +277,7 @@ export default function Relatorios() {
           contrato.empenhos
             .filter((empenho) => (fonteFilter === "all" || empenho.fonteRecursoId === fonteFilter) && (fichaFilter === "all" || empenho.fichaId === fichaFilter))
             .map((empenho) => ({
-              ente: contrato.processoDigital.departamento?.ente?.sigla ?? "-",
-              departamento: contrato.departamento?.nome ?? contrato.processoDigital.departamento?.nome ?? "-",
+              secretaria: contrato.ente?.nome ?? contrato.processoDigital.ente?.nome ?? "-",
               processo: contrato.processoDigital.numeroProcessoDigital,
               contrato: contrato.numeroContrato,
               fornecedor: contrato.fornecedor.nome,
@@ -342,10 +327,10 @@ export default function Relatorios() {
                 <SelectItem value="notas_detalhado">Notas Fiscais</SelectItem>
                 <SelectItem value="resumo_fornecedor">Resumo por Fornecedor</SelectItem>
                 <SelectItem value="resumo_processo">Resumo por Processo</SelectItem>
-                <SelectItem value="resumo_departamento">Resumo por Departamento</SelectItem>
+                <SelectItem value="resumo_secretaria">Resumo por Secretaria</SelectItem>
                 <SelectItem value="resumo_fonte">Resumo por Fonte</SelectItem>
                 <SelectItem value="resumo_ficha">Resumo por Ficha</SelectItem>
-                <SelectItem value="cruzado_contrato_empenho_departamento">Contratos x Empenhos x Departamento</SelectItem>
+                <SelectItem value="cruzado_contrato_empenho_secretaria">Contratos x Empenhos x Secretaria</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -363,16 +348,6 @@ export default function Relatorios() {
               </Select>
             </div>
           )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Departamento</label>
-            <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {departamentos.map((departamento) => <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Fornecedor</label>
             <Select value={fornecedorFilter} onValueChange={setFornecedorFilter}>

@@ -79,7 +79,7 @@ export default function Usuarios() {
       toast({
         variant: "destructive",
         title: "Preencha os campos obrigatorios",
-        description: "Selecione pelo menos um ente do usuario operacional antes de salvar.",
+        description: "Selecione pelo menos uma secretaria do usuario operacional antes de salvar.",
       });
       return;
     }
@@ -213,12 +213,12 @@ export default function Usuarios() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Entes {form.role === "operacional" ? "*" : ""}</Label>
+                <Label>Secretarias {form.role === "operacional" ? "*" : ""}</Label>
                 <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border p-3">
                   {form.role === "admin" ? (
-                    <p className="text-sm text-muted-foreground">Administrador acessa todos os entes.</p>
+                    <p className="text-sm text-muted-foreground">Administrador acessa todas as secretarias.</p>
                   ) : entes.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum ente cadastrado.</p>
+                    <p className="text-sm text-muted-foreground">Nenhuma secretaria cadastrada.</p>
                   ) : (
                     entes.map((ente) => (
                       <label key={ente.id} className="flex items-center gap-3 text-sm">
@@ -249,7 +249,7 @@ export default function Usuarios() {
                   )}
                 </div>
                 {form.role === "operacional" && (
-                  <p className="text-xs text-muted-foreground">Usuarios operacionais podem ser vinculados a um ou mais entes.</p>
+                  <p className="text-xs text-muted-foreground">Usuarios operacionais podem ser vinculados a uma ou mais secretarias.</p>
                 )}
               </div>
               {form.role === "operacional" && selectedHasFazenda && (
@@ -278,7 +278,7 @@ export default function Usuarios() {
             <Shield className="text-primary" />
             <div>
               <h2 className="font-semibold">Administrador</h2>
-              <p className="text-sm text-muted-foreground">Cadastra usuarios e controla o sistema.</p>
+              <p className="text-sm text-muted-foreground">Cadastra usuarios e controla todas as secretarias.</p>
             </div>
           </div>
         </div>
@@ -300,7 +300,7 @@ export default function Usuarios() {
               <TableHead>Nome</TableHead>
               <TableHead>E-mail</TableHead>
               <TableHead>Perfil</TableHead>
-              <TableHead>Ente</TableHead>
+              <TableHead>Secretaria</TableHead>
               <TableHead>Modulo ARP</TableHead>
               <TableHead>Criado Em</TableHead>
               <TableHead className="text-right">Acao</TableHead>

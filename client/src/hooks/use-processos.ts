@@ -121,12 +121,12 @@ export function useCreateFase() {
 export function useAddParticipante() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, departamentoId }: { id: string; departamentoId: string }) => {
+    mutationFn: async ({ id, enteId }: { id: string; enteId: string }) => {
       const url = buildUrl(api.processos.addParticipante.path, { id });
       const res = await fetch(url, {
         method: api.processos.addParticipante.method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ departamentoId }),
+        body: JSON.stringify({ enteId }),
         credentials: "include",
       });
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao adicionar participante"));
@@ -142,8 +142,8 @@ export function useAddParticipante() {
 export function useRemoveParticipante() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, departamentoId }: { id: string; departamentoId: string }) => {
-      const url = buildUrl(api.processos.removeParticipante.path, { id, departamentoId });
+    mutationFn: async ({ id, enteId }: { id: string; enteId: string }) => {
+      const url = buildUrl(api.processos.removeParticipante.path, { id, enteId });
       const res = await fetch(url, {
         method: api.processos.removeParticipante.method,
         credentials: "include",
@@ -257,7 +257,7 @@ export function useDeleteProcessoItem() {
 export function useSaveProcessoQuantidades() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, quantidades }: { id: string; quantidades: any[] }) => {
+    mutationFn: async ({ id, quantidades }: { id: string; quantidades: { itemId: string; enteId: string; quantidade: string }[] }) => {
       const url = buildUrl(api.processos.saveQuantidades.path, { id });
       const res = await fetch(url, {
         method: api.processos.saveQuantidades.method,

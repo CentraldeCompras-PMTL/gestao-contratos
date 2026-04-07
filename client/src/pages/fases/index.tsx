@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFases, useCreateFase, useUpdateFase, useDeleteFase } from "@/hooks/use-fases";
 import { useFornecedores } from "@/hooks/use-fornecedores";
 import { useProcessos } from "@/hooks/use-processos";
+import { useEntes } from "@/hooks/use-entes";
 import { useDepartamentos } from "@/hooks/use-departamentos";
 import { formatDate } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,7 @@ const defaultForm: InsertFaseContratacao = {
   nomeFase: "",
   fornecedorId: "",
   processoDigitalId: "",
+  enteId: undefined,
   departamentoId: undefined,
   modalidade: "pregao",
   numeroModalidade: "",
@@ -40,6 +42,7 @@ export default function Fases() {
   const { data: fases = [], isLoading } = useFases();
   const { data: fornecedores = [] } = useFornecedores();
   const { data: processos = [] } = useProcessos();
+  const { data: entes = [] } = useEntes();
   const { data: departamentos = [] } = useDepartamentos();
   const createFase = useCreateFase();
   const updateFase = useUpdateFase();
@@ -83,6 +86,7 @@ export default function Fases() {
       nomeFase: fase.nomeFase,
       fornecedorId: fase.fornecedorId,
       processoDigitalId: fase.processoDigitalId,
+      enteId: fase.enteId ?? undefined,
       departamentoId: fase.departamentoId ?? undefined,
       modalidade: fase.modalidade,
       numeroModalidade: fase.numeroModalidade,
@@ -136,7 +140,7 @@ export default function Fases() {
                   <Label>Processo Digital *</Label>
                   <Select value={formData.processoDigitalId} onValueChange={(v) => {
                     const processo = processos.find((item: ProcessoDigitalWithRelations) => item.id === v);
-                    setFormData({ ...formData, processoDigitalId: v, departamentoId: processo?.departamentoId ?? formData.departamentoId });
+                    setFormData({ ...formData, processoDigitalId: v, enteId: processo?.enteId ?? formData.enteId, departamentoId: processo?.departamentoId ?? formData.departamentoId });
                   }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
                     <SelectContent>
@@ -147,19 +151,31 @@ export default function Fases() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label>Secretaria (Ente)</Label>
+                  <Select value={formData.enteId ?? "none"} onValueChange={(v) => setFormData({ ...formData, enteId: v === "none" ? undefined : v, departamentoId: undefined })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a secretaria" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem secretaria</SelectItem>
+                      {entes.map((ente) => (
+                        <SelectItem key={ente.id} value={ente.id}>{ente.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedProcesso?.ente && (
+                    <p className="text-xs text-muted-foreground">Secretaria do processo: {selectedProcesso.ente.nome}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
                   <Label>Departamento</Label>
                   <Select value={formData.departamentoId ?? "none"} onValueChange={(v) => setFormData({ ...formData, departamentoId: v === "none" ? undefined : v })}>
                     <SelectTrigger><SelectValue placeholder="Selecione o departamento" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sem departamento</SelectItem>
-                      {departamentos.map((departamento) => (
-                        <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
+                      {departamentos.filter(d => d.enteId === formData.enteId).map((dep) => (
+                        <SelectItem key={dep.id} value={dep.id}>{dep.nome}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedProcesso?.departamento && (
-                    <p className="text-xs text-muted-foreground">Departamento do processo: {selectedProcesso.departamento.nome}</p>
-                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Fornecedor Relacionado *</Label>
@@ -219,7 +235,8 @@ export default function Fases() {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Processo</TableHead>
-                  <TableHead>Departamento</TableHead>
+                  <TableHead>Secretaria</TableHead>
+                  <TableHead>Depto</TableHead>
                   <TableHead>Fornecedor</TableHead>
                   <TableHead>Modalidade</TableHead>
                   <TableHead>No Modalidade</TableHead>
@@ -233,6 +250,7 @@ export default function Fases() {
                   <TableRow key={fase.id}>
                     <TableCell className="font-medium">{fase.nomeFase}</TableCell>
                     <TableCell>{fase.processoDigital.numeroProcessoDigital}</TableCell>
+                    <TableCell>{fase.ente?.sigla || "-"}</TableCell>
                     <TableCell>{fase.departamento?.nome || "-"}</TableCell>
                     <TableCell>{fase.fornecedor.nome}</TableCell>
                     <TableCell className="capitalize">{fase.modalidade}</TableCell>
@@ -254,7 +272,7 @@ export default function Fases() {
                                 <Label>Processo Digital</Label>
                                 <Select value={formData.processoDigitalId} onValueChange={(v) => {
                                   const processo = processos.find((item: ProcessoDigitalWithRelations) => item.id === v);
-                                  setFormData({ ...formData, processoDigitalId: v, departamentoId: processo?.departamentoId ?? formData.departamentoId });
+                                  setFormData({ ...formData, processoDigitalId: v, enteId: processo?.enteId ?? formData.enteId, departamentoId: processo?.departamentoId ?? formData.departamentoId });
                                 }}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
@@ -265,13 +283,25 @@ export default function Fases() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label>Departamento</Label>
-                                <Select value={formData.departamentoId ?? "none"} onValueChange={(v) => setFormData({ ...formData, departamentoId: v === "none" ? undefined : v })}>
+                                <Label>Secretaria (Ente)</Label>
+                                <Select value={formData.enteId ?? "none"} onValueChange={(v) => setFormData({ ...formData, enteId: v === "none" ? undefined : v, departamentoId: undefined })}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="none">Sem secretaria</SelectItem>
+                                    {entes.map((ente) => (
+                                      <SelectItem key={ente.id} value={ente.id}>{ente.nome}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Departamento</Label>
+                                <Select value={formData.departamentoId ?? "none"} onValueChange={(v) => setFormData({ ...formData, departamentoId: v === "none" ? undefined : v })}>
+                                  <SelectTrigger><SelectValue placeholder="Selecione o departamento" /></SelectTrigger>
+                                  <SelectContent>
                                     <SelectItem value="none">Sem departamento</SelectItem>
-                                    {departamentos.map((departamento) => (
-                                      <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
+                                    {departamentos.filter(d => d.enteId === formData.enteId).map((dep) => (
+                                      <SelectItem key={dep.id} value={dep.id}>{dep.nome}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>

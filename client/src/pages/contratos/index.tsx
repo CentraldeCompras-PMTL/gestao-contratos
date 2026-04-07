@@ -3,8 +3,8 @@ import { Link } from "wouter";
 import { useContratos, useCreateContrato, useUpdateContrato } from "@/hooks/use-contratos";
 import { useFases } from "@/hooks/use-fases";
 import { useProcessos } from "@/hooks/use-processos";
-import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useEntes } from "@/hooks/use-entes";
+import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ function resetForm(
   setValorContrato: (value: string) => void,
   setVigenciaInicial: (value: string) => void,
   setVigenciaFinal: (value: string) => void,
+  setDepartamentoId: (value: string) => void,
 ) {
   setProcId("");
   setFaseId("");
@@ -33,6 +34,7 @@ function resetForm(
   setValorContrato("");
   setVigenciaInicial("");
   setVigenciaFinal("");
+  setDepartamentoId("");
 }
 
 export default function Contratos() {
@@ -40,7 +42,6 @@ export default function Contratos() {
   const { data: contratos = [], isLoading } = useContratos();
   const { data: processos = [] } = useProcessos();
   const { data: fases = [] } = useFases();
-  const { data: departamentosData = [] } = useDepartamentos();
   const { data: entes = [] } = useEntes();
   const createContrato = useCreateContrato();
   const updateContrato = useUpdateContrato();
@@ -55,12 +56,15 @@ export default function Contratos() {
 
   const [procId, setProcId] = useState("");
   const [faseId, setFaseId] = useState("");
-  const [departamentoId, setDepartamentoId] = useState("");
+  const [enteId, setEnteId] = useState("");
   const [fornecedorId, setFornecedorId] = useState("");
   const [numeroContrato, setNumeroContrato] = useState("");
   const [valorContrato, setValorContrato] = useState("");
   const [vigenciaInicial, setVigenciaInicial] = useState("");
   const [vigenciaFinal, setVigenciaFinal] = useState("");
+  const [departamentoId, setDepartamentoId] = useState("");
+
+  const { data: departamentos = [] } = useDepartamentos();
 
   const selectedProcesso = processos.find((p: ProcessoDigitalWithRelations) => p.id === procId);
   const fasesDoProcesso = useMemo(
@@ -83,42 +87,43 @@ export default function Contratos() {
       setFornecedorId("");
     }
 
+    if (selectedFase?.enteId) {
+      setEnteId(selectedFase.enteId);
+    } else if (selectedProcesso?.enteId && !editingId) {
+      setEnteId(selectedProcesso.enteId);
+    } else if (!faseId && !selectedProcesso?.enteId) {
+      setEnteId("");
+    }
+  }, [editingId, faseId, selectedFase, selectedProcesso]);
+
+  useEffect(() => {
     if (selectedFase?.departamentoId) {
       setDepartamentoId(selectedFase.departamentoId);
     } else if (selectedProcesso?.departamentoId && !editingId) {
       setDepartamentoId(selectedProcesso.departamentoId);
-    } else if (!faseId && !selectedProcesso?.departamentoId) {
-      setDepartamentoId("");
     }
-  }, [editingId, faseId, selectedFase, selectedProcesso]);
+  }, [editingId, selectedFase, selectedProcesso]);
 
   const filtered = contratos.filter((c: ContratoWithRelations) =>
     (c.numeroContrato.toLowerCase().includes(search.toLowerCase()) ||
       c.fornecedor.nome.toLowerCase().includes(search.toLowerCase())) &&
     (statusFilter === "all" || c.status === statusFilter) &&
-    (enteFilter === "all" || c.processoDigital.departamento?.enteId === enteFilter) &&
+    (enteFilter === "all" || (c.enteId ?? c.processoDigital.enteId) === enteFilter) &&
     (departamentoFilter === "all" || (c.departamentoId ?? c.processoDigital.departamentoId) === departamentoFilter)
   );
 
-  const departamentos = Array.from(
-    new Map(
-      processos
-        .filter((processo) => enteFilter === "all" || processo.departamento?.enteId === enteFilter)
-        .map((processo) => [processo.departamentoId, processo.departamento])
-        .filter((entry): entry is [string, NonNullable<ProcessoDigitalWithRelations["departamento"]>] => Boolean(entry[0] && entry[1])),
-    ).values(),
-  );
 
   const handleEdit = (c: ContratoWithRelations) => {
     setEditingId(c.id);
     setProcId(c.processoDigitalId);
     setFaseId(c.faseContratacaoId);
-    setDepartamentoId(c.departamentoId ?? c.faseContratacao.departamentoId ?? c.processoDigital.departamentoId ?? "");
+    setEnteId(c.enteId ?? c.faseContratacao.enteId ?? c.processoDigital.enteId ?? "");
     setFornecedorId(c.fornecedorId);
     setNumeroContrato(c.numeroContrato);
     setValorContrato(String(c.valorContrato));
     setVigenciaInicial(c.vigenciaInicial);
     setVigenciaFinal(c.vigenciaFinal);
+    setDepartamentoId(c.departamentoId ?? c.faseContratacao.departamentoId ?? c.processoDigital.departamentoId ?? "");
     setDialogOpen(true);
   };
 
@@ -132,6 +137,7 @@ export default function Contratos() {
     const payload = {
       processoDigitalId: procId,
       faseContratacaoId: faseId,
+      enteId: enteId || undefined,
       departamentoId: departamentoId || undefined,
       fornecedorId,
       numeroContrato,
@@ -148,8 +154,8 @@ export default function Contratos() {
             toast({ title: "Registro atualizado com sucesso!" });
             setDialogOpen(false);
             setEditingId(null);
-            setDepartamentoId("");
-            resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
+            setEnteId("");
+            resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal, setDepartamentoId);
           },
           onError: (error) => {
             toast({
@@ -167,8 +173,8 @@ export default function Contratos() {
       onSuccess: () => {
         toast({ title: "Cadastro realizado com sucesso!" });
         setDialogOpen(false);
-        setDepartamentoId("");
-        resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
+        setEnteId("");
+        resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal, setDepartamentoId);
       },
       onError: (error) => {
         toast({
@@ -192,8 +198,8 @@ export default function Contratos() {
           setDialogOpen(open);
           if (!open) {
             setEditingId(null);
-            setDepartamentoId("");
-            resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal);
+            setEnteId("");
+            resetForm(setProcId, setFaseId, setFornecedorId, setNumeroContrato, setValorContrato, setVigenciaInicial, setVigenciaFinal, setDepartamentoId);
           }
         }}>
           <DialogTrigger asChild>
@@ -212,6 +218,7 @@ export default function Contratos() {
                     setProcId(val);
                     setFaseId("");
                     setFornecedorId("");
+                    setEnteId(processo?.enteId ?? "");
                     setDepartamentoId(processo?.departamentoId ?? "");
                   }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o processo..." /></SelectTrigger>
@@ -231,20 +238,36 @@ export default function Contratos() {
                 )}
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-primary">2.1 Departamento</label>
-                  <Select value={departamentoId || "none"} onValueChange={(value) => setDepartamentoId(value === "none" ? "" : value)}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o departamento..." /></SelectTrigger>
+                  <label className="text-sm font-medium text-primary">2. Secretaria</label>
+                  <Select value={enteId || "none"} onValueChange={(value) => {
+                    setEnteId(value === "none" ? "" : value);
+                    setDepartamentoId("");
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a secretaria..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sem departamento</SelectItem>
-                      {departamentosData.map((departamento) => (
-                        <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
+                      <SelectItem value="none">Sem secretaria</SelectItem>
+                      {entes.map((ente) => (
+                        <SelectItem key={ente.id} value={ente.id}>{ente.nome}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-primary">3. Fase de Contratacao</label>
+                  <label className="text-sm font-medium text-primary">3. Departamento</label>
+                  <Select value={departamentoId || "none"} onValueChange={(value) => setDepartamentoId(value === "none" ? "" : value)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o departamento..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem departamento</SelectItem>
+                      {departamentos.filter(d => d.enteId === enteId).map((dep) => (
+                        <SelectItem key={dep.id} value={dep.id}>{dep.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-primary">4. Fase de Contratacao</label>
                   <Select disabled={!procId} value={faseId} onValueChange={handleFaseSelect}>
                     <SelectTrigger><SelectValue placeholder="Selecione a fase..." /></SelectTrigger>
                     <SelectContent>
@@ -256,7 +279,7 @@ export default function Contratos() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-primary">4. Fornecedor da Etapa</label>
+                  <label className="text-sm font-medium text-primary">5. Fornecedor da Etapa</label>
                   <Input
                     value={selectedFase?.fornecedor?.nome ?? ""}
                     readOnly
@@ -310,7 +333,7 @@ export default function Contratos() {
             className="border-0 shadow-none focus-visible:ring-0 px-0"
           />
         </div>
-        <div className="grid gap-4 border-b border-border/50 p-4 md:grid-cols-3">
+        <div className={`grid gap-4 border-b border-border/50 p-4 ${user?.role === "admin" ? (enteFilter && enteFilter !== "all" ? "md:grid-cols-4" : "md:grid-cols-3") : "md:grid-cols-2"}`}>
           <div className="space-y-2">
             <label className="text-sm font-medium">Status</label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -324,14 +347,14 @@ export default function Contratos() {
           </div>
           {user?.role === "admin" && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Ente</label>
+              <label className="text-sm font-medium text-primary">Secretaria</label>
               <Select value={enteFilter} onValueChange={(value) => {
                 setEnteFilter(value);
                 setDepartamentoFilter("all");
               }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os entes</SelectItem>
+                  <SelectItem value="all">Todas as secretarias</SelectItem>
                   {entes.map((ente) => (
                     <SelectItem key={ente.id} value={ente.id}>{ente.sigla} - {ente.nome}</SelectItem>
                   ))}
@@ -339,18 +362,20 @@ export default function Contratos() {
               </Select>
             </div>
           )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Departamento</label>
-            <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os departamentos</SelectItem>
-                {departamentos.map((departamento) => (
-                  <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {user?.role === "admin" && enteFilter && enteFilter !== "all" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-primary">Departamento</label>
+              <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os departamentos</SelectItem>
+                  {departamentos.filter(d => d.enteId === enteFilter).map((dep) => (
+                    <SelectItem key={dep.id} value={dep.id}>{dep.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">

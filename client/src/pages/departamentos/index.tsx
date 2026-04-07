@@ -123,7 +123,7 @@ export default function Departamentos() {
                 <Input required value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Ente</label>
+                <label className="text-sm font-medium">Secretaria</label>
                 <Select value={formData.enteId} onValueChange={(value) => setFormData({ ...formData, enteId: value })} disabled={availableEntes.length <= 1}>
                   <SelectTrigger><SelectValue placeholder="Selecione o ente" /></SelectTrigger>
                   <SelectContent>
@@ -154,7 +154,7 @@ export default function Departamentos() {
           <Table>
             <TableHeader>
                 <TableRow>
-                <TableHead>Ente</TableHead>
+                <TableHead>Secretaria</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Descricao</TableHead>
                 <TableHead>Criado em</TableHead>

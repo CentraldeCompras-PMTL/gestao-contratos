@@ -7,6 +7,7 @@ import {
   insertFichaOrcamentariaSchema,
   insertProjetoAtividadeSchema,
   insertEnteSchema,
+  insertClassificacaoSchema,
   insertProcessoDigitalSchema, 
   insertProcessoItemSchema,
   insertProcessoItemQuantidadeSchema,
@@ -38,6 +39,7 @@ import {
   fichaOrcamentariaResponseSchema,
   projetoAtividadeResponseSchema,
   enteResponseSchema,
+  classificacaoResponseSchema,
   cnpjLookupResponseSchema,
   ataRegistroPrecoResponseSchema,
   ataRegistroPrecoWithRelationsSchema,
@@ -271,6 +273,30 @@ export const api = {
     deleteProjetoAtividade: {
       method: 'DELETE' as const,
       path: '/api/projetos-atividade/:id' as const,
+      responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
+    },
+  },
+  classificacoesOrcamentarias: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/classificacoes-orcamentarias' as const,
+      responses: { 200: z.array(classificacaoResponseSchema) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/classificacoes-orcamentarias' as const,
+      input: insertClassificacaoSchema,
+      responses: { 201: classificacaoResponseSchema },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/classificacoes-orcamentarias/:id' as const,
+      input: insertClassificacaoSchema.partial(),
+      responses: { 200: classificacaoResponseSchema, 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/classificacoes-orcamentarias/:id' as const,
       responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
     },
   },
@@ -523,12 +549,12 @@ export const api = {
     addParticipante: {
       method: 'POST' as const,
       path: '/api/processos/:id/participantes' as const,
-      input: z.object({ departamentoId: z.string() }),
+      input: z.object({ enteId: z.string() }),
       responses: { 201: z.any() },
     },
     removeParticipante: {
       method: 'DELETE' as const,
-      path: '/api/processos/:id/participantes/:departamentoId' as const,
+      path: '/api/processos/:id/participantes/:enteId' as const,
       responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
     },
     createItem: {
@@ -551,7 +577,7 @@ export const api = {
     saveQuantidades: {
       method: 'PUT' as const,
       path: '/api/processos/:id/quantidades' as const,
-      input: z.object({ quantidades: z.array(insertProcessoItemQuantidadeSchema.pick({ itemId: true, departamentoId: true, quantidade: true })) }),
+      input: z.object({ quantidades: z.array(insertProcessoItemQuantidadeSchema.pick({ itemId: true, enteId: true, quantidade: true })) }),
       responses: { 200: z.any(), 404: errorSchemas.notFound },
     },
     saveCotacoes: {

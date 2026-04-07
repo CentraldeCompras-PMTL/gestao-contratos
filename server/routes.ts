@@ -522,7 +522,7 @@ export async function registerRoutes(
       }
       ensureEnteAccess(req, current.enteId);
       const processos = await storage.getProcessosDigitais();
-      const hasProcessos = processos.some((item) => item.departamentoId === current.id);
+      const hasProcessos = processos.some((item) => item.enteId === current.id);
       if (hasProcessos) {
         throw new HttpError(400, "Nao e possivel excluir departamento com processos vinculados");
       }
@@ -779,21 +779,64 @@ export async function registerRoutes(
     }
   });
 
+  app.get(api.classificacoesOrcamentarias.list.path, requireAuth, async (_req, res) => {
+    const classificacoes = await storage.getClassificacoesOrcamentarias();
+    res.json(classificacoes);
+  });
+
+  app.post(api.classificacoesOrcamentarias.create.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.classificacoesOrcamentarias.create.input.parse(req.body);
+      const c = await storage.createClassificacaoOrcamentaria(data);
+      await audit(req, "create", "classificacao_orcamentaria", c.id, c.nome);
+      res.status(201).json(c);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao criar classificação orçamentária") });
+    }
+  });
+
+  app.put(api.classificacoesOrcamentarias.update.path, requireAuth, async (req, res) => {
+    try {
+      const data = api.classificacoesOrcamentarias.update.input.parse(req.body);
+      const current = await storage.getClassificacaoOrcamentaria(req.params.id);
+      if (!current) return res.status(404).json({ message: "Classificação orçamentária não encontrada" });
+      const updated = await storage.updateClassificacaoOrcamentaria(req.params.id, data);
+      await audit(req, "update", "classificacao_orcamentaria", updated?.id, updated?.nome ?? null);
+      res.json(updated);
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao atualizar classificação orçamentária") });
+    }
+  });
+
+  app.delete(api.classificacoesOrcamentarias.delete.path, requireAuth, async (req, res) => {
+    try {
+      const current = await storage.getClassificacaoOrcamentaria(req.params.id);
+      if (!current) return res.status(404).json({ message: "Classificação orçamentária não encontrada" });
+      
+      const fontes = await storage.getFontesRecurso();
+      const hasFichas = fontes.some(f => f.fichas.some(ficha => ficha.classificacaoId === current.id));
+      if (hasFichas) {
+        throw new HttpError(400, "Não é possível excluir uma classificação vinculada a fichas orçamentárias");
+      }
+
+      const deleted = await storage.deleteClassificacaoOrcamentaria(req.params.id);
+      await audit(req, "delete", "classificacao_orcamentaria", deleted?.id, deleted?.nome ?? null);
+      res.json({ message: "Classificação orçamentária excluída com sucesso" });
+    } catch (e) {
+      res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao excluir classificação orçamentária") });
+    }
+  });
+
   app.put(api.processos.update.path, requireAuth, async (req, res) => {
     try {
-      const data = api.processos.update.input.parse({
-        ...req.body,
-        departamentoId: req.body.departamentoId || undefined,
-      });
+      const data = api.processos.update.input.parse(req.body);
       const current = await storage.getProcessoDigital(req.params.id);
       if (!current) {
         return res.status(404).json({ message: "Processo nao encontrado" });
       }
-      ensureEnteAccess(req, current.departamento?.enteId);
-      if (data.departamentoId) {
-        const departamento = await storage.getDepartamento(data.departamentoId);
-        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
-        ensureEnteAccess(req, departamento.enteId);
+      ensureEnteAccess(req, current.enteId);
+      if (data.enteId) {
+        ensureEnteAccess(req, data.enteId);
       }
       const p = await storage.updateProcessoDigital(req.params.id, data);
       await audit(req, "update", "processo", p.id, p.numeroProcessoDigital);
@@ -811,12 +854,12 @@ export async function registerRoutes(
       ...proc,
       fases: proc.fases.map((f: any) => ({
         ...f,
-        fornecedorId: f.fornecedor_id, // 🔥 AQUI É A CORREÇÃO
+        fornecedorId: f.fornecedor_id,
       })),
     }));
 
   if (!isAdmin(req)) {
-    return res.json(p.filter((item) => hasEnteAccess(req, item.departamento?.enteId)));
+    return res.json(p.filter((item) => hasEnteAccess(req, item.enteId)));
   }
 
   res.json(p);
@@ -825,7 +868,7 @@ export async function registerRoutes(
  app.get(api.processos.get.path, requireAuth, async (req, res) => {
   const p = await storage.getProcessoDigital(req.params.id);
   if (!p) return res.status(404).json({ message: "Processo nao encontrado" });
-  ensureEnteAccess(req, p.departamento?.enteId);
+  ensureEnteAccess(req, p.enteId);
 
   const formatted = {
     ...p,
@@ -840,15 +883,8 @@ export async function registerRoutes(
 
   app.post(api.processos.create.path, requireAuth, async (req, res) => {
     try {
-      const data = api.processos.create.input.parse({
-        ...req.body,
-        departamentoId: req.body.departamentoId || undefined,
-      });
-      if (data.departamentoId) {
-        const departamento = await storage.getDepartamento(data.departamentoId);
-        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
-        ensureEnteAccess(req, departamento.enteId);
-      }
+      const data = api.processos.create.input.parse(req.body);
+      ensureEnteAccess(req, data.enteId);
       const p = await storage.createProcessoDigital(data);
       await audit(req, "create", "processo", p.id, p.numeroProcessoDigital);
       res.status(201).json(p);
@@ -863,7 +899,7 @@ export async function registerRoutes(
       if (!processo) {
         return res.status(404).json({ message: "Processo nao encontrado" });
       }
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
       if (processo.fases.length > 0) {
         throw new HttpError(400, "Nao e possivel excluir processo com fases cadastradas");
       }
@@ -884,13 +920,13 @@ export async function registerRoutes(
 
   app.post(api.processos.addParticipante.path, requireAuth, async (req, res) => {
     try {
-      const { departamentoId } = api.processos.addParticipante.input.parse(req.body);
+      const { enteId } = api.processos.addParticipante.input.parse(req.body);
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
       
-      await storage.addProcessoParticipante(processo.id, departamentoId);
-      await audit(req, "create", "processo_participante", processo.id, `Departamento ${departamentoId}`);
+      await storage.addProcessoParticipante(processo.id, enteId);
+      await audit(req, "create", "processo_participante", processo.id, `Ente ${enteId}`);
       res.status(201).json({ message: "Participante adicionado" });
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao adicionar participante") });
@@ -901,10 +937,10 @@ export async function registerRoutes(
     try {
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
       
-      await storage.removeProcessoParticipante(processo.id, req.params.departamentoId);
-      await audit(req, "delete", "processo_participante", processo.id, `Departamento ${req.params.departamentoId}`);
+      await storage.removeProcessoParticipante(processo.id, req.params.enteId);
+      await audit(req, "delete", "processo_participante", processo.id, `Ente ${req.params.enteId}`);
       res.json({ message: "Participante removido" });
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao remover participante") });
@@ -916,7 +952,7 @@ export async function registerRoutes(
       const data = api.processos.addDotacao.input.parse(req.body);
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
       const dotacao = await storage.addProcessoDotacao({ processoId: processo.id, ...data });
       await audit(req, "create", "processo_dotacao", dotacao.id, `Ficha ${data.fichaOrcamentariaId} - ${data.anoDotacao}`);
       res.status(201).json(dotacao);
@@ -929,7 +965,7 @@ export async function registerRoutes(
     try {
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
       await storage.removeProcessoDotacao(req.params.dotacaoId);
       await audit(req, "delete", "processo_dotacao", req.params.dotacaoId);
       res.json({ message: "Dotacao removida" });
@@ -943,7 +979,7 @@ export async function registerRoutes(
       const data = api.processos.createItem.input.parse(req.body);
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
       
       const item = await storage.createProcessoItem({ ...data, processoId: processo.id });
       await audit(req, "create", "processo_item", item.id, item.descricao);
@@ -979,7 +1015,7 @@ export async function registerRoutes(
       const { quantidades } = api.processos.saveQuantidades.input.parse(req.body);
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
 
       await storage.saveProcessoQuantidades(processo.id, quantidades);
       await audit(req, "update", "processo_quantidades", processo.id, `Quantidades atualizadas`);
@@ -995,7 +1031,7 @@ export async function registerRoutes(
       const { cotacoes } = api.processos.saveCotacoes.input.parse(req.body);
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
 
       await storage.saveProcessoCotacoes(processo.id, cotacoes);
       await audit(req, "update", "processo_cotacoes", processo.id, `Cotacoes atualizadas`);
@@ -1011,7 +1047,7 @@ export async function registerRoutes(
       const { resultados } = api.processos.saveResultados.input.parse(req.body);
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
 
       await storage.saveProcessoResultados(processo.id, resultados);
       await audit(req, "update", "processo_resultados", processo.id, `Resultados atualizados`);
@@ -1027,7 +1063,7 @@ export async function registerRoutes(
     if (!isAdmin(req)) {
       const processos = await storage.getProcessosDigitais();
       const allowedIds = new Set(
-        processos.filter((item) => hasEnteAccess(req, item.departamento?.enteId)).map((item) => item.id),
+        processos.filter((item) => hasEnteAccess(req, item.enteId)).map((item) => item.id),
       );
       return res.json(f.filter((item) => allowedIds.has(item.processoDigitalId)));
     }
@@ -1038,7 +1074,7 @@ export async function registerRoutes(
     const f = await storage.getFase(req.params.id);
     if (!f) return res.status(404).json({ message: "Fase nao encontrada" });
     const processo = await storage.getProcessoDigital(f.processoDigitalId);
-    ensureEnteAccess(req, processo?.departamento?.enteId);
+    ensureEnteAccess(req, processo?.enteId);
     res.json(f);
   });
 
@@ -1047,16 +1083,14 @@ export async function registerRoutes(
       const parsed = api.fases.create.input.parse(req.body);
       const processo = await storage.getProcessoDigital(parsed.processoDigitalId);
       if (!processo) throw new HttpError(404, "Processo nao encontrado");
-      ensureEnteAccess(req, processo.departamento?.enteId);
-      const departamentoId = parsed.departamentoId ?? processo.departamentoId ?? null;
-      if (departamentoId) {
-        const departamento = await storage.getDepartamento(departamentoId);
-        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
-        ensureEnteAccess(req, departamento.enteId);
+      ensureEnteAccess(req, processo.enteId);
+      const enteId = parsed.enteId ?? processo.enteId ?? null;
+      if (enteId) {
+        ensureEnteAccess(req, enteId);
       }
       const data = {
         ...parsed,
-        departamentoId: departamentoId ?? undefined,
+        enteId: enteId ?? undefined,
       };
       parseDateOnly(data.dataInicio, "Data de inicio");
       if (data.dataFim) {
@@ -1079,22 +1113,20 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Fase nao encontrada" });
       }
       const currentProcesso = await storage.getProcessoDigital(current.processoDigitalId);
-      ensureEnteAccess(req, currentProcesso?.departamento?.enteId);
+      ensureEnteAccess(req, currentProcesso?.enteId);
       const nextProcessoId = parsed.processoDigitalId ?? current.processoDigitalId;
       const nextProcesso = await storage.getProcessoDigital(nextProcessoId);
       if (!nextProcesso) {
         throw new HttpError(404, "Processo nao encontrado");
       }
-      ensureEnteAccess(req, nextProcesso.departamento?.enteId);
-      const departamentoId = parsed.departamentoId ?? current.departamentoId ?? nextProcesso.departamentoId ?? null;
-      if (departamentoId) {
-        const departamento = await storage.getDepartamento(departamentoId);
-        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
-        ensureEnteAccess(req, departamento.enteId);
+      ensureEnteAccess(req, nextProcesso.enteId);
+      const enteId = parsed.enteId ?? current.enteId ?? nextProcesso.enteId ?? null;
+      if (enteId) {
+        ensureEnteAccess(req, enteId);
       }
       const data = {
         ...parsed,
-        departamentoId: departamentoId ?? undefined,
+        enteId: enteId ?? undefined,
       };
 
       const nextStart = data.dataInicio ?? current.dataInicio;
@@ -1120,7 +1152,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Fase nao encontrada" });
       }
       const processo = await storage.getProcessoDigital(fase.processoDigitalId);
-      ensureEnteAccess(req, processo?.departamento?.enteId);
+      ensureEnteAccess(req, processo?.enteId);
       const contratoCount = await storage.countContratosByFase(fase.id);
       if (contratoCount > 0) {
         throw new HttpError(400, "Nao e possivel excluir fase vinculada a contrato");
@@ -1139,7 +1171,7 @@ export async function registerRoutes(
   app.get(api.contratos.list.path, requireAuth, async (req, res) => {
     const c = await storage.getContratosLight();
     if (!isAdmin(req)) {
-      return res.json(c.filter((item) => hasEnteAccess(req, item.processoDigital.departamento?.enteId)));
+      return res.json(c.filter((item) => hasEnteAccess(req, item.processoDigital.enteId)));
     }
     res.json(c);
   });
@@ -1148,7 +1180,7 @@ export async function registerRoutes(
   app.get(api.contratos.listFull.path, requireAuth, async (req, res) => {
     const c = await storage.getContratos();
     if (!isAdmin(req)) {
-      return res.json(c.filter((item) => hasEnteAccess(req, item.processoDigital.departamento?.enteId)));
+      return res.json(c.filter((item) => hasEnteAccess(req, item.processoDigital.enteId)));
     }
     res.json(c);
   });
@@ -1156,7 +1188,7 @@ export async function registerRoutes(
   app.get(api.contratos.get.path, requireAuth, async (req, res) => {
     const c = await storage.getContrato(req.params.id);
     if (!c) return res.status(404).json({ message: "Contrato nao encontrado" });
-    ensureEnteAccess(req, c.processoDigital.departamento?.enteId);
+    ensureEnteAccess(req, c.processoDigital.enteId);
     res.json(c);
   });
 
@@ -1166,7 +1198,7 @@ export async function registerRoutes(
       const parsed = api.contratos.create.input.parse(parsedBody);
       const processo = await storage.getProcessoDigital(parsed.processoDigitalId);
       if (!processo) throw new HttpError(404, "Processo nao encontrado");
-      ensureEnteAccess(req, processo.departamento?.enteId);
+      ensureEnteAccess(req, processo.enteId);
       ensureDateOrder(parsed.vigenciaInicial, parsed.vigenciaFinal, "vigencia inicial", "vigencia final");
       parseMoney(parsed.valorContrato, "Valor do contrato");
 
@@ -1180,18 +1212,16 @@ export async function registerRoutes(
       if (fase.fornecedorId !== parsed.fornecedorId) {
         throw new HttpError(400, "O fornecedor do contrato deve ser o mesmo da fase selecionada");
       }
-      const departamentoId = parsed.departamentoId ?? fase.departamentoId ?? processo.departamentoId ?? null;
-      if (departamentoId) {
-        const departamento = await storage.getDepartamento(departamentoId);
-        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
-        ensureEnteAccess(req, departamento.enteId);
+      const enteId = parsed.enteId ?? fase.enteId ?? processo.enteId ?? null;
+      if (enteId) {
+        ensureEnteAccess(req, enteId);
       }
-      if (fase.departamentoId && departamentoId && fase.departamentoId !== departamentoId) {
-        throw new HttpError(400, "O departamento do contrato deve ser o mesmo da fase selecionada");
+      if (fase.enteId && enteId && fase.enteId !== enteId) {
+        throw new HttpError(400, "A secretaria do contrato deve ser a mesma da fase selecionada");
       }
       const data = {
         ...parsed,
-        departamentoId: departamentoId ?? undefined,
+        enteId: enteId ?? undefined,
       };
 
       const c = await storage.createContrato(data);
@@ -1213,7 +1243,7 @@ export async function registerRoutes(
       if (!current) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
-      ensureEnteAccess(req, current.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, current.processoDigital.enteId);
       if (current.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao pode ser alterado");
       }
@@ -1221,7 +1251,7 @@ export async function registerRoutes(
       const nextData = {
         processoDigitalId: data.processoDigitalId ?? current.processoDigitalId,
         faseContratacaoId: data.faseContratacaoId ?? current.faseContratacaoId,
-        departamentoId: data.departamentoId ?? current.departamentoId ?? null,
+        enteId: data.enteId ?? current.enteId ?? null,
         fornecedorId: data.fornecedorId ?? current.fornecedorId,
         valorContrato: data.valorContrato ?? String(current.valorContrato),
         vigenciaInicial: data.vigenciaInicial ?? current.vigenciaInicial,
@@ -1245,19 +1275,17 @@ export async function registerRoutes(
       if (!processo) {
         throw new HttpError(404, "Processo nao encontrado");
       }
-      const departamentoId = nextData.departamentoId ?? fase.departamentoId ?? processo.departamentoId ?? null;
-      if (departamentoId) {
-        const departamento = await storage.getDepartamento(departamentoId);
-        if (!departamento) throw new HttpError(404, "Departamento nao encontrado");
-        ensureEnteAccess(req, departamento.enteId);
+      const enteId = nextData.enteId ?? fase.enteId ?? processo.enteId ?? null;
+      if (enteId) {
+        ensureEnteAccess(req, enteId);
       }
-      if (fase.departamentoId && departamentoId && fase.departamentoId !== departamentoId) {
-        throw new HttpError(400, "O departamento do contrato deve ser o mesmo da fase selecionada");
+      if (fase.enteId && enteId && fase.enteId !== enteId) {
+        throw new HttpError(400, "A secretaria do contrato deve ser a mesma da fase selecionada");
       }
 
       const updated = await storage.updateContrato(req.params.id, {
         ...data,
-        departamentoId: departamentoId ?? undefined,
+        enteId: enteId ?? undefined,
       });
       if (!updated) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
@@ -1276,7 +1304,7 @@ export async function registerRoutes(
       if (!contrato) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
-      ensureEnteAccess(req, contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato.processoDigital.enteId);
       if (contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato ja esta encerrado");
       }
@@ -1309,7 +1337,7 @@ export async function registerRoutes(
       if (!contrato) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
-      ensureEnteAccess(req, contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato.processoDigital.enteId);
 
       if (contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao pode ser excluido");
@@ -1339,7 +1367,7 @@ export async function registerRoutes(
       if (!contrato) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
-      ensureEnteAccess(req, contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato.processoDigital.enteId);
       if (contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao aceita novos aditivos");
       }
@@ -1365,7 +1393,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Aditivo nao encontrado" });
       }
       const contrato = await storage.getContrato(aditivo.contratoId);
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
       if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de aditivo");
       }
@@ -1387,7 +1415,7 @@ export async function registerRoutes(
       if (!contrato) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
-      ensureEnteAccess(req, contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato.processoDigital.enteId);
       if (contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao aceita novos anexos");
       }
@@ -1406,7 +1434,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Anexo nao encontrado" });
       }
       const contrato = await storage.getContrato(anexo.contratoId);
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
       if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de anexo");
       }
@@ -1431,7 +1459,7 @@ export async function registerRoutes(
       if (!contrato) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
-      ensureEnteAccess(req, contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato.processoDigital.enteId);
       if (contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao aceita novos empenhos");
       }
@@ -1484,7 +1512,7 @@ export async function registerRoutes(
       }
 
       const contrato = await storage.getContrato(empenho.contratoId);
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
 
       if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite anulacao de empenho");
@@ -1536,7 +1564,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Empenho nao encontrado" });
       }
       const contrato = await storage.getContrato(empenho.contratoId);
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
 
       if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de empenho");
@@ -1569,7 +1597,7 @@ export async function registerRoutes(
       if (!empenho) return res.status(404).json({ message: "Empenho nao encontrado" });
 
       const contrato = await storage.getContrato(empenho.contratoId);
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
 
       if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite edicao de empenho");
@@ -1603,7 +1631,7 @@ export async function registerRoutes(
   app.get(api.afs.list.path, requireAuth, async (req, res) => {
     const afs = await storage.getAfs();
     if (!isAdmin(req)) {
-      return res.json(afs.filter((item) => hasEnteAccess(req, item.empenho.contrato.processoDigital.departamento?.enteId)));
+      return res.json(afs.filter((item) => hasEnteAccess(req, item.empenho.contrato.processoDigital.enteId)));
     }
     res.json(afs);
   });
@@ -1619,7 +1647,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Empenho nao encontrado" });
       }
       const contratoPai = await storage.getContrato(empenho.contratoId);
-      ensureEnteAccess(req, contratoPai?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contratoPai?.processoDigital.enteId);
       if (contratoPai?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao aceita novas AFs");
       }
@@ -1650,7 +1678,7 @@ export async function registerRoutes(
       }
       const empenho = await storage.getEmpenho(current.empenhoId);
       const contrato = empenho ? await storage.getContrato(empenho.contratoId) : undefined;
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
       const a = await storage.notifyAf(req.params.id);
       await audit(req, "notify", "af", a.id, "Fornecedor notificado");
       res.json(a);
@@ -1669,7 +1697,7 @@ export async function registerRoutes(
       }
       const empenho = await storage.getEmpenho(current.empenhoId);
       const contrato = empenho ? await storage.getContrato(empenho.contratoId) : undefined;
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
       if (current.dataEntregaReal) {
         throw new HttpError(400, "A entrega desta AF ja foi registrada");
       }
@@ -1691,7 +1719,7 @@ export async function registerRoutes(
       }
       const empenho = await storage.getEmpenho(current.empenhoId);
       const contrato = empenho ? await storage.getContrato(empenho.contratoId) : undefined;
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
       if (current.dataEntregaReal) {
         throw new HttpError(400, "Nao e possivel prorrogar uma AF ja entregue");
       }
@@ -1713,7 +1741,7 @@ export async function registerRoutes(
       }
       const empenho = await storage.getEmpenho(current.empenhoId);
       const contrato = empenho ? await storage.getContrato(empenho.contratoId) : undefined;
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
       if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de AF");
       }
@@ -1739,7 +1767,7 @@ export async function registerRoutes(
 
       const empenho = await storage.getEmpenho(af.empenhoId);
       const contrato = await storage.getContrato(empenho!.contratoId);
-      ensureEnteAccess(req, contrato?.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato?.processoDigital.enteId);
 
       if (contrato?.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite edicao de AF");
@@ -1773,7 +1801,7 @@ export async function registerRoutes(
   app.get(api.notasFiscais.list.path, requireAuth, async (req, res) => {
     const notas = await storage.getNotasFiscais();
     if (!isAdmin(req)) {
-      return res.json(notas.filter((item) => hasEnteAccess(req, item.contrato.processoDigital.departamento?.enteId)));
+      return res.json(notas.filter((item) => hasEnteAccess(req, item.contrato.processoDigital.enteId)));
     }
     res.json(notas);
   });
@@ -1788,7 +1816,7 @@ export async function registerRoutes(
       if (!contrato) {
         return res.status(404).json({ message: "Contrato nao encontrado" });
       }
-      ensureEnteAccess(req, contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, contrato.processoDigital.enteId);
       if (contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao aceita novas notas fiscais");
       }
@@ -1807,7 +1835,7 @@ export async function registerRoutes(
       if (!nota) {
         return res.status(404).json({ message: "Nota fiscal nao encontrada" });
       }
-      ensureEnteAccess(req, nota.contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, nota.contrato.processoDigital.enteId);
       if (nota.contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite alterar a nota fiscal");
       }
@@ -1835,7 +1863,7 @@ export async function registerRoutes(
       if (!nota) {
         return res.status(404).json({ message: "Nota fiscal nao encontrada" });
       }
-      ensureEnteAccess(req, nota.contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, nota.contrato.processoDigital.enteId);
       if (nota.statusPagamento !== "aguardando_pagamento") {
         throw new HttpError(400, "Somente notas aguardando pagamento podem ser marcadas como pagas");
       }
@@ -1859,7 +1887,7 @@ export async function registerRoutes(
       if (!nota) {
         return res.status(404).json({ message: "Nota fiscal nao encontrada" });
       }
-      ensureEnteAccess(req, nota.contrato.processoDigital.departamento?.enteId);
+      ensureEnteAccess(req, nota.contrato.processoDigital.enteId);
       if (nota.contrato.status === "encerrado") {
         throw new HttpError(400, "Contrato encerrado nao permite exclusao de nota fiscal");
       }
@@ -1881,7 +1909,7 @@ export async function registerRoutes(
   app.get(api.notificacoes.list.path, requireAuth, async (req, res) => {
     let afs = await storage.getAfs();
     if (!isAdmin(req)) {
-      afs = afs.filter((item) => hasEnteAccess(req, item.empenho.contrato.processoDigital.departamento?.enteId));
+      afs = afs.filter((item) => hasEnteAccess(req, item.empenho.contrato.processoDigital.enteId));
     }
     const today = startOfTodayUtc();
 
@@ -1919,8 +1947,8 @@ export async function registerRoutes(
     ]);
 
     if (!isAdmin(req)) {
-      contratos = contratos.filter((item) => hasEnteAccess(req, item.processoDigital.departamento?.enteId));
-      procs = procs.filter((item) => hasEnteAccess(req, item.departamento?.enteId));
+      contratos = contratos.filter((item) => hasEnteAccess(req, item.processoDigital.enteId));
+      procs = procs.filter((item) => hasEnteAccess(req, item.enteId));
     }
 
     const totalContratos = contratos.length;

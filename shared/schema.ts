@@ -99,13 +99,21 @@ export const fontesRecurso = pgTable("fontes_recurso", {
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
+export const classificacoesOrcamentarias = pgTable("classificacoes_orcamentarias", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: text("nome").notNull(),
+  descricao: text("descricao"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
 export const fichasOrcamentarias = pgTable("fichas_orcamentarias", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   fonteRecursoId: varchar("fonte_recurso_id").references(() => fontesRecurso.id).notNull(),
   projetoAtividadeId: varchar("projeto_atividade_id").references(() => projetosAtividade.id).notNull(),
   codigo: text("codigo").notNull(),
   ano: varchar("ano").notNull(),
-  classificacao: text("classificacao").notNull(),
+  classificacaoId: varchar("classificacao_id").references(() => classificacoesOrcamentarias.id),
+  classificacao: text("classificacao"), // Mantendo como opcional por enquanto para compatibilidade
   criadoEm: timestamp("criado_em").defaultNow(),
 });
 
@@ -119,12 +127,22 @@ export const projetosAtividade = pgTable("projetos_atividade", {
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
+export const departamentos = pgTable("departamentos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: text("nome").notNull(),
+  descricao: text("descricao"),
+  enteId: varchar("ente_id").references(() => entes.id).notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
 export const processosDigitais = pgTable("processos_digitais", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   numeroProcessoDigital: text("numero_processo_digital").notNull().unique(),
   objetoCompleto: text("objeto_completo").notNull(),
   objetoResumido: text("objeto_resumido").notNull(),
   descricao: text("descricao"),
+  enteId: varchar("ente_id").references(() => entes.id),
   departamentoId: varchar("departamento_id").references(() => departamentos.id),
   status: text("status").notNull().default("planejamento"),
   criadoEm: timestamp("criado_em").defaultNow(),
@@ -134,7 +152,7 @@ export const processosDigitais = pgTable("processos_digitais", {
 export const processoParticipantes = pgTable("processo_participantes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   processoId: varchar("processo_id").references(() => processosDigitais.id).notNull(),
-  departamentoId: varchar("departamento_id").references(() => departamentos.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id).notNull(),
   criadoEm: timestamp("criado_em").defaultNow(),
 });
 
@@ -151,7 +169,7 @@ export const processoItens = pgTable("processo_itens", {
 export const processoItemQuantidades = pgTable("processo_item_quantidades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   itemId: varchar("item_id").references(() => processoItens.id).notNull(),
-  departamentoId: varchar("departamento_id").references(() => departamentos.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id).notNull(),
   quantidade: numeric("quantidade", { precision: 14, scale: 2 }).notNull().default("0"),
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
@@ -189,6 +207,7 @@ export const processoDotacoes = pgTable("processo_dotacoes", {
 export const fasesContratacao = pgTable("fases_contratacao", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   processoDigitalId: varchar("processo_digital_id").references(() => processosDigitais.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id),
   departamentoId: varchar("departamento_id").references(() => departamentos.id),
   nomeFase: text("nome_fase").notNull(),
   fornecedorId: varchar("fornecedor_id").references(() => fornecedores.id).notNull(),
@@ -203,6 +222,7 @@ export const contratos = pgTable("contratos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   processoDigitalId: varchar("processo_digital_id").references(() => processosDigitais.id).notNull(),
   faseContratacaoId: varchar("fase_contratacao_id").references(() => fasesContratacao.id).notNull(),
+  enteId: varchar("ente_id").references(() => entes.id),
   departamentoId: varchar("departamento_id").references(() => departamentos.id),
   numeroContrato: text("numero_contrato").notNull().unique(),
   fornecedorId: varchar("fornecedor_id").references(() => fornecedores.id).notNull(),
@@ -414,6 +434,7 @@ export const contratoAnexos = pgTable("contrato_anexos", {
 export const contratosRelations = relations(contratos, ({ one, many }) => ({
   processoDigital: one(processosDigitais, { fields: [contratos.processoDigitalId], references: [processosDigitais.id] }),
   faseContratacao: one(fasesContratacao, { fields: [contratos.faseContratacaoId], references: [fasesContratacao.id] }),
+  ente: one(entes, { fields: [contratos.enteId], references: [entes.id] }),
   departamento: one(departamentos, { fields: [contratos.departamentoId], references: [departamentos.id] }),
   fornecedor: one(fornecedores, { fields: [contratos.fornecedorId], references: [fornecedores.id] }),
   empenhos: many(empenhos),
@@ -511,6 +532,7 @@ export const notasFiscaisRelations = relations(notasFiscais, ({ one }) => ({
 export const fasesContratacaoRelations = relations(fasesContratacao, ({ one, many }) => ({
   processoDigital: one(processosDigitais, { fields: [fasesContratacao.processoDigitalId], references: [processosDigitais.id] }),
   fornecedor: one(fornecedores, { fields: [fasesContratacao.fornecedorId], references: [fornecedores.id] }),
+  ente: one(entes, { fields: [fasesContratacao.enteId], references: [entes.id] }),
   departamento: one(departamentos, { fields: [fasesContratacao.departamentoId], references: [departamentos.id] }),
   contratos: many(contratos),
 }));
@@ -528,14 +550,15 @@ export const afsRelations = relations(afs, ({ one }) => ({
 
 export const entesRelations = relations(entes, ({ many }) => ({
   departamentos: many(departamentos),
-}));
-
-export const departamentosRelations = relations(departamentos, ({ one, many }) => ({
-  ente: one(entes, { fields: [departamentos.enteId], references: [entes.id] }),
   processos: many(processosDigitais),
 }));
 
+export const departamentosRelations = relations(departamentos, ({ one }) => ({
+  ente: one(entes, { fields: [departamentos.enteId], references: [entes.id] }),
+}));
+
 export const processosDigitaisRelations = relations(processosDigitais, ({ one, many }) => ({
+  ente: one(entes, { fields: [processosDigitais.enteId], references: [entes.id] }),
   departamento: one(departamentos, { fields: [processosDigitais.departamentoId], references: [departamentos.id] }),
   fases: many(fasesContratacao),
   contratos: many(contratos),
@@ -550,9 +573,9 @@ export const processoParticipantesRelations = relations(processoParticipantes, (
     fields: [processoParticipantes.processoId],
     references: [processosDigitais.id],
   }),
-  departamento: one(departamentos, {
-    fields: [processoParticipantes.departamentoId],
-    references: [departamentos.id],
+  ente: one(entes, {
+    fields: [processoParticipantes.enteId],
+    references: [entes.id],
   }),
 }));
 
@@ -571,9 +594,9 @@ export const processoItemQuantidadesRelations = relations(processoItemQuantidade
     fields: [processoItemQuantidades.itemId],
     references: [processoItens.id],
   }),
-  departamento: one(departamentos, {
-    fields: [processoItemQuantidades.departamentoId],
-    references: [departamentos.id],
+  ente: one(entes, {
+    fields: [processoItemQuantidades.enteId],
+    references: [entes.id],
   }),
 }));
 
@@ -619,10 +642,22 @@ export const fontesRecursoRelations = relations(fontesRecurso, ({ many }) => ({
   empenhos: many(empenhos),
 }));
 
+export const classificacoesOrcamentariasRelations = relations(classificacoesOrcamentarias, ({ many }) => ({
+  fichas: many(fichasOrcamentarias),
+}));
+
 export const fichasOrcamentariasRelations = relations(fichasOrcamentarias, ({ one, many }) => ({
   fonteRecurso: one(fontesRecurso, {
     fields: [fichasOrcamentarias.fonteRecursoId],
     references: [fontesRecurso.id],
+  }),
+  projetoAtividade: one(projetosAtividade, {
+    fields: [fichasOrcamentarias.projetoAtividadeId],
+    references: [projetosAtividade.id],
+  }),
+  classificacao: one(classificacoesOrcamentarias, {
+    fields: [fichasOrcamentarias.classificacaoId],
+    references: [classificacoesOrcamentarias.id],
   }),
   empenhos: many(empenhos),
   processoDotacoes: many(processoDotacoes),
@@ -641,7 +676,24 @@ export const insertEnteSchema = z.object(createInsertSchema(entes).shape).omit({
 export const insertDepartamentoSchema = z.object(createInsertSchema(departamentos).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertFornecedorSchema = z.object(createInsertSchema(fornecedores).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertFonteRecursoSchema = z.object(createInsertSchema(fontesRecurso).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export const insertFichaOrcamentariaSchema = z.object(createInsertSchema(fichasOrcamentarias).shape).omit({ id: true, criadoEm: true });
+export const insertClassificacaoSchema = createInsertSchema(classificacoesOrcamentarias, {
+  nome: (s) => s.min(1, "Nome obrigatorio"),
+}).omit({ id: true, criadoEm: true });
+
+export const classificacaoResponseSchema = createInsertSchema(classificacoesOrcamentarias).extend({
+  criadoEm: timestampSchema,
+});
+
+export const insertFichaOrcamentariaSchema = createInsertSchema(fichasOrcamentarias, {
+  codigo: () => fichaCodigoSchema,
+}).omit({ id: true, criadoEm: true });
+
+export const fichaOrcamentariaResponseSchema = createInsertSchema(fichasOrcamentarias).extend({
+  criadoEm: timestampSchema,
+  classificacao: classificacaoResponseSchema.optional().nullable(),
+});
+
+
 export const insertProjetoAtividadeSchema = z.object(createInsertSchema(projetosAtividade).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertProcessoDigitalSchema = z.object(createInsertSchema(processosDigitais).shape).omit({ id: true, criadoEm: true, atualizadoEm: true });
 export const insertFaseContratacaoSchema = z.object(createInsertSchema(fasesContratacao).shape).omit({ id: true, criadoEm: true });
@@ -718,15 +770,8 @@ export const enteResponseSchema = z.object({
   atualizadoEm: timestampSchema.nullable().optional(),
 });
 
-export const fichaOrcamentariaResponseSchema = z.object({
-  id: z.string(),
-  fonteRecursoId: z.string(),
-  projetoAtividadeId: z.string(),
-  codigo: fichaCodigoSchema,
-  ano: z.string(),
-  classificacao: fichaClassificacaoSchema,
-  criadoEm: timestampSchema.nullable().optional(),
-});
+// Removendo declaração duplicada que ficava aqui (linhas 757-765)
+
 
 export const projetoAtividadeResponseSchema = z.object({
   id: z.string(),
@@ -810,6 +855,7 @@ export const processoDigitalResponseSchema = z.object({
   objetoCompleto: z.string(),
   objetoResumido: z.string(),
   descricao: z.string().nullable(),
+  enteId: z.string().nullable(),
   departamentoId: z.string().nullable(),
   status: z.string(),
   criadoEm: timestampSchema.nullable().optional(),
@@ -819,7 +865,7 @@ export const processoDigitalResponseSchema = z.object({
 export const processoParticipanteResponseSchema = z.object({
   id: z.string(),
   processoId: z.string(),
-  departamentoId: z.string(),
+  enteId: z.string(),
   criadoEm: timestampSchema.nullable().optional(),
 });
 
@@ -836,7 +882,7 @@ export const processoItemResponseSchema = z.object({
 export const processoItemQuantidadeResponseSchema = z.object({
   id: z.string(),
   itemId: z.string(),
-  departamentoId: z.string(),
+  enteId: z.string(),
   quantidade: z.union([z.string(), z.number()]),
   criadoEm: timestampSchema.nullable().optional(),
   atualizadoEm: timestampSchema.nullable().optional(),
@@ -873,6 +919,7 @@ export const processoDotacaoResponseSchema = z.object({
 export const faseContratacaoResponseSchema = z.object({
   id: z.string(),
   processoDigitalId: z.string(),
+  enteId: z.string().nullable(),
   departamentoId: z.string().nullable(),
   nomeFase: z.string(),
   fornecedorId: z.string(),
@@ -915,6 +962,7 @@ export const contratoResponseSchema = z.object({
   id: z.string(),
   processoDigitalId: z.string(),
   faseContratacaoId: z.string(),
+  enteId: z.string().nullable(),
   departamentoId: z.string().nullable(),
   numeroContrato: z.string(),
   fornecedorId: z.string(),
@@ -1098,11 +1146,12 @@ export const contratoAnexoResponseSchema = z.object({
 export const faseContratacaoWithRelationsSchema = faseContratacaoResponseSchema.extend({
   fornecedor: fornecedorResponseSchema,
   processoDigital: processoDigitalResponseSchema,
+  ente: enteResponseSchema.nullable(),
   departamento: departamentoResponseSchema.nullable(),
 });
 
-export const processoParticipanteWithDepartamentoSchema = processoParticipanteResponseSchema.extend({
-  departamento: departamentoResponseSchema,
+export const processoParticipanteWithEnteSchema = processoParticipanteResponseSchema.extend({
+  ente: enteResponseSchema,
 });
 
 export const processoDotacaoWithFichaSchema = processoDotacaoResponseSchema.extend({
@@ -1112,7 +1161,7 @@ export const processoDotacaoWithFichaSchema = processoDotacaoResponseSchema.exte
 export const processoItemWithRelationsSchema = processoItemResponseSchema.extend({
   quantidades: z.array(
     processoItemQuantidadeResponseSchema.extend({
-      departamento: departamentoResponseSchema,
+      ente: enteResponseSchema,
     }),
   ),
   cotacao: processoItemCotacaoResponseSchema.nullable(),
@@ -1122,19 +1171,20 @@ export const processoItemWithRelationsSchema = processoItemResponseSchema.extend
 });
 
 export const processoDigitalWithRelationsSchema = processoDigitalResponseSchema.extend({
-  departamento: departamentoResponseSchema.extend({ ente: enteResponseSchema.nullable() }).nullable(),
+  ente: enteResponseSchema.nullable(),
+  departamento: departamentoResponseSchema.nullable(),
   fases: z.array(
     faseContratacaoResponseSchema.extend({
       fornecedor: fornecedorResponseSchema,
     }),
   ),
-  participantes: z.array(processoParticipanteWithDepartamentoSchema),
+  participantes: z.array(processoParticipanteWithEnteSchema),
   itens: z.array(processoItemWithRelationsSchema),
   dotacoes: z.array(processoDotacaoWithFichaSchema),
 });
 
 export const processoDigitalScopedSchema = processoDigitalResponseSchema.extend({
-  departamento: departamentoResponseSchema.extend({ ente: enteResponseSchema.nullable() }).nullable(),
+  ente: enteResponseSchema.nullable(),
 });
 
 export const ataParticipanteWithEnteSchema = ataParticipanteResponseSchema.extend({
@@ -1214,6 +1264,7 @@ export const empenhoWithRelationsSchema = empenhoResponseSchema.extend({
 export const contratoWithRelationsSchema = contratoResponseSchema.extend({
   processoDigital: processoDigitalScopedSchema,
   faseContratacao: faseContratacaoWithRelationsSchema,
+  ente: enteResponseSchema.nullable(),
   departamento: departamentoResponseSchema.nullable(),
   fornecedor: fornecedorResponseSchema,
   empenhos: z.array(empenhoWithRelationsSchema),
@@ -1257,6 +1308,9 @@ export const dashboardStatsResponseSchema = z.object({
   saldoTotal: z.number(),
 });
 
+export type ClassificacaoOrcamentaria = typeof classificacoesOrcamentarias.$inferSelect;
+export type InsertClassificacao = z.infer<typeof insertClassificacaoSchema>;
+
 export type User = typeof users.$inferSelect;
 export type PublicUser = Omit<User, "password"> & { accessibleEnteIds: string[] };
 export type Fornecedor = typeof fornecedores.$inferSelect;
@@ -1287,11 +1341,12 @@ export type Departamento = typeof departamentos.$inferSelect;
 export type Ente = typeof entes.$inferSelect;
 export type UserEnte = typeof userEntes.$inferSelect;
 export type FonteRecurso = typeof fontesRecurso.$inferSelect;
-export type FichaOrcamentaria = typeof fichasOrcamentarias.$inferSelect;
+export type FichaOrcamentaria = typeof fichasOrcamentarias.$inferSelect & { classificacao?: ClassificacaoOrcamentaria | null };
 export type ProjetoAtividade = typeof projetosAtividade.$inferSelect;
 export type NotaFiscal = typeof notasFiscais.$inferSelect;
 export type ContratoAditivo = typeof contratoAditivos.$inferSelect;
 export type ContratoAnexo = typeof contratoAnexos.$inferSelect;
+
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertEnte = z.infer<typeof insertEnteSchema>;
@@ -1327,7 +1382,7 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export type AuditLogResponse = z.infer<typeof auditLogResponseSchema>;
 
 export type FaseContratacaoWithRelations = z.infer<typeof faseContratacaoWithRelationsSchema>;
-export type ProcessoParticipanteWithDepartamento = z.infer<typeof processoParticipanteWithDepartamentoSchema>;
+export type ProcessoParticipanteWithEnte = z.infer<typeof processoParticipanteWithEnteSchema>;
 export type ProcessoDotacaoWithFicha = z.infer<typeof processoDotacaoWithFichaSchema>;
 export type ProcessoItemWithRelations = z.infer<typeof processoItemWithRelationsSchema>;
 export type ProcessoDigitalWithRelations = z.infer<typeof processoDigitalWithRelationsSchema>;
