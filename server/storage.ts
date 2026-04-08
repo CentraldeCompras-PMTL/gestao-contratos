@@ -324,6 +324,7 @@ export class DatabaseStorage implements IStorage {
             classificacao: true,
           }
         },
+        projetosAtividade: true,
       },
     });
     return rows as any;
