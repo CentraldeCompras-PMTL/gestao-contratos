@@ -51,7 +51,7 @@ export default function NotasFiscais() {
       nota.contrato.numeroContrato.includes(search)) &&
     (statusTab === "all" || nota.statusPagamento === statusTab) &&
     (contratoStatusFilter === "all" || nota.contrato.status === contratoStatusFilter) &&
-    (enteFilter === "all" || nota.contrato.processoDigital.departamento?.enteId === enteFilter)
+    (enteFilter === "all" || nota.contrato.processoDigital.enteId === enteFilter || nota.contrato.enteId === enteFilter)
   );
 
   const resetForm = () => setFormData({ contratoId: "", numeroNota: "", valorNota: "", dataNota: "" });

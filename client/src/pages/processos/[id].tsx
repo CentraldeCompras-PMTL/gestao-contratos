@@ -57,6 +57,11 @@ function toDisplayDecimal(value: string | number | null | undefined) {
   return String(value).replace(".", ",");
 }
 
+function getFichaClassificacaoLabel(classificacao: any) {
+  if (!classificacao) return "-";
+  return typeof classificacao === "string" ? classificacao : classificacao.nome ?? "-";
+}
+
 export default function ProcessoDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: processo, isLoading } = useProcesso(id ?? "");
@@ -113,7 +118,10 @@ export default function ProcessoDetail() {
   }, [processo, participantes]);
 
   const participantesIds = new Set(participantes.map((p: any) => p.enteId));
-  const availableEntes = entes.filter((e) => !participantesIds.has(e.id) && e.id !== processo?.enteId);
+  const availableEntes = entes
+    .filter((e) => typeof e.nome === "string" && typeof e.sigla === "string")
+    .filter((e) => !participantesIds.has(e.id) && e.id !== processo?.enteId)
+    .sort((a, b) => a.nome.localeCompare(b.nome));
   const selectedFonteData = fontes.find((f) => f.id === selectedFonte);
 
   const valorEstimado = useMemo(() => itens.reduce((acc: number, item: any) => {
@@ -402,7 +410,7 @@ export default function ProcessoDetail() {
                           <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                           <SelectContent>
                             {availableEntes.map((e: any) => (
-                              <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                              <SelectItem key={e.id} value={e.id}>{e.sigla} - {e.nome}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

@@ -11,7 +11,12 @@ import {
   useUpdateFonteRecurso,
   useUpdateProjetoAtividade,
 } from "@/hooks/use-fontes-recurso";
-import { useClassificacoesOrcamentarias } from "@/hooks/use-classificacoes-orcamentarias";
+import {
+  useClassificacoesOrcamentarias,
+  useCreateClassificacaoOrcamentaria,
+  useDeleteClassificacaoOrcamentaria,
+  useUpdateClassificacaoOrcamentaria,
+} from "@/hooks/use-classificacoes-orcamentarias";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -19,17 +24,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Edit2, Plus, Trash2 } from "lucide-react";
-import type { FichaOrcamentaria, FonteRecursoWithFichas, ProjetoAtividade } from "@shared/schema";
+import { Edit2, Plus, Shapes, Trash2 } from "lucide-react";
+import type { ClassificacaoOrcamentaria, FichaOrcamentaria, FonteRecursoWithFichas, ProjetoAtividade } from "@shared/schema";
 
 const defaultFonteForm = { nome: "", codigo: "", ano: "" };
 const defaultFichaForm = { codigo: "", projetoAtividadeId: "", classificacaoId: "", ano: "" };
 const defaultProjetoAtividadeForm = { codigo: "", descricao: "", ano: "" };
+const defaultClassificacaoForm = { nome: "", descricao: "" };
+
+function getClassificacaoLabel(classificacao: unknown) {
+  if (!classificacao) return "-";
+  if (typeof classificacao === "string") return classificacao;
+  if (typeof classificacao === "object" && "nome" in classificacao && typeof classificacao.nome === "string") {
+    return classificacao.nome;
+  }
+  return "-";
+}
 
 export default function FontesRecursoPage() {
   const { data: fontes = [], isLoading } = useFontesRecurso();
   const { data: classificacoes = [] } = useClassificacoesOrcamentarias();
+  const createClassificacao = useCreateClassificacaoOrcamentaria();
+  const updateClassificacao = useUpdateClassificacaoOrcamentaria();
+  const deleteClassificacao = useDeleteClassificacaoOrcamentaria();
   const createFonte = useCreateFonteRecurso();
   const updateFonte = useUpdateFonteRecurso();
   const deleteFonte = useDeleteFonteRecurso();
@@ -47,6 +75,10 @@ export default function FontesRecursoPage() {
   const [fichaFonteId, setFichaFonteId] = useState<string | null>(null);
   const [editingFicha, setEditingFicha] = useState<FichaOrcamentaria | null>(null);
   const [fichaForm, setFichaForm] = useState(defaultFichaForm);
+  const [classificacaoDialog, setClassificacaoDialog] = useState(false);
+  const [editingClassificacao, setEditingClassificacao] = useState<ClassificacaoOrcamentaria | null>(null);
+  const [classificacaoForm, setClassificacaoForm] = useState(defaultClassificacaoForm);
+  const [classificacaoToDelete, setClassificacaoToDelete] = useState<ClassificacaoOrcamentaria | null>(null);
   const [projetoAtividadeFonteId, setProjetoAtividadeFonteId] = useState<string | null>(null);
   const [editingProjetoAtividade, setEditingProjetoAtividade] = useState<ProjetoAtividade | null>(null);
   const [projetoAtividadeForm, setProjetoAtividadeForm] = useState(defaultProjetoAtividadeForm);
@@ -60,6 +92,11 @@ export default function FontesRecursoPage() {
     setEditingFicha(null);
     setFichaForm(defaultFichaForm);
     setFichaFonteId(null);
+  };
+
+  const resetClassificacao = () => {
+    setEditingClassificacao(null);
+    setClassificacaoForm(defaultClassificacaoForm);
   };
 
   const resetProjetoAtividade = () => {
@@ -165,6 +202,37 @@ export default function FontesRecursoPage() {
     );
   };
 
+  const handleClassificacaoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingClassificacao) {
+      updateClassificacao.mutate(
+        { id: editingClassificacao.id, data: classificacaoForm },
+        {
+          onSuccess: () => {
+            toast({ title: "Classificacao atualizada com sucesso!" });
+            setClassificacaoDialog(false);
+            resetClassificacao();
+          },
+          onError: (error: unknown) => {
+            toast({ variant: "destructive", title: "Erro", description: error instanceof Error ? error.message : "Erro ao salvar classificacao" });
+          },
+        },
+      );
+      return;
+    }
+
+    createClassificacao.mutate(classificacaoForm, {
+      onSuccess: () => {
+        toast({ title: "Classificacao cadastrada com sucesso!" });
+        setClassificacaoDialog(false);
+        resetClassificacao();
+      },
+      onError: (error: unknown) => {
+        toast({ variant: "destructive", title: "Erro", description: error instanceof Error ? error.message : "Erro ao salvar classificacao" });
+      },
+    });
+  };
+
   const fichaFonte = fontes.find((fonte) => fonte.id === fichaFonteId) ?? null;
 
   return (
@@ -200,6 +268,113 @@ export default function FontesRecursoPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Shapes size={18} />
+              Classificacoes das Fichas
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Cadastre aqui as classificacoes que poderao ser vinculadas nas fichas orcamentarias.
+            </p>
+          </div>
+          <Dialog
+            open={classificacaoDialog}
+            onOpenChange={(open) => {
+              setClassificacaoDialog(open);
+              if (!open) resetClassificacao();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="mr-2" size={16} />
+                Nova Classificacao
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingClassificacao ? "Editar Classificacao" : "Cadastrar Classificacao"}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleClassificacaoSubmit} className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Nome</Label>
+                  <Input
+                    value={classificacaoForm.nome}
+                    onChange={(e) => setClassificacaoForm((current) => ({ ...current, nome: e.target.value }))}
+                    placeholder="Ex: Material de Consumo"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Descricao</Label>
+                  <Input
+                    value={classificacaoForm.descricao}
+                    onChange={(e) => setClassificacaoForm((current) => ({ ...current, descricao: e.target.value }))}
+                    placeholder="Opcional"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={createClassificacao.isPending || updateClassificacao.isPending}
+                >
+                  {createClassificacao.isPending || updateClassificacao.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Descricao</TableHead>
+                <TableHead className="text-right">Acao</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {classificacoes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                    Nenhuma classificacao cadastrada.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                classificacoes.map((classificacao) => (
+                  <TableRow key={classificacao.id}>
+                    <TableCell className="font-medium">{classificacao.nome}</TableCell>
+                    <TableCell>{classificacao.descricao || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingClassificacao(classificacao);
+                            setClassificacaoForm({
+                              nome: classificacao.nome,
+                              descricao: classificacao.descricao || "",
+                            });
+                            setClassificacaoDialog(true);
+                          }}
+                        >
+                          <Edit2 size={16} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setClassificacaoToDelete(classificacao)}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando fontes...</CardContent></Card>
@@ -254,9 +429,7 @@ export default function FontesRecursoPage() {
                           <TableCell>{ficha.codigo}</TableCell>
                           <TableCell>{ficha.ano}</TableCell>
                           <TableCell>{fontes.find(f => f.id === ficha.fonteRecursoId)?.projetosAtividade.find((projetoAtividade) => projetoAtividade.id === ficha.projetoAtividadeId)?.codigo ?? "-"}</TableCell>
-                          <TableCell className="capitalize">
-                            {(ficha as any).classificacao?.nome || ficha.classificacao || "-"}
-                          </TableCell>
+                          <TableCell className="capitalize">{getClassificacaoLabel(ficha.classificacao)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button variant="ghost" size="sm" onClick={() => {
@@ -408,6 +581,37 @@ export default function FontesRecursoPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!classificacaoToDelete} onOpenChange={(open) => { if (!open) setClassificacaoToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir classificacao</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voce deseja realmente excluir a classificacao "{classificacaoToDelete?.nome}"?
+              A exclusao sera bloqueada se houver fichas vinculadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!classificacaoToDelete) return;
+                deleteClassificacao.mutate(classificacaoToDelete.id, {
+                  onSuccess: () => {
+                    toast({ title: "Classificacao excluida com sucesso!" });
+                    setClassificacaoToDelete(null);
+                  },
+                  onError: (error: unknown) => {
+                    toast({ variant: "destructive", title: "Erro", description: error instanceof Error ? error.message : "Erro ao excluir classificacao" });
+                  },
+                });
+              }}
+            >
+              Confirmar exclusao
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

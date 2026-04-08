@@ -37,6 +37,17 @@ type PrePedidoLine = {
 type AtaAfWithNotasLike = any;
 type AtaEmpenhoWithRelationsLike = any;
 
+function formatFichaClassificacao(
+  classificacao:
+    | AtaPrePedidoWithRelations["ficha"]["classificacao"]
+    | { nome?: string | null }
+    | null
+    | undefined,
+) {
+  if (!classificacao) return "";
+  return typeof classificacao === "string" ? classificacao : classificacao.nome;
+}
+
 function makeLine(): PrePedidoLine {
   return {
     id: Math.random().toString(36).slice(2),
@@ -186,7 +197,7 @@ export default function PrePedidosArpPage() {
       fornecedor: getFornecedorNome(prePedido),
       fonte: `${prePedido.fonteRecurso.codigo} - ${prePedido.fonteRecurso.nome}`,
       ficha: prePedido.ficha.codigo,
-      classificacao: prePedido.ficha.classificacao,
+      classificacao: formatFichaClassificacao(prePedido.ficha.classificacao),
       quantidade: prePedido.quantidadeSolicitada,
       status: prePedido.status,
       contrato: prePedido.ataContrato?.numeroContrato ?? "",
@@ -201,7 +212,7 @@ export default function PrePedidosArpPage() {
     fornecedor: getFornecedorNome(prePedido),
     fonte: `${prePedido.fonteRecurso.codigo} - ${prePedido.fonteRecurso.nome}`,
     ficha: prePedido.ficha.codigo,
-    classificacao: prePedido.ficha.classificacao,
+    classificacao: formatFichaClassificacao(prePedido.ficha.classificacao),
     quantidade: prePedido.quantidadeSolicitada,
     status: prePedido.status,
     contrato: prePedido.ataContrato?.numeroContrato ?? "",
@@ -812,7 +823,9 @@ export default function PrePedidosArpPage() {
                             <SelectTrigger><SelectValue placeholder="Ficha" /></SelectTrigger>
                             <SelectContent>
                               {fichas.map((ficha) => (
-                                <SelectItem key={ficha.id} value={ficha.id}>{ficha.codigo} - {ficha.classificacao}</SelectItem>
+                                <SelectItem key={ficha.id} value={ficha.id}>
+                                  {ficha.codigo} - {formatFichaClassificacao(ficha.classificacao)}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>

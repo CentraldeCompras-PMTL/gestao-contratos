@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { invalidateDashboardQueries } from "@/lib/dashboard-cache";
 import { api, buildUrl } from "@shared/routes";
 import type { ClassificacaoOrcamentaria, InsertClassificacao } from "@shared/schema";
 
@@ -37,6 +38,8 @@ export function useCreateClassificacaoOrcamentaria() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.classificacoesOrcamentarias.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -56,6 +59,8 @@ export function useUpdateClassificacaoOrcamentaria() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.classificacoesOrcamentarias.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
@@ -73,6 +78,8 @@ export function useDeleteClassificacaoOrcamentaria() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.classificacoesOrcamentarias.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.fontesRecurso.list.path] });
+      invalidateDashboardQueries(queryClient);
     },
   });
 }
