@@ -64,14 +64,6 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const departamentos = pgTable("departamentos", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  enteId: varchar("ente_id").references(() => entes.id),
-  nome: text("nome").notNull().unique(),
-  descricao: text("descricao"),
-  criadoEm: timestamp("criado_em").defaultNow(),
-  atualizadoEm: timestamp("atualizado_em").defaultNow(),
-});
 
 export const fornecedores = pgTable("fornecedores", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -129,7 +121,7 @@ export const projetosAtividade = pgTable("projetos_atividade", {
 
 export const departamentos = pgTable("departamentos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  nome: text("nome").notNull(),
+  nome: text("nome").notNull().unique(),
   descricao: text("descricao"),
   enteId: varchar("ente_id").references(() => entes.id).notNull(),
   criadoEm: timestamp("criado_em").defaultNow(),
