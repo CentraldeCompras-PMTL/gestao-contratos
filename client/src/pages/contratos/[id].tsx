@@ -48,6 +48,15 @@ function getEmpenhoMetrics(empenho: EmpenhoWithRelations) {
   return { valorTotal, totalAfs, valorAnulado, saldoDisponivel, valorComprometido };
 }
 
+function getFichaClassificacaoLabel(classificacao: unknown) {
+  if (!classificacao) return "-";
+  if (typeof classificacao === "string") return classificacao;
+  if (typeof classificacao === "object" && classificacao !== null && "nome" in classificacao && typeof classificacao.nome === "string") {
+    return classificacao.nome;
+  }
+  return "-";
+}
+
 export default function ContratoDetail() {
   const { id } = useParams();
   const { data: contrato, isLoading } = useContrato(id!);
@@ -509,7 +518,7 @@ export default function ContratoDetail() {
                       >
                         <option value="">Selecione a ficha</option>
                         {fichasDaFonte.map((ficha) => (
-                          <option key={ficha.id} value={ficha.id}>{ficha.codigo} - {ficha.classificacao}</option>
+                          <option key={ficha.id} value={ficha.id}>{ficha.codigo} - {getFichaClassificacaoLabel(ficha.classificacao)}</option>
                         ))}
                       </select>
                     </div>

@@ -19,6 +19,15 @@ type ReportDefinition = {
   rows: Row[];
 };
 
+function getFichaClassificacaoLabel(classificacao: unknown) {
+  if (!classificacao) return "-";
+  if (typeof classificacao === "string") return classificacao;
+  if (typeof classificacao === "object" && classificacao !== null && "nome" in classificacao && typeof classificacao.nome === "string") {
+    return classificacao.nome;
+  }
+  return "-";
+}
+
 function getEmpenhoSaldo(empenho: ContratoWithRelations["empenhos"][number]) {
   return parseNumberString(empenho.valorEmpenho) - parseNumberString(empenho.valorAnulado) - empenho.afs.reduce((acc, af) => acc + parseNumberString(af.valorAf), 0);
 }
@@ -62,7 +71,7 @@ export default function Relatorios() {
   const fichasOpcoes = Array.from(new Map(
     contratos.flatMap((contrato) => contrato.empenhos
       .filter((empenho) => fonteFilter === "all" || empenho.fonteRecursoId === fonteFilter)
-      .map((empenho) => [empenho.fichaId, { id: empenho.fichaId, label: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}` }]))
+      .map((empenho) => [empenho.fichaId, { id: empenho.fichaId, label: `${empenho.ficha.codigo} - ${getFichaClassificacaoLabel(empenho.ficha.classificacao)}` }]))
   ).values());
 
   const report = useMemo<ReportDefinition>(() => {
@@ -121,7 +130,7 @@ export default function Relatorios() {
               contrato: contrato.numeroContrato,
               fornecedor: contrato.fornecedor.nome,
               fonte: `${empenho.fonteRecurso.codigo} - ${empenho.fonteRecurso.nome}`,
-              ficha: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`,
+              ficha: `${empenho.ficha.codigo} - ${getFichaClassificacaoLabel(empenho.ficha.classificacao)}`,
               data: formatDate(empenho.dataEmpenho),
               valor: formatCurrency(parseNumberString(empenho.valorEmpenho) - parseNumberString(empenho.valorAnulado)),
               execucao: formatCurrency(empenho.afs.reduce((acc, af) => acc + parseNumberString(af.valorAf), 0)),
@@ -152,7 +161,7 @@ export default function Relatorios() {
                 contrato: contrato.numeroContrato,
                 fornecedor: contrato.fornecedor.nome,
                 fonte: `${empenho.fonteRecurso.codigo} - ${empenho.fonteRecurso.nome}`,
-                ficha: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`,
+                ficha: `${empenho.ficha.codigo} - ${getFichaClassificacaoLabel(empenho.ficha.classificacao)}`,
                 dataPedido: formatDate(af.dataPedidoAf),
                 valor: formatCurrency(af.valorAf),
                 status: af.dataEntregaReal ? "Entregue" : "Pendente",
@@ -253,7 +262,7 @@ export default function Relatorios() {
         ).keys()).map((fichaId) => {
           const empenhos = filteredContratos.flatMap((contrato) => contrato.empenhos).filter((empenho) => empenho.fichaId === fichaId);
           return {
-            ficha: `${empenhos[0]?.ficha.codigo ?? "-"} - ${empenhos[0]?.ficha.classificacao ?? "-"}`,
+            ficha: `${empenhos[0]?.ficha.codigo ?? "-"} - ${getFichaClassificacaoLabel(empenhos[0]?.ficha.classificacao)}`,
             valor: formatCurrency(empenhos.reduce((acc, empenho) => acc + parseNumberString(empenho.valorEmpenho) - parseNumberString(empenho.valorAnulado), 0)),
             execucao: formatCurrency(empenhos.reduce((acc, empenho) => acc + empenho.afs.reduce((afAcc, af) => afAcc + parseNumberString(af.valorAf), 0), 0)),
           };
@@ -282,7 +291,7 @@ export default function Relatorios() {
               contrato: contrato.numeroContrato,
               fornecedor: contrato.fornecedor.nome,
               fonte: `${empenho.fonteRecurso.codigo} - ${empenho.fonteRecurso.nome}`,
-              ficha: `${empenho.ficha.codigo} - ${empenho.ficha.classificacao}`,
+              ficha: `${empenho.ficha.codigo} - ${getFichaClassificacaoLabel(empenho.ficha.classificacao)}`,
               empenhoData: formatDate(empenho.dataEmpenho),
               valorEmpenhado: formatCurrency(parseNumberString(empenho.valorEmpenho) - parseNumberString(empenho.valorAnulado)),
               valorExecutado: formatCurrency(empenho.afs.reduce((acc, af) => acc + parseNumberString(af.valorAf), 0)),
