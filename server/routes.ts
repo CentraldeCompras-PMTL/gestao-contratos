@@ -685,7 +685,11 @@ export async function registerRoutes(
       if (!projetoAtividade || projetoAtividade.fonteRecursoId !== fonte.id) {
         throw new HttpError(400, "O projeto/atividade informado nao pertence a fonte selecionada");
       }
-      const ficha = await storage.createFicha({ ...data, fonteRecursoId: fonte.id });
+      const ficha = await storage.createFicha({
+        ...data,
+        fonteRecursoId: fonte.id,
+        ano: projetoAtividade.ano,
+      });
       await audit(
         req,
         "create",
@@ -709,7 +713,10 @@ export async function registerRoutes(
       if (!projetoAtividade || projetoAtividade.fonteRecursoId !== current.fonteRecursoId) {
         throw new HttpError(400, "O projeto/atividade informado nao pertence a fonte da ficha");
       }
-      const updated = await storage.updateFicha(req.params.id, data);
+      const updated = await storage.updateFicha(req.params.id, {
+        ...data,
+        ano: projetoAtividade.ano,
+      });
       await audit(
         req,
         "update",

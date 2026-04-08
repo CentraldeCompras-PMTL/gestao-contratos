@@ -234,6 +234,7 @@ export default function FontesRecursoPage() {
   };
 
   const fichaFonte = fontes.find((fonte) => fonte.id === fichaFonteId) ?? null;
+  const selectedProjetoAtividade = fichaFonte?.projetosAtividade.find((projetoAtividade) => projetoAtividade.id === fichaForm.projetoAtividadeId) ?? null;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -521,12 +522,18 @@ export default function FontesRecursoPage() {
               <Input value={fichaForm.codigo} onChange={(e) => setFichaForm((current) => ({ ...current, codigo: e.target.value }))} placeholder="001" required />
             </div>
             <div className="space-y-2">
-              <Label>Ano</Label>
-              <Input value={fichaForm.ano} onChange={(e) => setFichaForm((current) => ({ ...current, ano: e.target.value }))} placeholder="Ex: 2025" maxLength={4} required />
-            </div>
-            <div className="space-y-2">
               <Label>Projeto/Atividade</Label>
-              <Select value={fichaForm.projetoAtividadeId} onValueChange={(value) => setFichaForm((current) => ({ ...current, projetoAtividadeId: value }))}>
+              <Select
+                value={fichaForm.projetoAtividadeId}
+                onValueChange={(value) => {
+                  const projetoAtividade = fichaFonte?.projetosAtividade.find((entry) => entry.id === value);
+                  setFichaForm((current) => ({
+                    ...current,
+                    projetoAtividadeId: value,
+                    ano: projetoAtividade?.ano ?? "",
+                  }));
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Selecione o projeto/atividade" /></SelectTrigger>
                 <SelectContent>
                   {fichaFonte?.projetosAtividade.map((projetoAtividade) => (
@@ -536,6 +543,11 @@ export default function FontesRecursoPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Ano</Label>
+              <Input value={selectedProjetoAtividade?.ano ?? fichaForm.ano} readOnly disabled placeholder="Definido pelo projeto/atividade" />
+              <p className="text-xs text-muted-foreground">O ano da ficha e herdado automaticamente do projeto/atividade selecionado.</p>
             </div>
             <div className="space-y-2">
               <Label>Classificação</Label>
