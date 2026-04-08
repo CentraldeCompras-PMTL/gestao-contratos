@@ -27,6 +27,27 @@ function normalizeCnpj(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+async function resolveDepartamentoContext(
+  enteId?: string | null,
+  departamentoId?: string | null,
+) {
+  if (!departamentoId) {
+    return { enteId: enteId ?? null, departamentoId: null };
+  }
+
+  const departamento = await storage.getDepartamento(departamentoId);
+  if (!departamento) {
+    throw new HttpError(404, "Departamento nao encontrado");
+  }
+
+  const resolvedEnteId = enteId ?? departamento.enteId;
+  if (departamento.enteId !== resolvedEnteId) {
+    throw new HttpError(400, "O departamento selecionado nao pertence a secretaria informada");
+  }
+
+  return { enteId: resolvedEnteId, departamentoId: departamento.id };
+}
+
 type CnpjLookupResult = {
   cnpj: string;
   nome: string;
@@ -835,10 +856,24 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Processo nao encontrado" });
       }
       ensureEnteAccess(req, current.enteId);
-      if (data.enteId) {
-        ensureEnteAccess(req, data.enteId);
+      const resolvedContext = await resolveDepartamentoContext(
+        data.enteId ?? current.enteId ?? null,
+        data.departamentoId ?? current.departamentoId ?? null,
+      );
+      if (resolvedContext.enteId) {
+        ensureEnteAccess(req, resolvedContext.enteId);
       }
-      const p = await storage.updateProcessoDigital(req.params.id, data);
+
+      const payload = {
+        ...data,
+        enteId: resolvedContext.enteId ?? undefined,
+        departamentoId: resolvedContext.departamentoId ?? undefined,
+      };
+      const p = await storage.updateProcessoDigital(req.params.id, payload);
+      await storage.syncFasesFromProcesso(req.params.id, {
+        enteId: resolvedContext.enteId,
+        departamentoId: resolvedContext.departamentoId,
+      });
       await audit(req, "update", "processo", p.id, p.numeroProcessoDigital);
       res.json(p);
     } catch (e) {
@@ -884,8 +919,15 @@ export async function registerRoutes(
   app.post(api.processos.create.path, requireAuth, async (req, res) => {
     try {
       const data = api.processos.create.input.parse(req.body);
-      ensureEnteAccess(req, data.enteId);
-      const p = await storage.createProcessoDigital(data);
+      const resolvedContext = await resolveDepartamentoContext(data.enteId ?? null, data.departamentoId ?? null);
+      if (resolvedContext.enteId) {
+        ensureEnteAccess(req, resolvedContext.enteId);
+      }
+      const p = await storage.createProcessoDigital({
+        ...data,
+        enteId: resolvedContext.enteId ?? undefined,
+        departamentoId: resolvedContext.departamentoId ?? undefined,
+      });
       await audit(req, "create", "processo", p.id, p.numeroProcessoDigital);
       res.status(201).json(p);
     } catch (e) {
@@ -1084,13 +1126,17 @@ export async function registerRoutes(
       const processo = await storage.getProcessoDigital(parsed.processoDigitalId);
       if (!processo) throw new HttpError(404, "Processo nao encontrado");
       ensureEnteAccess(req, processo.enteId);
-      const enteId = parsed.enteId ?? processo.enteId ?? null;
-      if (enteId) {
-        ensureEnteAccess(req, enteId);
+      const resolvedContext = await resolveDepartamentoContext(
+        parsed.enteId ?? processo.enteId ?? null,
+        parsed.departamentoId ?? processo.departamentoId ?? null,
+      );
+      if (resolvedContext.enteId) {
+        ensureEnteAccess(req, resolvedContext.enteId);
       }
       const data = {
         ...parsed,
-        enteId: enteId ?? undefined,
+        enteId: resolvedContext.enteId ?? undefined,
+        departamentoId: resolvedContext.departamentoId ?? undefined,
       };
       parseDateOnly(data.dataInicio, "Data de inicio");
       if (data.dataFim) {
@@ -1120,13 +1166,17 @@ export async function registerRoutes(
         throw new HttpError(404, "Processo nao encontrado");
       }
       ensureEnteAccess(req, nextProcesso.enteId);
-      const enteId = parsed.enteId ?? current.enteId ?? nextProcesso.enteId ?? null;
-      if (enteId) {
-        ensureEnteAccess(req, enteId);
+      const resolvedContext = await resolveDepartamentoContext(
+        parsed.enteId ?? current.enteId ?? nextProcesso.enteId ?? null,
+        parsed.departamentoId ?? current.departamentoId ?? nextProcesso.departamentoId ?? null,
+      );
+      if (resolvedContext.enteId) {
+        ensureEnteAccess(req, resolvedContext.enteId);
       }
       const data = {
         ...parsed,
-        enteId: enteId ?? undefined,
+        enteId: resolvedContext.enteId ?? undefined,
+        departamentoId: resolvedContext.departamentoId ?? undefined,
       };
 
       const nextStart = data.dataInicio ?? current.dataInicio;
@@ -1137,6 +1187,10 @@ export async function registerRoutes(
       }
 
       const f = await storage.updateFaseContratacao(req.params.id, data);
+      await storage.syncContratosFromFase(req.params.id, {
+        enteId: resolvedContext.enteId,
+        departamentoId: resolvedContext.departamentoId,
+      });
       const updated = await storage.getFase(f.id);
       await audit(req, "update", "fase", f.id, f.nomeFase);
       res.json(updated);
@@ -1212,16 +1266,23 @@ export async function registerRoutes(
       if (fase.fornecedorId !== parsed.fornecedorId) {
         throw new HttpError(400, "O fornecedor do contrato deve ser o mesmo da fase selecionada");
       }
-      const enteId = parsed.enteId ?? fase.enteId ?? processo.enteId ?? null;
-      if (enteId) {
-        ensureEnteAccess(req, enteId);
+      const resolvedContext = await resolveDepartamentoContext(
+        parsed.enteId ?? fase.enteId ?? processo.enteId ?? null,
+        parsed.departamentoId ?? fase.departamentoId ?? processo.departamentoId ?? null,
+      );
+      if (resolvedContext.enteId) {
+        ensureEnteAccess(req, resolvedContext.enteId);
       }
-      if (fase.enteId && enteId && fase.enteId !== enteId) {
+      if (fase.enteId && resolvedContext.enteId && fase.enteId !== resolvedContext.enteId) {
         throw new HttpError(400, "A secretaria do contrato deve ser a mesma da fase selecionada");
+      }
+      if (fase.departamentoId && resolvedContext.departamentoId && fase.departamentoId !== resolvedContext.departamentoId) {
+        throw new HttpError(400, "O departamento do contrato deve ser o mesmo da fase selecionada");
       }
       const data = {
         ...parsed,
-        enteId: enteId ?? undefined,
+        enteId: resolvedContext.enteId ?? undefined,
+        departamentoId: resolvedContext.departamentoId ?? undefined,
       };
 
       const c = await storage.createContrato(data);
@@ -1252,6 +1313,7 @@ export async function registerRoutes(
         processoDigitalId: data.processoDigitalId ?? current.processoDigitalId,
         faseContratacaoId: data.faseContratacaoId ?? current.faseContratacaoId,
         enteId: data.enteId ?? current.enteId ?? null,
+        departamentoId: data.departamentoId ?? current.departamentoId ?? null,
         fornecedorId: data.fornecedorId ?? current.fornecedorId,
         valorContrato: data.valorContrato ?? String(current.valorContrato),
         vigenciaInicial: data.vigenciaInicial ?? current.vigenciaInicial,
@@ -1275,17 +1337,24 @@ export async function registerRoutes(
       if (!processo) {
         throw new HttpError(404, "Processo nao encontrado");
       }
-      const enteId = nextData.enteId ?? fase.enteId ?? processo.enteId ?? null;
-      if (enteId) {
-        ensureEnteAccess(req, enteId);
+      const resolvedContext = await resolveDepartamentoContext(
+        nextData.enteId ?? fase.enteId ?? processo.enteId ?? null,
+        nextData.departamentoId ?? fase.departamentoId ?? processo.departamentoId ?? null,
+      );
+      if (resolvedContext.enteId) {
+        ensureEnteAccess(req, resolvedContext.enteId);
       }
-      if (fase.enteId && enteId && fase.enteId !== enteId) {
+      if (fase.enteId && resolvedContext.enteId && fase.enteId !== resolvedContext.enteId) {
         throw new HttpError(400, "A secretaria do contrato deve ser a mesma da fase selecionada");
+      }
+      if (fase.departamentoId && resolvedContext.departamentoId && fase.departamentoId !== resolvedContext.departamentoId) {
+        throw new HttpError(400, "O departamento do contrato deve ser o mesmo da fase selecionada");
       }
 
       const updated = await storage.updateContrato(req.params.id, {
         ...data,
-        enteId: enteId ?? undefined,
+        enteId: resolvedContext.enteId ?? undefined,
+        departamentoId: resolvedContext.departamentoId ?? undefined,
       });
       if (!updated) {
         return res.status(404).json({ message: "Contrato nao encontrado" });

@@ -71,14 +71,17 @@ export interface IStorage {
   getProcessosDigitais(): Promise<ProcessoDigitalWithRelations[]>;
   getProcessoDigital(id: string): Promise<ProcessoDigitalWithRelations | undefined>;
   createProcessoDigital(processo: InsertProcessoDigital): Promise<ProcessoDigital>;
+  updateProcessoDigital(id: string, proc: Partial<InsertProcessoDigital>): Promise<ProcessoDigital>;
+  syncFasesFromProcesso(processoId: string, data: { enteId?: string | null; departamentoId?: string | null }): Promise<void>;
   deleteProcessoDigital(id: string): Promise<ProcessoDigital | undefined>;
   addProcessoParticipante(processoId: string, enteId: string): Promise<void>;
   removeProcessoParticipante(processoId: string, enteId: string): Promise<void>;
   
-  getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null })[]>;
-  getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null }) | undefined>;
+  getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null; departamento: Departamento | null })[]>;
+  getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null; departamento: Departamento | null }) | undefined>;
   createFaseContratacao(fase: InsertFaseContratacao): Promise<FaseContratacao>;
   updateFaseContratacao(id: string, fase: Partial<InsertFaseContratacao>): Promise<FaseContratacao>;
+  syncContratosFromFase(faseId: string, data: { enteId?: string | null; departamentoId?: string | null }): Promise<void>;
   deleteFaseContratacao(id: string): Promise<FaseContratacao | undefined>;
 
   getContratos(): Promise<ContratoWithRelations[]>;
@@ -430,8 +433,9 @@ export class DatabaseStorage implements IStorage {
     const procs = await db.query.processosDigitais.findMany({
       with: {
         ente: true,
+        departamento: true,
         fases: {
-          with: { fornecedor: true }
+          with: { fornecedor: true, ente: true, departamento: true }
         },
         participantes: {
           with: { ente: true }
@@ -456,9 +460,10 @@ export class DatabaseStorage implements IStorage {
       where: eq(processosDigitais.id, id),
       with: {
         fases: {
-          with: { fornecedor: true }
+          with: { fornecedor: true, ente: true, departamento: true }
         },
         ente: true,
+        departamento: true,
         participantes: {
           with: { ente: true },
         },
@@ -485,6 +490,24 @@ export class DatabaseStorage implements IStorage {
   async updateProcessoDigital(id: string, proc: Partial<InsertProcessoDigital>): Promise<ProcessoDigital> {
     const [updated] = await db.update(processosDigitais).set(proc).where(eq(processosDigitais.id, id)).returning();
     return updated;
+  }
+
+  async syncFasesFromProcesso(processoId: string, data: { enteId?: string | null; departamentoId?: string | null }): Promise<void> {
+    await db
+      .update(fasesContratacao)
+      .set({
+        ...(data.enteId !== undefined ? { enteId: data.enteId } : {}),
+        ...(data.departamentoId !== undefined ? { departamentoId: data.departamentoId } : {}),
+      })
+      .where(eq(fasesContratacao.processoDigitalId, processoId));
+
+    await db
+      .update(contratos)
+      .set({
+        ...(data.enteId !== undefined ? { enteId: data.enteId } : {}),
+        ...(data.departamentoId !== undefined ? { departamentoId: data.departamentoId } : {}),
+      })
+      .where(eq(contratos.processoDigitalId, processoId));
   }
 
   async deleteProcessoDigital(id: string): Promise<ProcessoDigital | undefined> {
@@ -634,23 +657,35 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null })[]> {
+  async getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null; departamento: Departamento | null })[]> {
     return await db.query.fasesContratacao.findMany({
       with: {
         fornecedor: true,
-        processoDigital: true,
+        processoDigital: {
+          with: {
+            ente: true,
+            departamento: true,
+          },
+        },
         ente: true,
+        departamento: true,
       }
     });
   }
 
-  async getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null }) | undefined> {
+  async getFase(id: string): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null; departamento: Departamento | null }) | undefined> {
     return await db.query.fasesContratacao.findFirst({
       where: eq(fasesContratacao.id, id),
       with: {
         fornecedor: true,
-        processoDigital: true,
+        processoDigital: {
+          with: {
+            ente: true,
+            departamento: true,
+          },
+        },
         ente: true,
+        departamento: true,
       }
     });
   }
@@ -665,6 +700,16 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async syncContratosFromFase(faseId: string, data: { enteId?: string | null; departamentoId?: string | null }): Promise<void> {
+    await db
+      .update(contratos)
+      .set({
+        ...(data.enteId !== undefined ? { enteId: data.enteId } : {}),
+        ...(data.departamentoId !== undefined ? { departamentoId: data.departamentoId } : {}),
+      })
+      .where(eq(contratos.faseContratacaoId, faseId));
+  }
+
   async deleteFaseContratacao(id: string): Promise<FaseContratacao | undefined> {
     const [deleted] = await db.delete(fasesContratacao).where(eq(fasesContratacao.id, id)).returning();
     return deleted;
@@ -675,6 +720,7 @@ export class DatabaseStorage implements IStorage {
     const results = await db.query.contratos.findMany({
       with: {
         ente: true,
+        departamento: true,
         fornecedor: true,
         empenhos: { with: { afs: true, fonteRecurso: true, ficha: true } },
         notasFiscais: true,
@@ -689,6 +735,7 @@ export class DatabaseStorage implements IStorage {
       where: inArray(processosDigitais.id, procIds),
       with: {
         ente: true,
+        departamento: true,
         fases: { with: { fornecedor: true } },
       }
     });
@@ -699,6 +746,8 @@ export class DatabaseStorage implements IStorage {
       where: inArray(fasesContratacao.id, faseIds),
       with: {
         fornecedor: true,
+        ente: true,
+        departamento: true,
       }
     });
 
@@ -715,12 +764,14 @@ export class DatabaseStorage implements IStorage {
         processoDigital: {
           with: {
             ente: true,
+            departamento: true,
           },
         },
         faseContratacao: {
-          with: { fornecedor: true },
+          with: { fornecedor: true, ente: true, departamento: true },
         },
         ente: true,
+        departamento: true,
         fornecedor: true,
         empenhos: true,
         notasFiscais: true,
@@ -738,13 +789,15 @@ export class DatabaseStorage implements IStorage {
         processoDigital: {
           with: {
             ente: true,
+            departamento: true,
             fases: { with: { fornecedor: true } },
           },
         },
         faseContratacao: {
-          with: { fornecedor: true },
+          with: { fornecedor: true, ente: true, departamento: true },
         },
         ente: true,
+        departamento: true,
         fornecedor: true,
         empenhos: { with: { afs: true, fonteRecurso: true, ficha: true } },
         notasFiscais: true,

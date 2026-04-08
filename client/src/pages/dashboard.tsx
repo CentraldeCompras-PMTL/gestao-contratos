@@ -77,6 +77,24 @@ function getContratoEnteNome(contrato: ContratoWithRelations) {
   return contrato.ente?.nome ?? contrato.processoDigital.ente?.nome ?? "Sem secretaria";
 }
 
+function getProcessoEnteId(contrato: ContratoWithRelations) {
+  return contrato.processoDigital.enteId ?? contrato.enteId ?? null;
+}
+
+function getProcessoEnteNome(contrato: ContratoWithRelations) {
+  return contrato.processoDigital.ente?.nome ?? contrato.ente?.nome ?? "Sem secretaria";
+}
+
+function getContratoDepartamentoId(contrato: ContratoWithRelations) {
+  return contrato.departamentoId ?? contrato.faseContratacao.departamentoId ?? contrato.processoDigital.departamentoId ?? null;
+}
+
+function getContratoDepartamentoNome(contrato: ContratoWithRelations) {
+  return contrato.departamento?.nome
+    ?? contrato.faseContratacao.departamento?.nome
+    ?? "Sem departamento";
+}
+
 function aggregateEmpenhos(
   contratos: ContratoWithRelations[],
   getKey: (contrato: ContratoWithRelations, empenho: ContratoWithRelations["empenhos"][number]) => string,
@@ -268,7 +286,7 @@ export default function Dashboard() {
       if (showEnteFilter && filterEnte && getContratoEnteId(contrato) !== filterEnte) return false;
       if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
       if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
-      if (filterDepartamento && contrato.departamentoId !== filterDepartamento && contrato.processoDigital.departamentoId !== filterDepartamento) return false;
+      if (filterDepartamento && getContratoDepartamentoId(contrato) !== filterDepartamento) return false;
       if (filterEnte && getContratoEnteId(contrato) !== filterEnte) return false;
       if (!matchesFonte || !matchesFicha || !matchesClassificacao) return false;
       return true;
@@ -315,14 +333,42 @@ export default function Dashboard() {
       ? deferredEntes.filter((ente) =>
           deferredContratos.some(
             (contrato) =>
-              (!showEnteFilter || !filterEnte || getContratoEnteId(contrato) === filterEnte) &&
+              (!showEnteFilter || !filterEnte || getProcessoEnteId(contrato) === filterEnte) &&
               (!filterFonteRecurso || contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) &&
               (!filterFicha || contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) &&
               contrato.fornecedor.id === filterFornecedor &&
-              getContratoEnteId(contrato) === ente.id,
+              getProcessoEnteId(contrato) === ente.id,
           ),
         )
       : deferredEntes;
+
+    return aggregateBy(
+      deferredContratos.filter((contrato) => {
+        if (showEnteFilter && filterEnte && getProcessoEnteId(contrato) !== filterEnte) return false;
+        if (filterFornecedor && contrato.fornecedor.id !== filterFornecedor) return false;
+        if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
+        if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
+        if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
+        const enteId = getProcessoEnteId(contrato);
+        return !!enteId && entesBase.some((ente) => ente.id === enteId);
+      }),
+      (contrato) => getProcessoEnteId(contrato),
+      (contrato) => getProcessoEnteNome(contrato),
+    ).sort((a, b) => a.label.localeCompare(b.label));
+  }, [deferredContratos, deferredEntes, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+
+  const departamentosUnicos = useMemo(() => {
+    if (filterProcesso) {
+      const processoSelecionado = contratos.find((contrato) => contrato.processoDigital.id === filterProcesso);
+      const departamentoId = processoSelecionado ? getContratoDepartamentoId(processoSelecionado) : null;
+      if (!processoSelecionado || !departamentoId) return [];
+      return [{
+        id: departamentoId,
+        label: departamentos.find((departamento) => departamento.id === departamentoId)?.nome ?? getContratoDepartamentoNome(processoSelecionado),
+        count: 0,
+        value: 0,
+      }];
+    }
 
     return aggregateBy(
       deferredContratos.filter((contrato) => {
@@ -331,13 +377,15 @@ export default function Dashboard() {
         if (filterProcesso && contrato.processoDigital.id !== filterProcesso) return false;
         if (filterFonteRecurso && !contrato.empenhos.some((empenho) => empenho.fonteRecursoId === filterFonteRecurso)) return false;
         if (filterFicha && !contrato.empenhos.some((empenho) => empenho.fichaId === filterFicha)) return false;
-        const enteId = getContratoEnteId(contrato);
-        return !!enteId && entesBase.some((ente) => ente.id === enteId);
+        const departamentoId = getContratoDepartamentoId(contrato);
+        if (!departamentoId) return false;
+        if (filterDepartamento && departamentoId !== filterDepartamento) return false;
+        return true;
       }),
-      (contrato) => getContratoEnteId(contrato),
-      (contrato) => getContratoEnteNome(contrato),
+      (contrato) => getContratoDepartamentoId(contrato),
+      (contrato) => departamentos.find((departamento) => departamento.id === getContratoDepartamentoId(contrato))?.nome ?? getContratoDepartamentoNome(contrato),
     ).sort((a, b) => a.label.localeCompare(b.label));
-  }, [deferredContratos, deferredEntes, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
+  }, [deferredContratos, departamentos, filterDepartamento, filterEnte, filterFicha, filterFonteRecurso, filterFornecedor, filterProcesso, showEnteFilter]);
 
   const entesDisponiveis = useMemo(() => {
     if (!showEnteFilter) return [];
@@ -963,7 +1011,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
         <Card className="border-border/50 shadow-md">
           <CardHeader className="border-b border-border/50 bg-muted/20"><CardTitle className="text-lg flex items-center gap-2"><Building2 size={20} />Contratos por Fornecedor</CardTitle></CardHeader>
           <CardContent className="p-0">
@@ -997,6 +1045,20 @@ export default function Dashboard() {
           <CardContent className="p-0">
             <div className="divide-y divide-border/50 max-h-[400px] overflow-auto">
               {entesUnicos.length === 0 ? <div className="p-4 text-center text-muted-foreground">Nenhuma secretaria</div> : entesUnicos.map((d: any) => (
+                <div key={d.id} className="p-4 flex justify-between items-start hover:bg-muted/30 transition-colors">
+                  <div><p className="font-medium text-sm">{d.label}</p><p className="text-xs text-muted-foreground">{d.count} contrato{d.count !== 1 ? "s" : ""}</p></div>
+                  <p className="font-semibold text-sm">{formatCurrency(d.value)}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 shadow-md">
+          <CardHeader className="border-b border-border/50 bg-muted/20"><CardTitle className="text-lg flex items-center gap-2"><Building2 size={20} />Valor por Departamento</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50 max-h-[400px] overflow-auto">
+              {departamentosUnicos.length === 0 ? <div className="p-4 text-center text-muted-foreground">Nenhum departamento</div> : departamentosUnicos.map((d: any) => (
                 <div key={d.id} className="p-4 flex justify-between items-start hover:bg-muted/30 transition-colors">
                   <div><p className="font-medium text-sm">{d.label}</p><p className="text-xs text-muted-foreground">{d.count} contrato{d.count !== 1 ? "s" : ""}</p></div>
                   <p className="font-semibold text-sm">{formatCurrency(d.value)}</p>
