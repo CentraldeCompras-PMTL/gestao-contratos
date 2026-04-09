@@ -171,6 +171,37 @@ export default function Dashboard() {
   const [filterAtaFornecedor, setFilterAtaFornecedor] = useState("");
   const [filterAtaParticipante, setFilterAtaParticipante] = useState("");
 
+  const clearContratoFilters = () => {
+    setFilterFornecedor("");
+    setFilterProcesso("");
+    setFilterEnte("");
+    setFilterDepartamento("");
+    setFilterFonteRecurso("");
+    setFilterFicha("");
+    setFilterClassificacao("");
+  };
+
+  const clearAtaFilters = () => {
+    setFilterAtaRegistroPreco("");
+    setFilterAtaProcesso("");
+    setFilterAtaFornecedor("");
+    setFilterAtaParticipante("");
+  };
+
+  const handleContratoFilterChange = (setter: (value: string) => void, value: string) => {
+    if (value) {
+      clearAtaFilters();
+    }
+    setter(value);
+  };
+
+  const handleAtaFilterChange = (setter: (value: string) => void, value: string) => {
+    if (value) {
+      clearContratoFilters();
+    }
+    setter(value);
+  };
+
   const accessibleEnteIds = user?.accessibleEnteIds ?? (user?.enteId ? [user.enteId] : []);
   const showEnteFilter = user?.role === "admin" || (user?.role === "operacional" && accessibleEnteIds.length > 1);
   const canManageArp = useMemo(() => {
@@ -756,7 +787,10 @@ export default function Dashboard() {
           {showEnteFilter && (
             <div>
               <label className="text-sm font-medium mb-2 block">Secretaria (Ente)</label>
-              <Select value={filterEnte || "all"} onValueChange={(v) => setFilterEnte(v === "all" ? "" : v)}>
+              <Select value={filterEnte || "all"} onValueChange={(v) => {
+                handleContratoFilterChange(setFilterEnte, v === "all" ? "" : v);
+                setFilterDepartamento("");
+              }}>
                 <SelectTrigger><SelectValue placeholder="Todos os entes vinculados" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os entes vinculados</SelectItem>
@@ -768,7 +802,7 @@ export default function Dashboard() {
           {filterEnte && (
             <div>
               <label className="text-sm font-medium mb-2 block">Departamento</label>
-              <Select value={filterDepartamento || "all"} onValueChange={(v) => setFilterDepartamento(v === "all" ? "" : v)}>
+              <Select value={filterDepartamento || "all"} onValueChange={(v) => handleContratoFilterChange(setFilterDepartamento, v === "all" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Todos os departamentos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os departamentos</SelectItem>
@@ -779,7 +813,7 @@ export default function Dashboard() {
           )}
           <div>
             <label className="text-sm font-medium mb-2 block">Fornecedor</label>
-            <Select value={filterFornecedor || "all"} onValueChange={(v) => setFilterFornecedor(v === "all" ? "" : v)}>
+            <Select value={filterFornecedor || "all"} onValueChange={(v) => handleContratoFilterChange(setFilterFornecedor, v === "all" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os fornecedores</SelectItem>
@@ -789,7 +823,7 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Processo Digital</label>
-            <Select value={filterProcesso || "all"} onValueChange={(v) => setFilterProcesso(v === "all" ? "" : v)}>
+            <Select value={filterProcesso || "all"} onValueChange={(v) => handleContratoFilterChange(setFilterProcesso, v === "all" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Todos os processos" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os processos</SelectItem>
@@ -801,7 +835,7 @@ export default function Dashboard() {
             <label className="text-sm font-medium mb-2 block">Fonte de Recurso</label>
             <Select value={filterFonteRecurso || "all"} onValueChange={(v) => {
               const nextFonte = v === "all" ? "" : v;
-              setFilterFonteRecurso(nextFonte);
+              handleContratoFilterChange(setFilterFonteRecurso, nextFonte);
               setFilterFicha("");
               setFilterClassificacao("");
             }}>
@@ -814,7 +848,7 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Classificacao</label>
-            <Select value={filterClassificacao || "all"} onValueChange={(v) => { setFilterClassificacao(v === "all" ? "" : v); setFilterFicha(""); }}>
+            <Select value={filterClassificacao || "all"} onValueChange={(v) => { handleContratoFilterChange(setFilterClassificacao, v === "all" ? "" : v); setFilterFicha(""); }}>
               <SelectTrigger><SelectValue placeholder="Todas as classificacoes" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as classificacoes</SelectItem>
@@ -824,7 +858,7 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Ficha</label>
-            <Select value={filterFicha || "all"} onValueChange={(v) => setFilterFicha(v === "all" ? "" : v)}>
+            <Select value={filterFicha || "all"} onValueChange={(v) => handleContratoFilterChange(setFilterFicha, v === "all" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Todas as fichas" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as fichas</SelectItem>
@@ -888,7 +922,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Ata de RP</label>
-                  <Select value={filterAtaRegistroPreco || "all"} onValueChange={(v) => setFilterAtaRegistroPreco(v === "all" ? "" : v)}>
+                  <Select value={filterAtaRegistroPreco || "all"} onValueChange={(v) => handleAtaFilterChange(setFilterAtaRegistroPreco, v === "all" ? "" : v)}>
                     <SelectTrigger><SelectValue placeholder="Todas as atas" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas as atas</SelectItem>
@@ -898,7 +932,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Processo da ARP</label>
-                  <Select value={filterAtaProcesso || "all"} onValueChange={(v) => setFilterAtaProcesso(v === "all" ? "" : v)}>
+                  <Select value={filterAtaProcesso || "all"} onValueChange={(v) => handleAtaFilterChange(setFilterAtaProcesso, v === "all" ? "" : v)}>
                     <SelectTrigger><SelectValue placeholder="Todos os processos" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os processos</SelectItem>
@@ -908,7 +942,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Participante</label>
-                  <Select value={filterAtaParticipante || "all"} onValueChange={(v) => setFilterAtaParticipante(v === "all" ? "" : v)}>
+                  <Select value={filterAtaParticipante || "all"} onValueChange={(v) => handleAtaFilterChange(setFilterAtaParticipante, v === "all" ? "" : v)}>
                     <SelectTrigger><SelectValue placeholder="Todos os participantes" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os participantes</SelectItem>
@@ -918,7 +952,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Fornecedor da ARP</label>
-                  <Select value={filterAtaFornecedor || "all"} onValueChange={(v) => setFilterAtaFornecedor(v === "all" ? "" : v)}>
+                  <Select value={filterAtaFornecedor || "all"} onValueChange={(v) => handleAtaFilterChange(setFilterAtaFornecedor, v === "all" ? "" : v)}>
                     <SelectTrigger><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os fornecedores</SelectItem>
