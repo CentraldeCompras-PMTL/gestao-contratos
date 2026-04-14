@@ -490,7 +490,7 @@ export default function ProcessoDetail() {
                     </div>
                     <div>
                       <p className="text-sm font-bold">{processo.ente?.nome || "Órgão gestor"}</p>
-                      <p className="text-xs text-muted-foreground">Órgão Gestor do Processo</p>
+                      <p className="text-xs text-muted-foreground">Secretaria gestora do processo</p>
                     </div>
                   </div>
                   <Badge variant="secondary" className="text-xs font-bold uppercase tracking-wider px-3 py-1">Gestor</Badge>
@@ -510,7 +510,7 @@ export default function ProcessoDetail() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold">{ente.nome}</p>
-                            <p className="text-xs text-muted-foreground">{ente.id === processo.enteId ? "Órgão Gestor" : "Participante"}</p>
+                            <p className="text-xs text-muted-foreground">{ente.isGestor ? "Secretaria gestora" : "Secretaria participante"}</p>
                           </div>
                         </div>
                         {!ente.isGestor && (
@@ -579,7 +579,7 @@ export default function ProcessoDetail() {
                             <SelectTrigger><SelectValue placeholder="Selecione a ficha..." /></SelectTrigger>
                             <SelectContent>
                               {selectedFonteData.fichas.map((fi: any) => (
-                                <SelectItem key={fi.id} value={fi.id}>Ficha {fi.codigo} ({fi.ano}) — {fi.classificacao}</SelectItem>
+                                <SelectItem key={fi.id} value={fi.id}>Ficha {fi.codigo} ({fi.ano}) - {getFichaClassificacaoLabel(fi.classificacao)}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -633,7 +633,7 @@ export default function ProcessoDetail() {
                         </TableCell>
                         <TableCell className="font-mono text-xs bg-muted/20 rounded px-2 py-1 mx-2">{d.fichaOrcamentaria?.codigo}</TableCell>
                         <TableCell className="capitalize text-xs text-muted-foreground max-w-[250px] truncate">
-                          {d.fichaOrcamentaria?.classificacao || "—"}
+                          {getFichaClassificacaoLabel(d.fichaOrcamentaria?.classificacao)}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
                           {d.valorEstimado
