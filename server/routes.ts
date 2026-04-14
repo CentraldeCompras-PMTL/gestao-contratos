@@ -685,10 +685,15 @@ export async function registerRoutes(
       if (!projetoAtividade || projetoAtividade.fonteRecursoId !== fonte.id) {
         throw new HttpError(400, "O projeto/atividade informado nao pertence a fonte selecionada");
       }
+      const classificacao = data.classificacaoId ? await storage.getClassificacaoOrcamentaria(data.classificacaoId) : undefined;
+      if (data.classificacaoId && !classificacao) {
+        throw new HttpError(404, "Classificacao orcamentaria nao encontrada");
+      }
       const ficha = await storage.createFicha({
         ...data,
         fonteRecursoId: fonte.id,
         ano: projetoAtividade.ano,
+        classificacao: classificacao?.nome ?? "Sem classificacao",
       });
       await audit(
         req,
@@ -713,9 +718,15 @@ export async function registerRoutes(
       if (!projetoAtividade || projetoAtividade.fonteRecursoId !== current.fonteRecursoId) {
         throw new HttpError(400, "O projeto/atividade informado nao pertence a fonte da ficha");
       }
+      const classificacaoId = data.classificacaoId === undefined ? current.classificacaoId : data.classificacaoId;
+      const classificacao = classificacaoId ? await storage.getClassificacaoOrcamentaria(classificacaoId) : undefined;
+      if (classificacaoId && !classificacao) {
+        throw new HttpError(404, "Classificacao orcamentaria nao encontrada");
+      }
       const updated = await storage.updateFicha(req.params.id, {
         ...data,
         ano: projetoAtividade.ano,
+        classificacao: classificacao?.nome ?? "Sem classificacao",
       });
       await audit(
         req,
