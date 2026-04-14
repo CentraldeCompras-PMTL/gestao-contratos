@@ -347,7 +347,8 @@ export const ataAfs = pgTable("ata_afs", {
 export const ataNotasFiscais = pgTable("ata_notas_fiscais", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ataContratoId: varchar("ata_contrato_id").references(() => ataContratos.id),
-  ataAfId: varchar("ata_af_id").references(() => ataAfs.id).notNull(),
+  ataEmpenhoId: varchar("ata_empenho_id").references(() => ataEmpenhos.id),
+  ataAfId: varchar("ata_af_id").references(() => ataAfs.id),
   numeroNota: text("numero_nota").notNull().unique(),
   quantidadeNota: numeric("quantidade_nota", { precision: 14, scale: 2 }).notNull(),
   valorNota: numeric("valor_nota", { precision: 14, scale: 2 }).notNull(),
@@ -506,6 +507,7 @@ export const ataEmpenhosRelations = relations(ataEmpenhos, ({ one, many }) => ({
   contrato: one(ataContratos, { fields: [ataEmpenhos.ataContratoId], references: [ataContratos.id] }),
   prePedido: one(ataPrePedidos, { fields: [ataEmpenhos.ataPrePedidoId], references: [ataPrePedidos.id] }),
   afs: many(ataAfs),
+  notasFiscais: many(ataNotasFiscais),
 }));
 
 export const ataAfsRelations = relations(ataAfs, ({ one, many }) => ({
@@ -515,6 +517,7 @@ export const ataAfsRelations = relations(ataAfs, ({ one, many }) => ({
 
 export const ataNotasFiscaisRelations = relations(ataNotasFiscais, ({ one }) => ({
   contrato: one(ataContratos, { fields: [ataNotasFiscais.ataContratoId], references: [ataContratos.id] }),
+  empenho: one(ataEmpenhos, { fields: [ataNotasFiscais.ataEmpenhoId], references: [ataEmpenhos.id] }),
   af: one(ataAfs, { fields: [ataNotasFiscais.ataAfId], references: [ataAfs.id] }),
 }));
 
@@ -1092,7 +1095,8 @@ export const ataAfResponseSchema = z.object({
 export const ataNotaFiscalResponseSchema = z.object({
   id: z.string(),
   ataContratoId: z.string().nullable(),
-  ataAfId: z.string(),
+  ataEmpenhoId: z.string().nullable().optional(),
+  ataAfId: z.string().nullable().optional(),
   numeroNota: z.string(),
   quantidadeNota: z.union([z.string(), z.number()]),
   valorNota: z.union([z.string(), z.number()]),
@@ -1222,6 +1226,7 @@ export const ataPrePedidoWithRelationsSchema = ataPrePedidoResponseSchema.extend
   item: ataItemWithRelationsSchema,
   ata: ataRegistroPrecoWithRelationsSchema,
   empenhos: z.array(ataEmpenhoResponseSchema.extend({
+    notasFiscais: z.array(ataNotaFiscalResponseSchema).optional(),
     afs: z.array(ataAfResponseSchema.extend({
       notasFiscais: z.array(ataNotaFiscalResponseSchema).optional(),
     })).optional(),
@@ -1242,6 +1247,7 @@ export const ataPrePedidoDisponivelSchema = ataRegistroPrecoResponseSchema.exten
 
 export const ataEmpenhoWithRelationsSchema = ataEmpenhoResponseSchema.extend({
   prePedido: ataPrePedidoWithRelationsSchema,
+  notasFiscais: z.array(ataNotaFiscalResponseSchema).optional(),
   afs: z.array(ataAfResponseSchema.extend({
     notasFiscais: z.array(ataNotaFiscalResponseSchema).optional(),
   })),

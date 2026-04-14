@@ -36,6 +36,9 @@ type PrePedidoLine = {
 
 type AtaAfWithNotasLike = any;
 type AtaEmpenhoWithRelationsLike = any;
+type AtaNotaTarget =
+  | { kind: "af"; id: string }
+  | { kind: "empenho"; id: string };
 
 function formatFichaClassificacao(
   classificacao:
@@ -127,6 +130,7 @@ export default function PrePedidosArpPage() {
   const [selectedPrePedidoEmpenho, setSelectedPrePedidoEmpenho] = useState<AtaPrePedidoWithRelations | null>(null);
   const [selectedAtaEmpenho, setSelectedAtaEmpenho] = useState<any | null>(null);
   const [selectedAtaAf, setSelectedAtaAf] = useState<any | null>(null);
+  const [selectedAtaNotaTarget, setSelectedAtaNotaTarget] = useState<AtaNotaTarget | null>(null);
   const [selectedAtaNota, setSelectedAtaNota] = useState<any | null>(null);
   const [selectedAtaNotaPagamento, setSelectedAtaNotaPagamento] = useState<any | null>(null);
   const [empenhoForm, setEmpenhoForm] = useState(defaultEmpenhoForm);
@@ -270,13 +274,22 @@ export default function PrePedidosArpPage() {
     (empenho.afs ?? []).reduce((sum: number, af: any) => sum + parseNumberString(af.quantidadeAf), 0);
 
   const getSaldoAf = (empenho: AtaEmpenhoWithRelationsLike) =>
-    Math.max(parseNumberString(empenho.quantidadeEmpenhada) - getQuantidadeAf(empenho), 0);
+    Math.max(parseNumberString(empenho.quantidadeEmpenhada) - getQuantidadeAf(empenho) - (empenho.notasFiscais ?? []).reduce((sum: number, nota: any) => sum + parseNumberString(nota.quantidadeNota), 0), 0);
+
+  const getQuantidadeNotaDireta = (empenho: AtaEmpenhoWithRelationsLike | null | undefined) =>
+    (empenho.notasFiscais ?? []).reduce((sum: number, nota: any) => sum + parseNumberString(nota.quantidadeNota), 0);
+
+  const getSaldoNotaDireta = (empenho: AtaEmpenhoWithRelationsLike | null | undefined) =>
+    empenho ? Math.max(parseNumberString(empenho.quantidadeEmpenhada) - getQuantidadeAf(empenho) - getQuantidadeNotaDireta(empenho), 0) : 0;
 
   const getQuantidadeNota = (af: AtaAfWithNotasLike) =>
     (af.notasFiscais ?? []).reduce((sum: number, nota: any) => sum + parseNumberString(nota.quantidadeNota), 0);
 
   const getSaldoNota = (af: AtaAfWithNotasLike) =>
     Math.max(parseNumberString(af.quantidadeAf) - getQuantidadeNota(af), 0);
+
+  const getEmpenhoById = (empenhoId: string) =>
+    prePedidos.flatMap((prePedido) => prePedido.empenhos ?? []).find((empenho) => empenho.id === empenhoId) ?? null;
 
   const getSaldoDisponivel = (itemId: string) => {
     if (!selectedDisponivel) return 0;
@@ -329,16 +342,16 @@ export default function PrePedidosArpPage() {
   };
 
   const handleCreateNota = () => {
-    if (!selectedAtaAf) return;
+    if (!selectedAtaNotaTarget) return;
     createNotaFiscal.mutate(
-      {
-        ataAfId: selectedAtaAf.id,
-        data: notaForm,
-      },
+      selectedAtaNotaTarget.kind === "af"
+        ? { ataAfId: selectedAtaNotaTarget.id, data: notaForm }
+        : { ataEmpenhoId: selectedAtaNotaTarget.id, data: notaForm },
       {
         onSuccess: () => {
           toast({ title: "Cadastro realizado com sucesso!" });
           setSelectedAtaAf(null);
+          setSelectedAtaNotaTarget(null);
           setNotaForm(defaultNotaForm);
         },
         onError: (error) => {
@@ -576,14 +589,47 @@ export default function PrePedidosArpPage() {
                                           <p className="text-xs text-muted-foreground">
                                             Qtd. {empenho.quantidadeEmpenhada} | Valor {formatCurrency(empenho.valorEmpenho)}
                                           </p>
-                                          <p className="text-xs text-muted-foreground">Saldo para AF: {getSaldoAf(empenho)}</p>
+                                          <p className="text-xs text-muted-foreground">Saldo para AF/nota direta: {getSaldoNotaDireta(empenho)}</p>
                                         </div>
                                         {canManageArp && (
-                                          <Button variant="outline" size="sm" onClick={() => { setSelectedAtaEmpenho(empenho); setAfForm(defaultAfForm); }}>
-                                            Nova AF
-                                          </Button>
+                                          <div className="flex items-center gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => { setSelectedAtaNotaTarget({ kind: "empenho", id: empenho.id }); setNotaForm(defaultNotaForm); }}>
+                                              Nova Nota
+                                            </Button>
+                                            <Button variant="outline" size="sm" onClick={() => { setSelectedAtaEmpenho(empenho); setAfForm(defaultAfForm); }}>
+                                              Nova AF
+                                            </Button>
+                                          </div>
                                         )}
                                       </div>
+                                      {(empenho.notasFiscais?.length ?? 0) > 0 && (
+                                        <div className="space-y-1">
+                                          {empenho.notasFiscais!.map((nota) => (
+                                            <div key={nota.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                                              <div>
+                                                <p className="text-sm font-medium">{nota.numeroNota}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                  Qtd. {nota.quantidadeNota} | Valor {formatCurrency(nota.valorNota)} | {nota.statusPagamento}
+                                                </p>
+                                              </div>
+                                              {canManageArp && (
+                                                <div className="flex items-center gap-2">
+                                                  {nota.statusPagamento === "nota_recebida" && (
+                                                    <Button variant="outline" size="sm" onClick={() => { setSelectedAtaNota(nota); setEnviarPagamentoForm(defaultEnviarPagamentoForm); }}>
+                                                      Enviar
+                                                    </Button>
+                                                  )}
+                                                  {nota.statusPagamento === "aguardando_pagamento" && (
+                                                    <Button variant="outline" size="sm" onClick={() => { setSelectedAtaNotaPagamento(nota); setRegistrarPagamentoForm(defaultRegistrarPagamentoForm); }}>
+                                                      Pagar
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                       {(empenho.afs?.length ?? 0) > 0 && (
                                         <div className="space-y-2">
                                           {empenho.afs!.map((af) => (
@@ -596,7 +642,7 @@ export default function PrePedidosArpPage() {
                                                   </p>
                                                 </div>
                                                 {canManageArp && (
-                                                  <Button variant="outline" size="sm" onClick={() => { setSelectedAtaAf(af); setNotaForm(defaultNotaForm); }}>
+                                                  <Button variant="outline" size="sm" onClick={() => { setSelectedAtaAf(af); setSelectedAtaNotaTarget({ kind: "af", id: af.id }); setNotaForm(defaultNotaForm); }}>
                                                     Nova Nota
                                                   </Button>
                                                 )}
@@ -701,7 +747,7 @@ export default function PrePedidosArpPage() {
                                                   </p>
                                                 </div>
                                                 {canManageArp && (
-                                                  <Button variant="outline" size="sm" onClick={() => { setSelectedAtaAf(af); setNotaForm(defaultNotaForm); }}>
+                                                  <Button variant="outline" size="sm" onClick={() => { setSelectedAtaAf(af); setSelectedAtaNotaTarget({ kind: "af", id: af.id }); setNotaForm(defaultNotaForm); }}>
                                                     Nova Nota
                                                   </Button>
                                                 )}
@@ -931,15 +977,17 @@ export default function PrePedidosArpPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedAtaAf} onOpenChange={(open) => { if (!open) setSelectedAtaAf(null); }}>
+      <Dialog open={!!selectedAtaNotaTarget} onOpenChange={(open) => { if (!open) { setSelectedAtaAf(null); setSelectedAtaNotaTarget(null); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Criar Nota Fiscal da ARP</DialogTitle>
           </DialogHeader>
-          {selectedAtaAf && (
+          {selectedAtaNotaTarget && (
             <div className="space-y-4">
               <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
-                Saldo disponivel para nota: {getSaldoNota(selectedAtaAf as AtaAfWithNotasLike)}
+                Saldo disponivel para nota: {selectedAtaNotaTarget.kind === "af"
+                  ? getSaldoNota(selectedAtaAf as AtaAfWithNotasLike)
+                  : getSaldoNotaDireta(getEmpenhoById(selectedAtaNotaTarget.id))}
               </div>
               <div className="space-y-2">
                 <Label>Numero da Nota</Label>

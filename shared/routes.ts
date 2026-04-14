@@ -500,6 +500,12 @@ export const api = {
       input: insertAtaNotaFiscalSchema.omit({ ataAfId: true }),
       responses: { 201: ataNotaFiscalResponseSchema, 404: errorSchemas.notFound },
     },
+    createFromEmpenho: {
+      method: 'POST' as const,
+      path: '/api/ata-empenhos/:id/notas-fiscais' as const,
+      input: insertAtaNotaFiscalSchema.omit({ ataEmpenhoId: true, ataAfId: true }),
+      responses: { 201: ataNotaFiscalResponseSchema, 404: errorSchemas.notFound },
+    },
     sendToPayment: {
       method: 'PATCH' as const,
       path: '/api/ata-notas-fiscais/:id/enviar-pagamento' as const,

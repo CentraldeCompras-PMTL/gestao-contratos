@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { api } from "@shared/routes";
 import {
@@ -102,6 +102,7 @@ async function getPrePedidoWithRelations(id: string): Promise<AtaPrePedidoWithRe
       ficha: true,
       empenhos: {
         with: {
+          notasFiscais: true,
           afs: {
             with: {
               notasFiscais: true,
@@ -175,6 +176,7 @@ async function getAtaContratoWithRelations(id: string): Promise<AtaContratoWithR
       },
       empenhos: {
         with: {
+          notasFiscais: true,
           prePedido: {
             with: {
               ata: {
@@ -265,6 +267,7 @@ async function getAtaEmpenhoWithRelations(id: string): Promise<AtaEmpenhoWithRel
           notasFiscais: true,
         },
       },
+      notasFiscais: true,
     },
   }) as unknown as Promise<AtaEmpenhoWithRelations | undefined>;
 }
@@ -281,6 +284,13 @@ async function getEmpenhoAfQuantidade(ataEmpenhoId: string) {
     where: eq(ataAfs.ataEmpenhoId, ataEmpenhoId),
   }) as unknown as any[];
   return afs.reduce((sum: number, af: any) => sum + parseMoney(af.quantidadeAf, "Quantidade da AF"), 0);
+}
+
+async function getEmpenhoQuantidadeFaturadaDireta(ataEmpenhoId: string) {
+  const notas = await db.query.ataNotasFiscais.findMany({
+    where: and(eq(ataNotasFiscais.ataEmpenhoId, ataEmpenhoId), isNull(ataNotasFiscais.ataAfId)),
+  }) as unknown as any[];
+  return notas.reduce((sum: number, nota: any) => sum + parseMoney(nota.quantidadeNota, "Quantidade da nota"), 0);
 }
 
 async function getAfQuantidadeFaturada(ataAfId: string) {
@@ -839,6 +849,7 @@ export function registerAtaRegistroPrecoRoutes(app: Express, helpers: RouteHelpe
           ficha: true,
           empenhos: {
             with: {
+              notasFiscais: true,
               afs: {
                 with: {
                   notasFiscais: true,
@@ -943,6 +954,7 @@ export function registerAtaRegistroPrecoRoutes(app: Express, helpers: RouteHelpe
                   notasFiscais: true,
                 },
               },
+              notasFiscais: true,
             },
           },
         },
@@ -1305,7 +1317,8 @@ export function registerAtaRegistroPrecoRoutes(app: Express, helpers: RouteHelpe
         throw new HttpError(400, "A quantidade da AF deve ser maior que zero");
       }
       const afJaCriadas = await getEmpenhoAfQuantidade(empenho.id);
-      const saldoQuantidade = parseMoney(empenho.quantidadeEmpenhada, "Quantidade empenhada") - afJaCriadas;
+      const notasDiretas = await getEmpenhoQuantidadeFaturadaDireta(empenho.id);
+      const saldoQuantidade = parseMoney(empenho.quantidadeEmpenhada, "Quantidade empenhada") - afJaCriadas - notasDiretas;
       if (quantidadeAf > saldoQuantidade) {
         throw new HttpError(400, "A quantidade da AF excede o saldo do empenho");
       }
@@ -1351,6 +1364,7 @@ export function registerAtaRegistroPrecoRoutes(app: Express, helpers: RouteHelpe
       }
       const [nota] = await db.insert(ataNotasFiscais).values({
         ataContratoId: af.empenho.ataContratoId,
+        ataEmpenhoId: af.ataEmpenhoId,
         ataAfId: af.id,
         numeroNota: data.numeroNota,
         quantidadeNota: quantidadeNota.toFixed(2),
@@ -1359,6 +1373,43 @@ export function registerAtaRegistroPrecoRoutes(app: Express, helpers: RouteHelpe
         statusPagamento: "nota_recebida",
       }).returning();
       await helpers.audit(req, "create", "ata_nota_fiscal", nota.id, `Nota ${nota.numeroNota} criada para AF da ARP`);
+      res.status(201).json(nota);
+    } catch (error) {
+      res.status(helpers.getErrorStatus(error)).json({ message: helpers.getErrorMessage(error, "Erro ao criar nota fiscal da ARP") });
+    }
+  });
+
+  app.post(api.ataNotasFiscais.createFromEmpenho.path, helpers.requireAuth, async (req, res) => {
+    try {
+      if (!await userCanManageAtas(req, helpers)) {
+        throw new HttpError(403, "Acesso restrito ao modulo de atas");
+      }
+      const data = api.ataNotasFiscais.createFromEmpenho.input.parse(req.body);
+      const empenho = await getAtaEmpenhoWithRelations(req.params.id);
+      if (!empenho) {
+        return res.status(404).json({ message: "Empenho da ARP nao encontrado" });
+      }
+      const quantidadeNota = parseMoney(data.quantidadeNota, "Quantidade da nota");
+      if (quantidadeNota <= 0) {
+        throw new HttpError(400, "A quantidade da nota deve ser maior que zero");
+      }
+      const quantidadeAf = await getEmpenhoAfQuantidade(empenho.id);
+      const quantidadeJaFaturadaDireta = await getEmpenhoQuantidadeFaturadaDireta(empenho.id);
+      const saldoQuantidade = parseMoney(empenho.quantidadeEmpenhada, "Quantidade empenhada") - quantidadeAf - quantidadeJaFaturadaDireta;
+      if (quantidadeNota > saldoQuantidade) {
+        throw new HttpError(400, "A quantidade da nota excede o saldo disponivel do empenho");
+      }
+      const [nota] = await db.insert(ataNotasFiscais).values({
+        ataContratoId: empenho.ataContratoId,
+        ataEmpenhoId: empenho.id,
+        ataAfId: null,
+        numeroNota: data.numeroNota,
+        quantidadeNota: quantidadeNota.toFixed(2),
+        valorNota: parseMoney(data.valorNota, "Valor da nota").toFixed(2),
+        dataNota: data.dataNota,
+        statusPagamento: "nota_recebida",
+      }).returning();
+      await helpers.audit(req, "create", "ata_nota_fiscal", nota.id, `Nota ${nota.numeroNota} criada para empenho da ARP`);
       res.status(201).json(nota);
     } catch (error) {
       res.status(helpers.getErrorStatus(error)).json({ message: helpers.getErrorMessage(error, "Erro ao criar nota fiscal da ARP") });

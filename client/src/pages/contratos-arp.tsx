@@ -28,6 +28,9 @@ import type { AtaAf, AtaPrePedidoWithRelations } from "@shared/schema";
 
 type AtaAfWithNotasLike = any;
 type AtaEmpenhoWithRelationsLike = any;
+type AtaNotaTarget =
+  | { kind: "af"; id: string }
+  | { kind: "empenho"; id: string };
 
 const defaultContratoForm = {
   numeroContrato: "",
@@ -112,7 +115,7 @@ export default function ContratosArpPage() {
   const [contratoForm, setContratoForm] = useState(defaultContratoForm);
   const [empenhoDialogOpen, setEmpenhoDialogOpen] = useState<string | null>(null);
   const [afDialogOpen, setAfDialogOpen] = useState<string | null>(null);
-  const [notaDialogOpen, setNotaDialogOpen] = useState<any | null>(null);
+  const [notaDialogOpen, setNotaDialogOpen] = useState<AtaNotaTarget | null>(null);
   const [enviarPagamentoDialogOpen, setEnviarPagamentoDialogOpen] = useState<string | null>(null);
   const [registrarPagamentoDialogOpen, setRegistrarPagamentoDialogOpen] = useState<string | null>(null);
   const [empenhoForm, setEmpenhoForm] = useState(defaultEmpenhoForm);
@@ -216,8 +219,13 @@ export default function ContratosArpPage() {
     setAfForm(defaultAfForm);
   };
 
-  const handleOpenNota = (af: any) => {
-    setNotaDialogOpen(af);
+  const handleOpenNotaAf = (af: any) => {
+    setNotaDialogOpen({ kind: "af", id: af.id });
+    setNotaForm(defaultNotaForm);
+  };
+
+  const handleOpenNotaEmpenho = (empenho: any) => {
+    setNotaDialogOpen({ kind: "empenho", id: empenho.id });
     setNotaForm(defaultNotaForm);
   };
 
@@ -274,10 +282,9 @@ export default function ContratosArpPage() {
   const handleCreateNota = () => {
     if (!notaDialogOpen) return;
     createNotaFiscal.mutate(
-      {
-        ataAfId: notaDialogOpen.id,
-        data: notaForm,
-      },
+      notaDialogOpen.kind === "af"
+        ? { ataAfId: notaDialogOpen.id, data: notaForm }
+        : { ataEmpenhoId: notaDialogOpen.id, data: notaForm },
       {
         onSuccess: () => {
           toast({ title: "Cadastro realizado com sucesso!" });
@@ -543,7 +550,7 @@ export default function ContratosArpPage() {
                     </div>
                     <div className="rounded-lg border p-3">
                       <p className="text-muted-foreground">Notas da ARP</p>
-                      <p className="font-semibold">{contrato.empenhos.reduce((sum, empenho) => sum + empenho.afs.reduce((afSum, af) => afSum + (af.notasFiscais?.length ?? 0), 0), 0)}</p>
+                      <p className="font-semibold">{contrato.empenhos.reduce((sum, empenho) => sum + (empenho.notasFiscais?.length ?? 0) + empenho.afs.reduce((afSum, af) => afSum + (af.notasFiscais?.length ?? 0), 0), 0)}</p>
                     </div>
                     <div className="rounded-lg border p-3">
                       <p className="text-muted-foreground">Saldo dos Pre-pedidos</p>
@@ -586,17 +593,80 @@ export default function ContratosArpPage() {
                             <TableCell>{empenho.quantidadeEmpenhada}</TableCell>
                             <TableCell>{formatCurrency(empenho.valorEmpenho)}</TableCell>
                             <TableCell>{empenho.afs.length}</TableCell>
-                            <TableCell>{empenho.afs.reduce((sum, af) => sum + (af.notasFiscais?.length ?? 0), 0)}</TableCell>
+                            <TableCell>{(empenho.notasFiscais?.length ?? 0) + empenho.afs.reduce((sum, af) => sum + (af.notasFiscais?.length ?? 0), 0)}</TableCell>
                             <TableCell className="text-right">
-                              <Button variant="outline" size="sm" onClick={() => handleOpenAf(empenho.id)}>
-                                Nova AF
-                              </Button>
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => handleOpenNotaEmpenho(empenho)}>
+                                  Nova Nota
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => handleOpenAf(empenho.id)}>
+                                  Nova AF
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
                       )}
                     </TableBody>
                   </Table>
+
+                  {contrato.empenhos.some((empenho) => (empenho.notasFiscais?.length ?? 0) > 0) && (
+                    <div className="space-y-3">
+                      {contrato.empenhos
+                        .filter((empenho) => (empenho.notasFiscais?.length ?? 0) > 0)
+                        .map((empenho) => (
+                          <Card key={`notas-diretas-${empenho.id}`} className="border-border/50">
+                            <CardContent className="pt-4 space-y-3">
+                              <div>
+                                <p className="font-medium text-sm">Notas diretas do empenho {empenho.numeroEmpenho}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Pre-pedido {empenho.prePedido.item.codigoInterno} / {empenho.prePedido.ente.sigla}
+                                </p>
+                              </div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Nota</TableHead>
+                                    <TableHead>Data</TableHead>
+                                    <TableHead>Qtd.</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Processo</TableHead>
+                                    <TableHead>Valor</TableHead>
+                                    <TableHead className="text-right">Acao</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {empenho.notasFiscais!.map((nota) => (
+                                    <TableRow key={nota.id}>
+                                      <TableCell>{nota.numeroNota}</TableCell>
+                                      <TableCell>{new Date(`${nota.dataNota}T00:00:00`).toLocaleDateString("pt-BR")}</TableCell>
+                                      <TableCell>{nota.quantidadeNota}</TableCell>
+                                      <TableCell><Badge variant="secondary">{nota.statusPagamento}</Badge></TableCell>
+                                      <TableCell>{nota.numeroProcessoPagamento ?? "-"}</TableCell>
+                                      <TableCell>{formatCurrency(nota.valorNota)}</TableCell>
+                                      <TableCell className="text-right">
+                                        <div className="flex justify-end gap-2">
+                                          {nota.statusPagamento === "nota_recebida" && (
+                                            <Button variant="outline" size="sm" onClick={() => handleOpenEnviarPagamento(nota.id)}>
+                                              Enviar
+                                            </Button>
+                                          )}
+                                          {nota.statusPagamento === "aguardando_pagamento" && (
+                                            <Button variant="outline" size="sm" onClick={() => handleOpenRegistrarPagamento(nota.id)}>
+                                              Registrar Pagamento
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </CardContent>
+                          </Card>
+                        ))}
+                    </div>
+                  )}
 
                   {contrato.empenhos.some((empenho) => empenho.afs.length > 0) && (
                     <div className="space-y-3">
@@ -613,7 +683,7 @@ export default function ContratosArpPage() {
                                                     Empenho {empenho.numeroEmpenho} | Qtd. {af.quantidadeAf} | Entrega estimada {new Date(`${af.dataEstimadaEntrega}T00:00:00`).toLocaleDateString("pt-BR")}
                                                   </p>
                                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => handleOpenNota(af)}>
+                                <Button variant="outline" size="sm" onClick={() => handleOpenNotaAf(af)}>
                                   Nova Nota
                                 </Button>
                               </div>

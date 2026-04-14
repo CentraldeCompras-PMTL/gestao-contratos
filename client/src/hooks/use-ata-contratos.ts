@@ -120,9 +120,11 @@ export function useCreateAtaNotaFiscal() {
   return useMutation({
     mutationFn: async ({
       ataAfId,
+      ataEmpenhoId,
       data,
     }: {
-      ataAfId: string;
+      ataAfId?: string;
+      ataEmpenhoId?: string;
       data: {
         numeroNota: string;
         quantidadeNota: string;
@@ -130,9 +132,15 @@ export function useCreateAtaNotaFiscal() {
         dataNota: string;
       };
     }) => {
-      const url = buildUrl(api.ataNotasFiscais.create.path, { id: ataAfId });
+      const isViaAf = Boolean(ataAfId);
+      const route = isViaAf ? api.ataNotasFiscais.create : api.ataNotasFiscais.createFromEmpenho;
+      const id = ataAfId ?? ataEmpenhoId;
+      if (!id) {
+        throw new Error("Informe a origem da nota da ARP");
+      }
+      const url = buildUrl(route.path, { id });
       const res = await fetch(url, {
-        method: api.ataNotasFiscais.create.method,
+        method: route.method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(data),
