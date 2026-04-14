@@ -980,13 +980,24 @@ export async function registerRoutes(
 
   app.post(api.processos.addParticipante.path, requireAuth, async (req, res) => {
     try {
-      const { enteId } = api.processos.addParticipante.input.parse(req.body);
+      const { enteId, departamentoId } = api.processos.addParticipante.input.parse(req.body);
       const processo = await storage.getProcessoDigital(req.params.id);
       if (!processo) return res.status(404).json({ message: "Processo nao encontrado" });
       ensureEnteAccess(req, processo.enteId);
-      
-      await storage.addProcessoParticipante(processo.id, enteId);
-      await audit(req, "create", "processo_participante", processo.id, `Ente ${enteId}`);
+
+      const resolvedContext = await resolveDepartamentoContext(enteId, departamentoId ?? null);
+      await storage.addProcessoParticipante(
+        processo.id,
+        resolvedContext.enteId ?? enteId,
+        resolvedContext.departamentoId ?? null,
+      );
+      await audit(
+        req,
+        "create",
+        "processo_participante",
+        processo.id,
+        `Ente ${enteId}${resolvedContext.departamentoId ? ` / Departamento ${resolvedContext.departamentoId}` : ""}`,
+      );
       res.status(201).json({ message: "Participante adicionado" });
     } catch (e) {
       res.status(getErrorStatus(e)).json({ message: getErrorMessage(e, "Erro ao adicionar participante") });

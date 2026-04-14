@@ -145,6 +145,7 @@ export const processoParticipantes = pgTable("processo_participantes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   processoId: varchar("processo_id").references(() => processosDigitais.id).notNull(),
   enteId: varchar("ente_id").references(() => entes.id).notNull(),
+  departamentoId: varchar("departamento_id").references(() => departamentos.id),
   criadoEm: timestamp("criado_em").defaultNow(),
 });
 
@@ -569,6 +570,10 @@ export const processoParticipantesRelations = relations(processoParticipantes, (
     fields: [processoParticipantes.enteId],
     references: [entes.id],
   }),
+  departamento: one(departamentos, {
+    fields: [processoParticipantes.departamentoId],
+    references: [departamentos.id],
+  }),
 }));
 
 export const processoItensRelations = relations(processoItens, ({ one, many }) => ({
@@ -858,6 +863,7 @@ export const processoParticipanteResponseSchema = z.object({
   id: z.string(),
   processoId: z.string(),
   enteId: z.string(),
+  departamentoId: z.string().nullable().optional(),
   criadoEm: timestampSchema.nullable().optional(),
 });
 
@@ -1144,6 +1150,7 @@ export const faseContratacaoWithRelationsSchema = faseContratacaoResponseSchema.
 
 export const processoParticipanteWithEnteSchema = processoParticipanteResponseSchema.extend({
   ente: enteResponseSchema,
+  departamento: departamentoResponseSchema.nullable().optional(),
 });
 
 export const processoDotacaoWithFichaSchema = processoDotacaoResponseSchema.extend({

@@ -549,7 +549,7 @@ export const api = {
     addParticipante: {
       method: 'POST' as const,
       path: '/api/processos/:id/participantes' as const,
-      input: z.object({ enteId: z.string() }),
+      input: z.object({ enteId: z.string(), departamentoId: z.string().optional() }),
       responses: { 201: z.any() },
     },
     removeParticipante: {

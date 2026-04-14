@@ -121,12 +121,12 @@ export function useCreateFase() {
 export function useAddParticipante() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, enteId }: { id: string; enteId: string }) => {
+    mutationFn: async ({ id, enteId, departamentoId }: { id: string; enteId: string; departamentoId?: string }) => {
       const url = buildUrl(api.processos.addParticipante.path, { id });
       const res = await fetch(url, {
         method: api.processos.addParticipante.method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enteId }),
+        body: JSON.stringify({ enteId, departamentoId }),
         credentials: "include",
       });
       if (!res.ok) throw new Error(await readErrorMessage(res, "Erro ao adicionar participante"));

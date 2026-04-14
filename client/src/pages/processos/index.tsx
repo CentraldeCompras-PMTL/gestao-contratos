@@ -35,6 +35,8 @@ type FaseForm = {
   dataFim: string;
 };
 
+const ALL_DEPARTAMENTOS_VALUE = "__all_departamentos__";
+
 const defaultProcessoForm: ProcessoForm = {
   numeroProcessoDigital: "",
   objetoResumido: "",
@@ -203,7 +205,7 @@ export default function Processos() {
                 <Textarea value={procForm.descricao || ""} onChange={(e) => setProcForm({ ...procForm, descricao: e.target.value })} placeholder="Descricao adicional..." />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Secretaria Responsavel</label>
+                <label className="text-sm font-medium">Secretaria Gestora</label>
                 <Select value={procForm.enteId || ""} onValueChange={(value) => setProcForm({ ...procForm, enteId: value, departamentoId: "" })}>
                   <SelectTrigger><SelectValue placeholder="Selecione a secretaria..." /></SelectTrigger>
                   <SelectContent>
@@ -215,11 +217,19 @@ export default function Processos() {
               </div>
               {procForm.enteId && (
                 <div className="space-y-2 animate-in slide-in-from-top-2">
-                  <label className="text-sm font-medium">Departamento (Opcional)</label>
-                  <Select value={procForm.departamentoId || ""} onValueChange={(value) => setProcForm({ ...procForm, departamentoId: value })}>
+                  <label className="text-sm font-medium">Departamento Responsavel (Opcional)</label>
+                  <Select
+                    value={procForm.departamentoId || ALL_DEPARTAMENTOS_VALUE}
+                    onValueChange={(value) =>
+                      setProcForm({
+                        ...procForm,
+                        departamentoId: value === ALL_DEPARTAMENTOS_VALUE ? "" : value,
+                      })
+                    }
+                  >
                     <SelectTrigger><SelectValue placeholder="Todos os departamentos" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos os departamentos</SelectItem>
+                      <SelectItem value={ALL_DEPARTAMENTOS_VALUE}>Todos os departamentos</SelectItem>
                       {departamentos.filter(d => d.enteId === procForm.enteId).map((dep) => (
                         <SelectItem key={dep.id} value={dep.id}>{dep.nome}</SelectItem>
                       ))}

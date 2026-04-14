@@ -14,6 +14,7 @@ import {
   useSaveProcessoResultados,
 } from "@/hooks/use-processos";
 import { useEntes } from "@/hooks/use-entes";
+import { useDepartamentos } from "@/hooks/use-departamentos";
 import { useFontesRecurso } from "@/hooks/use-fontes-recurso";
 import { useFornecedores } from "@/hooks/use-fornecedores";
 import {
@@ -66,6 +67,7 @@ export default function ProcessoDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: processo, isLoading } = useProcesso(id ?? "");
   const { data: entes = [] } = useEntes();
+  const { data: departamentos = [] } = useDepartamentos();
   const { data: fontes = [] } = useFontesRecurso();
   const { data: fornecedores = [] } = useFornecedores();
   const { toast } = useToast();
@@ -85,6 +87,7 @@ export default function ProcessoDetail() {
   // States
   const [participanteDialog, setParticipanteDialog] = useState(false);
   const [selectedEnte, setSelectedEnte] = useState("");
+  const [selectedDepartamentoParticipante, setSelectedDepartamentoParticipante] = useState("");
 
   const [dotacaoDialog, setDotacaoDialog] = useState(false);
   const [dotacaoForm, setDotacaoForm] = useState({ fichaId: "", ano: "", valor: "" });
@@ -108,19 +111,38 @@ export default function ProcessoDetail() {
   
   const allParticipantes = useMemo(() => {
     if (!processo) return [];
-    // O gestor tambem e participante implicito
-    const gestor = processo.ente;
-    const parts = participantes.map((p: any) => p.ente);
-    if (gestor && !parts.find((p: any) => p.id === gestor.id)) {
-      return [gestor, ...parts];
-    }
-    return parts;
+    const gestor = processo.ente
+      ? [{
+          enteId: processo.ente.id,
+          id: processo.ente.id,
+          nome: processo.departamento?.nome ? `${processo.ente.nome} (${processo.departamento.nome})` : processo.ente.nome,
+          sigla: processo.ente.sigla,
+          departamentoId: processo.departamento?.id ?? null,
+          departamentoNome: processo.departamento?.nome ?? null,
+          isGestor: true,
+        }]
+      : [];
+
+    const parts = participantes.map((p: any) => ({
+      enteId: p.ente.id,
+      id: p.ente.id,
+      nome: p.departamento?.nome ? `${p.ente.nome} (${p.departamento.nome})` : p.ente.nome,
+      sigla: p.ente.sigla,
+      departamentoId: p.departamento?.id ?? null,
+      departamentoNome: p.departamento?.nome ?? null,
+      isGestor: false,
+    }));
+
+    return [...gestor, ...parts.filter((p) => p.enteId !== processo.enteId)];
   }, [processo, participantes]);
 
   const participantesIds = new Set(participantes.map((p: any) => p.enteId));
   const availableEntes = entes
     .filter((e) => typeof e.nome === "string" && typeof e.sigla === "string")
     .filter((e) => !participantesIds.has(e.id) && e.id !== processo?.enteId)
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  const availableParticipantDepartamentos = departamentos
+    .filter((departamento) => departamento.enteId === selectedEnte)
     .sort((a, b) => a.nome.localeCompare(b.nome));
   const selectedFonteData = fontes.find((f) => f.id === selectedFonte);
 
@@ -138,8 +160,13 @@ export default function ProcessoDetail() {
   // Handlers
   const handleAddParticipante = () => {
     if (!selectedEnte || !id) return;
-    addParticipante.mutate({ id, enteId: selectedEnte }, {
-      onSuccess: () => { toast({ title: "Secretaria adicionada!" }); setParticipanteDialog(false); setSelectedEnte(""); },
+    addParticipante.mutate({ id, enteId: selectedEnte, departamentoId: selectedDepartamentoParticipante || undefined }, {
+      onSuccess: () => {
+        toast({ title: "Secretaria participante adicionada!" });
+        setParticipanteDialog(false);
+        setSelectedEnte("");
+        setSelectedDepartamentoParticipante("");
+      },
       onError: (e) => toast({ variant: "destructive", title: "Erro", description: e instanceof Error ? e.message : "Erro" }),
     });
   };
@@ -395,7 +422,16 @@ export default function ProcessoDetail() {
                     Gerencie quais secretarias participam deste processo de compra
                   </CardDescription>
                 </div>
-                <Dialog open={participanteDialog} onOpenChange={(o) => { setParticipanteDialog(o); if (!o) setSelectedEnte(""); }}>
+                <Dialog
+                  open={participanteDialog}
+                  onOpenChange={(o) => {
+                    setParticipanteDialog(o);
+                    if (!o) {
+                      setSelectedEnte("");
+                      setSelectedDepartamentoParticipante("");
+                    }
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button size="sm" variant="outline" className="gap-2 bg-background hover:bg-violet-50 hover:text-violet-600 transition-colors">
                       <Plus className="w-4 h-4" /> Adicionar Secretaria
@@ -406,7 +442,13 @@ export default function ProcessoDetail() {
                     <div className="space-y-4 pt-4">
                       <div className="space-y-2">
                         <Label>Secretaria</Label>
-                        <Select value={selectedEnte} onValueChange={setSelectedEnte}>
+                        <Select
+                          value={selectedEnte}
+                          onValueChange={(value) => {
+                            setSelectedEnte(value);
+                            setSelectedDepartamentoParticipante("");
+                          }}
+                        >
                           <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                           <SelectContent>
                             {availableEntes.map((e: any) => (
@@ -415,6 +457,20 @@ export default function ProcessoDetail() {
                           </SelectContent>
                         </Select>
                       </div>
+                      {selectedEnte && (
+                        <div className="space-y-2">
+                          <Label>Departamento Responsavel (Opcional)</Label>
+                          <Select value={selectedDepartamentoParticipante || "__sem_departamento__"} onValueChange={(value) => setSelectedDepartamentoParticipante(value === "__sem_departamento__" ? "" : value)}>
+                            <SelectTrigger><SelectValue placeholder="Selecione o departamento..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__sem_departamento__">Sem departamento especifico</SelectItem>
+                              {availableParticipantDepartamentos.map((departamento: any) => (
+                                <SelectItem key={departamento.id} value={departamento.id}>{departamento.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setParticipanteDialog(false)}>Cancelar</Button>
@@ -447,7 +503,7 @@ export default function ProcessoDetail() {
                 ) : (
                   <div className="flex-1 space-y-3 p-6">
                     {allParticipantes.map((ente: any, idx: number) => (
-                      <div key={ente.id} className="flex items-center justify-between p-3 rounded-lg border bg-background/50 hover:bg-background transition-colors group">
+                      <div key={ente.enteId} className="flex items-center justify-between p-3 rounded-lg border bg-background/50 hover:bg-background transition-colors group">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold">
                             {idx + 1}
@@ -457,12 +513,12 @@ export default function ProcessoDetail() {
                             <p className="text-xs text-muted-foreground">{ente.id === processo.enteId ? "Órgão Gestor" : "Participante"}</p>
                           </div>
                         </div>
-                        {ente.id !== processo.enteId && (
+                        {!ente.isGestor && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleRemoveParticipante(ente.id)}
+                            onClick={() => handleRemoveParticipante(ente.enteId)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -720,19 +776,19 @@ export default function ProcessoDetail() {
                     </TableHeader>
                     <TableBody>
                       {allParticipantes.map((p: any) => (
-                        <TableRow key={p.id}>
+                        <TableRow key={p.enteId}>
                           <TableCell className="font-medium">
-                            <span className={p.id === processo.enteId ? "text-primary font-bold" : ""}>
+                            <span className={p.isGestor ? "text-primary font-bold" : ""}>
                               {p.nome}
-                              {p.id === processo.enteId && <Badge variant="outline" className="ml-2 text-[10px] h-4">Gestor</Badge>}
+                              {p.isGestor && <Badge variant="outline" className="ml-2 text-[10px] h-4">Gestor</Badge>}
                             </span>
                           </TableCell>
                           <TableCell>
                             <Input
                               className="text-right"
                               placeholder="0,00"
-                              value={quantidadesForm[p.id] || ""}
-                              onChange={(e) => setQuantidadesForm(f => ({ ...f, [p.id]: normalizeDecimalInput(e.target.value) }))}
+                              value={quantidadesForm[p.enteId] || ""}
+                              onChange={(e) => setQuantidadesForm(f => ({ ...f, [p.enteId]: normalizeDecimalInput(e.target.value) }))}
                             />
                           </TableCell>
                         </TableRow>

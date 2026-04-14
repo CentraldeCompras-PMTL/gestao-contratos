@@ -74,7 +74,7 @@ export interface IStorage {
   updateProcessoDigital(id: string, proc: Partial<InsertProcessoDigital>): Promise<ProcessoDigital>;
   syncFasesFromProcesso(processoId: string, data: { enteId?: string | null; departamentoId?: string | null }): Promise<void>;
   deleteProcessoDigital(id: string): Promise<ProcessoDigital | undefined>;
-  addProcessoParticipante(processoId: string, enteId: string): Promise<void>;
+  addProcessoParticipante(processoId: string, enteId: string, departamentoId?: string | null): Promise<void>;
   removeProcessoParticipante(processoId: string, enteId: string): Promise<void>;
   
   getFases(): Promise<(FaseContratacao & { fornecedor: Fornecedor; processoDigital: ProcessoDigital; ente: Ente | null; departamento: Departamento | null })[]>;
@@ -439,7 +439,7 @@ export class DatabaseStorage implements IStorage {
           with: { fornecedor: true, ente: true, departamento: true }
         },
         participantes: {
-          with: { ente: true }
+          with: { ente: true, departamento: true }
         },
         itens: {
           with: {
@@ -466,7 +466,7 @@ export class DatabaseStorage implements IStorage {
         ente: true,
         departamento: true,
         participantes: {
-          with: { ente: true },
+          with: { ente: true, departamento: true },
         },
         dotacoes: {
           with: { fichaOrcamentaria: true },
@@ -516,8 +516,22 @@ export class DatabaseStorage implements IStorage {
     return deleted;
   }
 
-  async addProcessoParticipante(processoId: string, enteId: string): Promise<void> {
-    await db.insert(processoParticipantes).values({ processoId, enteId }).onConflictDoNothing();
+  async addProcessoParticipante(processoId: string, enteId: string, departamentoId?: string | null): Promise<void> {
+    const existing = await db
+      .select()
+      .from(processoParticipantes)
+      .where(eq(processoParticipantes.processoId, processoId));
+
+    const target = existing.find((record) => record.enteId === enteId);
+    if (target) {
+      await db
+        .update(processoParticipantes)
+        .set({ departamentoId: departamentoId ?? null })
+        .where(eq(processoParticipantes.id, target.id));
+      return;
+    }
+
+    await db.insert(processoParticipantes).values({ processoId, enteId, departamentoId: departamentoId ?? null });
   }
 
   async removeProcessoParticipante(processoId: string, enteId: string): Promise<void> {
